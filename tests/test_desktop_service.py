@@ -584,3 +584,34 @@ async def test_concurrent_disconnect_requests_share_single_cleanup():
     assert service.flow_state == "disconnected"
     assert service.session is None
     await service.close()
+
+@pytest.mark.asyncio
+async def test_cancelled_disconnect_waiter_does_not_cancel_shared_cleanup():
+    """Shielded cleanup survives cancellation of one waiting caller."""
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        calls = 0
+        async def stop(self):
+            self.calls += 1
+            entered.set()
+            await release.wait()
+    session = Session()
+    service.session = session
+    service.flow_state = "connected"
+    first = asyncio.create_task(service.disconnect_flow())
+    await entered.wait()
+    second = asyncio.create_task(service.disconnect_flow())
+    await asyncio.sleep(0)
+    first.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await first
+    assert service.disconnect_task is not None
+    assert not service.disconnect_task.done()
+    assert session.calls == 1
+    release.set()
+    await second
+    assert session.calls == 1
+    assert service.flow_state == "disconnected"
+    assert service.session is None
+    await service.close()

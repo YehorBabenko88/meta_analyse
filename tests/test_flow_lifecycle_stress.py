@@ -117,6 +117,7 @@ async def test_close_with_twenty_active_instruments_and_pending_db_write(postgre
     from meta_analyse.raw_store import RawStore
     symbols,state = load_peers
     entered,release = threading.Event(),threading.Event()
+    stopping,release_stop = threading.Event(),threading.Event()
     original_save = RawStore.save
     def delayed_save(self,event):
         entered.set()
@@ -135,8 +136,22 @@ async def test_close_with_twenty_active_instruments_and_pending_db_write(postgre
         await until(app,lambda: entered.is_set() and window._snapshot.flow_state=='connected'
                     and state['active']==4 and expected <= state['topics'])
         if disconnect_first:
+            async def install_stop_gate():
+                session = window.service.session
+                original_stop = session.stop
+                async def gated_stop():
+                    stopping.set()
+                    await original_stop()
+                    # Hold ownership of cleanup even if Linux closes sockets
+                    # before the next 100ms GUI snapshot observes stopping.
+                    while not release_stop.is_set():
+                        await asyncio.sleep(.001)
+                session.stop = gated_stop
+            configured = window.schedule(install_stop_gate())
+            await until(app,configured.done)
+            configured.result()
             window.disconnect_flow()
-            await until(app,lambda: window._snapshot.flow_state=='stopping')
+            await until(app,stopping.is_set)
         before = time.perf_counter()
         window.close()
         assert time.perf_counter()-before < .25
@@ -151,11 +166,13 @@ async def test_close_with_twenty_active_instruments_and_pending_db_write(postgre
         timer.stop()
         assert window.worker.is_alive()
         release.set()
+        release_stop.set()
         await until(app,lambda: not window.worker.is_alive() and not window.isVisible())
         assert window.loop.is_closed()
         assert window.service.api.client.is_closed and window.service.exchange.client.is_closed
         assert not state['http_writes']
     finally:
         release.set()
+        release_stop.set()
         window.close()
         await until(app,lambda: not window.worker.is_alive())

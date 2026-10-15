@@ -175,6 +175,12 @@ class DesktopService:
         ended = next((task for task in tasks if task.done()), None)
         if ended is not None:
             exc = asyncio.CancelledError() if ended.cancelled() else ended.exception()
+            # A user-initiated disconnect takes precedence over health reporting.
+            # No await occurs between the ownership check and scheduling cleanup.
+            if self.flow_state != 'connected' or self.closing:
+                return
+            if self.disconnect_task is not None and not self.disconnect_task.done():
+                return
             await self.disconnect_flow()
             if self.closing:
                 return

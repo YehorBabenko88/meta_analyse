@@ -661,3 +661,25 @@ async def test_connect_is_rejected_once_close_begins(monkeypatch):
     assert service.flow_task is None
     assert service.session is None
     assert service.flow_state == "disconnected"
+
+@pytest.mark.asyncio
+async def test_close_continues_after_first_client_shutdown_failure():
+    """A broken API client must not prevent the exchange client from closing."""
+    service = DesktopService(None, lambda snapshot: None)
+    class FailingApi:
+        calls = 0
+        async def close(self):
+            self.calls += 1
+            raise OSError("token=secret")
+    class ExchangeClient:
+        closed = False
+        async def close(self):
+            self.closed = True
+    api, exchange = FailingApi(), ExchangeClient()
+    service.api, service.exchange = api, exchange
+    await service.close()
+    assert service.closing
+    assert api.calls == 1
+    assert exchange.closed
+    assert "Client shutdown failed (OSError)" in service.status
+    assert "secret" not in service.status

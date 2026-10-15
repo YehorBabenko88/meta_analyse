@@ -127,3 +127,44 @@ async def test_duplicate_disconnect_keeps_stopping_until_cleanup_finishes():
         await asyncio.gather(first, second)
     assert service.flow_state == 'disconnected'
     await service.close()
+
+@pytest.mark.asyncio
+async def test_collector_crash_invalidates_telemetry_and_allows_reconnect():
+    """A dead sibling must never leave old persisted counters visible."""
+    from meta_analyse.analysis_session import AnalysisSession
+    from meta_analyse.market_telemetry import MarketTelemetry
+    from types import SimpleNamespace
+    service = DesktopService(None, lambda snapshot: None)
+    service.runtime = SimpleNamespace(
+        symbols=[], paper=SimpleNamespace(fills=[], positions={}))
+    session = AnalysisSession(None, None, {'BTCUSDT': D('.5')})
+    session.market.telemetry.observe("orderbook", "BTCUSDT")
+    session.market.telemetry.gap("orderbook", "BTCUSDT")
+    async def fail():
+        raise OSError("password=should-never-leak")
+    crashed = asyncio.create_task(fail())
+    sibling = asyncio.create_task(asyncio.Event().wait())
+    session.raw.tasks.append(crashed)
+    session.market.tasks.append(sibling)
+    service.session, service.flow_state = session, "connected"
+    await asyncio.sleep(0)
+    assert service.snapshot().market_events == (("orderbook:BTCUSDT", 1),)
+    await service.check_health()
+    snapshot = service.snapshot()
+    assert snapshot.flow_state == "failed"
+    assert "OSError" in snapshot.flow_status
+    assert "password" not in snapshot.flow_status
+    assert snapshot.market_events == ()
+    assert snapshot.market_gaps == ()
+    assert snapshot.market_ages == ()
+    assert sibling.done()
+    assert service.session is None
+    # A new session's diagnostics are independent of the failed collector.
+    replacement = MarketTelemetry()
+    replacement.observe("orderbook", "ETHUSDT")
+    service.session = SimpleNamespace(market=SimpleNamespace(telemetry=replacement))
+    service.flow_state = "connected"
+    assert service.snapshot().market_events == (("orderbook:ETHUSDT", 1),)
+    service.session = None
+    service.flow_state = "disconnected"
+    await service.close()

@@ -29,7 +29,7 @@ class OrderBookStream:
                     book.reset()
                 await self.on_gap(symbols,"orderbook reconnect requires fresh snapshots")
                 async with websockets.connect(self.url,ping_interval=20,ping_timeout=15,
-                                              max_queue=1024,max_size=8_388_608) as ws:
+                                              max_queue=1024,max_size=8_388_608,close_timeout=2) as ws:
                     await ws.send(json.dumps({"op":"subscribe","args":[
                         f"orderbook.{self.depth}.{s}" for s in symbols]}))
                     delay=1

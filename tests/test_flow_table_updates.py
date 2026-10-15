@@ -78,3 +78,7 @@ def test_quality_style_updates_and_user_can_disable_sorting(flow_window):
     render(flow_window,[replace(r,quality='UNVERIFIED')])
     assert table.item(0,3).foreground().color().name() != original
     assert not table.isSortingEnabled()
+def test_numeric_sort_places_malformed_values_after_numbers(flow_window):
+    render(flow_window,[row('AAAUSDT','1a'),row('BBBUSDT','2'),row('CCCUSDT','10')])
+    flow_window.flow_table.sortItems(3,Qt.AscendingOrder)
+    assert [flow_window.flow_table.item(i,3).text() for i in range(3)] == ['2','10','1a']

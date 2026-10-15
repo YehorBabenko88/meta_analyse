@@ -100,7 +100,7 @@ class Runtime:
                 self.connection_id = eligible[0]["id"]
                 await self.refresh_watchlist()
                 port = int(self.api.base.rsplit(":", 1)[1])
-                async with websockets.connect(f"ws://127.0.0.1:{port}/", max_size=4_194_304) as socket:
+                async with websockets.connect(f"ws://127.0.0.1:{port}/", max_size=4_194_304, close_timeout=2) as socket:
                     for symbol in self.symbols:
                         await socket.send(json.dumps({"Type":"trade_subscribe", "Data":{
                             "connectionId":self.connection_id,"ticker":symbol,"zoomIndex":1}}))

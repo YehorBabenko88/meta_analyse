@@ -683,3 +683,26 @@ async def test_close_continues_after_first_client_shutdown_failure():
     assert exchange.closed
     assert "Client shutdown failed (OSError)" in service.status
     assert "secret" not in service.status
+
+@pytest.mark.asyncio
+async def test_close_records_second_client_shutdown_failure():
+    """An exchange shutdown error is sanitized after API cleanup succeeds."""
+    service = DesktopService(None, lambda snapshot: None)
+    class ApiClient:
+        closed = False
+        async def close(self):
+            self.closed = True
+    class FailingExchange:
+        calls = 0
+        async def close(self):
+            self.calls += 1
+            raise RuntimeError("api_key=private")
+    api, exchange = ApiClient(), FailingExchange()
+    service.api, service.exchange = api, exchange
+    await service.close()
+    assert service.closing
+    assert api.closed
+    assert exchange.calls == 1
+    assert "Client shutdown failed (RuntimeError)" in service.status
+    assert "api_key" not in service.status
+    assert "private" not in service.status

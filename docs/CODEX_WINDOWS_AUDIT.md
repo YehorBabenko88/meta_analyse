@@ -85,7 +85,7 @@ A subsequent Windows run (38764445003) exposed a smoke-fixture race: it disconne
 
 Final PR: [#3](https://github.com/YehorBabenko88/meta_analyse/pull/3), targeting `feat/metascalp-companion-v01`. Original draft PR #2 was closed without deleting its branch or history.
 
-Rebased CI runs: [pull_request 38764932706](https://github.com/YehorBabenko88/meta_analyse/actions/runs/38764932706), [push 38764858444](https://github.com/YehorBabenko88/meta_analyse/actions/runs/38764858444). Workflow artifacts `windows-test-evidence` and `linux-test-evidence` contain test output/JUnit and the Windows isolated PostgreSQL log. Final status is available on these runs and on the PR checks; Linux has passed while Windows is completing at report preparation.
+Rebased CI runs: [pull_request 38764932706](https://github.com/YehorBabenko88/meta_analyse/actions/runs/38764932706), [push 38764858444](https://github.com/YehorBabenko88/meta_analyse/actions/runs/38764858444). Workflow artifacts `windows-test-evidence` and `linux-test-evidence` contain test output/JUnit and the Windows isolated PostgreSQL log. **Both jobs passed** on the rebased code at `2776439d23ecfe06836bd6dd54d3c07cf56414d3`: Windows **96 passed**, Linux **95 passed / 1 Windows-only installer test skipped**. Both push and pull-request workflows succeeded. Documentation-only follow-up commits are also checked on the PR.
 
 Independent review confirmed conflict resolution retained upstream feed health, book callbacks, nine columns and quality-gated colors. No new actionable findings remained.
 
@@ -98,3 +98,5 @@ Independent review confirmed conflict resolution retained upstream feed health, 
 - Lock pins runtime/test resolution but does not hash every package or fully pin isolated setuptools build tooling. Source-checkout installation is not a signed standalone executable.
 - Metadata allows Python 3.11; this audit and CI target Python 3.12. Winget bootstrap was reviewed; explicit-interpreter installation was exercised.
 - Long-duration/high-rate load and excluded microstructure algorithms require separate evidence. Test PostgreSQL binaries are never deployed to production.
+
+Final source verification: `python -m compileall -q src`, `git diff --check`, repeated installer/import and `pip check` succeeded. Base branch69b45d0 was not modified, no merge performed, and original remote branch391afa1 remains unchanged.

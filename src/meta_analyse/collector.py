@@ -2,6 +2,7 @@
 from __future__ import annotations
 import asyncio
 import logging
+from datetime import datetime, timezone, timedelta
 from .exchange import BybitPublic
 from .instruments import instruments
 from .pipeline import RawPipeline
@@ -24,9 +25,14 @@ class CollectorService:
         try:
             while self.running:
                 try:
-                    ranked=await self.exchange.top_volatile(20)
                     metadata=await instruments(self.exchange)
-                    selected=tuple(s for s in ranked if s in metadata)
+                    now_ms=int(datetime.now(timezone.utc).timestamp()*1000)
+                    cutoff=now_ms-int(timedelta(days=30).total_seconds()*1000)
+                    eligible={s:meta for s,meta in metadata.items() if meta.launch_ms <= cutoff}
+                    # Rank the entire market before taking the first 20 eligible symbols.
+                    # Otherwise recently listed instruments can crowd out older ones.
+                    ranked=await self.exchange.top_volatile(len(metadata))
+                    selected=tuple(s for s in ranked if s in eligible)[:20]
                     if not selected:
                         raise RuntimeError("No eligible instruments with validated tick sizes")
                     if selected != self.current:

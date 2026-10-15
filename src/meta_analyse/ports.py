@@ -1,6 +1,7 @@
 """MetaScalp localhost REST client. No sockets are bound by this application."""
 from __future__ import annotations
 import httpx
+import asyncio
 
 class MetaScalp:
     def __init__(self):
@@ -24,9 +25,18 @@ class MetaScalp:
     async def request(self, method: str, endpoint: str, **kwargs):
         if not self.base:
             await self.discover()
-        resp = await self.client.request(method, self.base + endpoint, **kwargs)
-        resp.raise_for_status()
-        return resp.json() if resp.content else None
+        # Retry reads only: a timed-out POST/DELETE may already have executed.
+        attempts = 3 if method.upper() == "GET" else 1
+        for attempt in range(attempts):
+            try:
+                resp = await self.client.request(method, self.base + endpoint, **kwargs)
+                resp.raise_for_status()
+                return resp.json() if resp.content else None
+            except (httpx.TransportError, httpx.HTTPStatusError):
+                if attempt == attempts - 1:
+                    self.base = None
+                    raise
+                await asyncio.sleep(0.25 * (2 ** attempt))
 
     async def connections(self):
         return await self.request("GET", "/api/connections")

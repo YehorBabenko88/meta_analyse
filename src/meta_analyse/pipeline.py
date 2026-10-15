@@ -11,10 +11,13 @@ from .health import HealthTracker
 LOG = logging.getLogger(__name__)
 
 class RawPipeline:
-    def __init__(self, store, tick_sizes: dict[str, Decimal], on_closed=None):
+    def __init__(self, store, tick_sizes: dict[str, Decimal], on_closed=None, on_execution=None, on_gap=None):
         self.db = RawStore(store)
         self.aggregators = {s: ExecutionAggregator(tick) for s, tick in tick_sizes.items()}
         self.on_closed = on_closed
+        self.on_execution = on_execution
+        self.on_gap = on_gap
+        self._locks = {symbol: asyncio.Lock() for symbol in tick_sizes}
         self.health = HealthTracker()
         self.stop_event = asyncio.Event()
         self.streams = []
@@ -24,26 +27,39 @@ class RawPipeline:
         aggregator = self.aggregators.get(event.symbol)
         if aggregator is None:
             raise ValueError("unknown symbol or tick size")
-        # Persist first. Only a durable, newly inserted execution enters calculations.
-        inserted = await asyncio.to_thread(self.db.save, event)
-        if not inserted:
-            return
-        self.health.record(event)
-        before = len(aggregator.closed)
-        aggregator.accept(event)
-        for symbol, minute, quality in aggregator.closed[before:]:
-            if quality != "observed_contiguous":
-                continue
-            if self.on_closed:
-                await self.on_closed(symbol, minute, quality)
+        async with self._locks[event.symbol]:
+            # Serialize persistence, aggregation and callbacks per instrument.
+            # DB errors propagate; no execution is considered observed before commit.
+            try:
+                inserted = await asyncio.to_thread(self.db.save, event)
+            except Exception:
+                aggregator.gap([event.symbol], "database_error")
+                if self.on_gap:
+                    await self.on_gap([event.symbol], "database_error")
+                raise
+            if not inserted:
+                return
+            self.health.record(event)
+            before = len(aggregator.closed)
+            aggregator.accept(event)
+            quality = aggregator.quality.get(event.symbol)
+            contiguous = bool(quality and quality.contiguous)
+            if self.on_execution:
+                await self.on_execution(event, contiguous=contiguous)
+            for symbol, minute, status in aggregator.closed[before:]:
+                if status == "observed_contiguous" and self.on_closed:
+                    await self.on_closed(symbol, minute, status)
 
     async def gap(self, symbols, reason):
-        # Fail closed if DB is unavailable; never report continuity.
-        await asyncio.to_thread(self.db.gap, symbols, reason)
+        # Mark in-memory continuity invalid even when database is unavailable.
         for symbol in symbols:
-            self.health.gap(symbol)
             if symbol in self.aggregators:
-                self.aggregators[symbol].gap([symbol], reason)
+                async with self._locks[symbol]:
+                    self.aggregators[symbol].gap([symbol], reason)
+                    self.health.gap(symbol)
+        if self.on_gap:
+            await self.on_gap(symbols, reason)
+        await asyncio.to_thread(self.db.gap, symbols, reason)
 
     async def start(self):
         await asyncio.to_thread(self.db.initialize)

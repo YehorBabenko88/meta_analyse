@@ -162,8 +162,9 @@ class Window(QWidget):
             if len(tick_sizes) != len(symbols):
                 raise ValueError("Missing tick sizes for selected symbols")
             session = AnalysisSession(self.store, self.exchange, tick_sizes,
-                                      on_update=self.flow_bridge.update,
-                                      on_gap=self._invalidate_flow)
+                                      on_update=self._flow_execution,
+                                      on_gap=self._invalidate_flow,
+                                      on_book_update=self._flow_book)
             if level > 0:
                 for symbol in symbols:
                     session.select_level(symbol, level)
@@ -175,6 +176,13 @@ class Window(QWidget):
             print("Flow startup failed:", exc, file=sys.stderr)
             self.flow_start_error = str(exc)
             self.flow_starting = False
+
+    async def _flow_execution(self,symbol,footprint,tape):
+        await self.flow_bridge.update(symbol,footprint,tape)
+        self.flow_bridge.trade_observed(symbol)
+
+    async def _flow_book(self,symbol):
+        self.flow_bridge.book_observed(symbol)
 
     async def _invalidate_flow(self, symbols, reason):
         self.flow_bridge.invalidate(symbols)

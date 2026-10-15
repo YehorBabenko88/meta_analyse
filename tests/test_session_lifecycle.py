@@ -97,3 +97,22 @@ async def test_concurrent_starts_allocate_only_one_session():
         assert len(raw.tasks) == len(market.tasks) == 1
     finally:
         await s.stop()
+@pytest.mark.asyncio
+async def test_stop_cannot_be_overtaken_by_a_duplicate_start():
+    raw, market = Collector(asyncio.Event()), Collector()
+    s = session(raw, market)
+    a = asyncio.create_task(s.start())
+    await raw.entered.wait()
+    b = asyncio.create_task(s.start())
+    await asyncio.sleep(0)
+    stop = asyncio.create_task(s.stop())
+    try:
+        await asyncio.wait_for(asyncio.shield(stop), .5)
+        assert not s.started and not raw.tasks and not market.tasks
+        assert isinstance((await asyncio.gather(b, return_exceptions=True))[0], RuntimeError)
+    finally:
+        for task in (a, b, stop):
+            task.cancel()
+        await asyncio.gather(a, b, stop, return_exceptions=True)
+        await raw.stop()
+        await market.stop()

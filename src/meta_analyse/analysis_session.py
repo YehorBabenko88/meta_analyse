@@ -42,6 +42,10 @@ class AnalysisSession:
             await self.on_gap(symbols,reason)
 
     async def start(self):
+        # Reject queued starts: otherwise a waiting start can acquire the lock
+        # between cancellation of the first startup and stop() cleanup.
+        if self._lifecycle_lock.locked():
+            raise RuntimeError("session lifecycle operation already in progress")
         async with self._lifecycle_lock:
             if self.started:
                 raise RuntimeError("session already running")

@@ -216,3 +216,32 @@ async def test_idle_disconnect_is_idempotent_and_does_not_replace_cleanup_task()
     assert service.flow_task is None
     assert service.flow_state == "disconnected"
     await service.close()
+
+@pytest.mark.asyncio
+async def test_close_drains_monitor_and_clients_if_runtime_stop_raises():
+    """Shutdown failures must not skip unrelated resource cleanup."""
+    service = DesktopService(None, lambda snapshot: None)
+    events = []
+    class BadRuntime:
+        def stop(self):
+            events.append("runtime-stop")
+            raise RuntimeError("password=do-not-show")
+    class Client:
+        def __init__(self, name):
+            self.name = name
+        async def close(self):
+            events.append(self.name)
+    async def monitor():
+        try:
+            await asyncio.Event().wait()
+        finally:
+            events.append("monitor-drained")
+    service.runtime = BadRuntime()
+    service.api, service.exchange = Client("api-closed"), Client("exchange-closed")
+    service.monitor_task = asyncio.create_task(monitor())
+    await asyncio.sleep(0)
+    await service.close()
+    assert events == ["runtime-stop", "monitor-drained", "api-closed", "exchange-closed"]
+    assert service.monitor_task.done()
+    assert "RuntimeError" in service.status
+    assert "password" not in service.status

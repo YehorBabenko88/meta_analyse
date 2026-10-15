@@ -38,20 +38,21 @@ class ExecutionAggregator:
             q.out_of_order += 1
             q.contiguous = False
             q.reason = "out_of_order"
+            self.minutes.pop(e.symbol, None)
             return None
         timestamp = datetime.fromtimestamp(e.timestamp_ms / 1000, timezone.utc)
         t = Trade(e.symbol, timestamp, e.price, e.quantity, e.taker_side)
         current = self.minutes.get(e.symbol)
         slot = floor_minute(timestamp)
         if current and current.start != slot:
-            if slot - current.start == __import__('datetime').timedelta(minutes=1) and q.contiguous:
+            if slot - current.start == __import__('datetime').timedelta(minutes=1) and q.contiguous and current.complete:
                 self.closed.append((e.symbol, current, "observed_contiguous"))
             else:
                 q.contiguous = False
                 q.reason = "minute_gap"
             current = None
         if current is None:
-            current = new_minute(t, self.tick_size)
+            current = new_minute(t, self.tick_size, complete=False)
             self.minutes[e.symbol] = current
         else:
             current.add(t)

@@ -5,13 +5,70 @@ on:
 permissions:
   contents: read
 jobs:
-  test:
+  windows:
     runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONASYNCIODEBUG: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -e ".[test]"
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - run: python -m pip install -c requirements.lock -e ".[test]"
+      - run: python -m pip check
+      - name: Windows Qt and disposable PostgreSQL integration
+        shell: pwsh
+        run: ./scripts/test-windows.ps1
+      - name: Verify repeated installation
+        shell: pwsh
+        run: |
+          ./install.ps1 -Python (Get-Command python).Source -InstallRoot "$env:RUNNER_TEMP\installer target"
+          ./install.ps1 -Python (Get-Command python).Source -InstallRoot "$env:RUNNER_TEMP\installer target"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-test-evidence
+          path: |
+            ${{ runner.temp }}/meta-analyse-ci/tests.log
+            ${{ runner.temp }}/meta-analyse-ci/tests.xml
+            ${{ runner.temp }}/meta-analyse-ci/postgresql.log
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONASYNCIODEBUG: '1'
+      META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
+      - run: python -m pip install -c requirements.lock -e ".[test]"
+      - run: python -m pip check
       - run: python -m compileall -q src
-      - run: python -m pytest -q
+      - run: python -m pytest -q --junitxml=tests.xml | tee tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-test-evidence
+          path: |
+            tests.xml
+            tests.log

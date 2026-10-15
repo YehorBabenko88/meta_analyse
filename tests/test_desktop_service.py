@@ -325,3 +325,31 @@ async def test_collector_normal_exit_or_cancellation_marks_feed_failed(mode, exp
     assert service.session is None
     assert sibling.done()
     await service.close()
+
+@pytest.mark.asyncio
+async def test_close_during_collector_failure_does_not_restore_failed_state():
+    """An in-flight health check must not override final shutdown status."""
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        def __init__(self):
+            async def failed():
+                raise RuntimeError("collector failed")
+            self.raw = type("Raw", (), {"tasks": [asyncio.create_task(failed())]})()
+            self.market = type("Market", (), {"tasks": []})()
+        async def stop(self):
+            entered.set()
+            await release.wait()
+    service.session = Session()
+    service.flow_state = "connected"
+    await asyncio.sleep(0)
+    health = asyncio.create_task(service.check_health())
+    await entered.wait()
+    closing = asyncio.create_task(service.close())
+    await asyncio.sleep(0)
+    assert service.closing
+    release.set()
+    await asyncio.gather(health, closing)
+    assert service.flow_state == "disconnected"
+    assert service.flow_status.startswith("Disconnected")
+    assert service.session is None

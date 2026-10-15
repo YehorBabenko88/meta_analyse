@@ -31,7 +31,10 @@ class DesktopService:
 
     def initialize(self):
         self.api, self.exchange = MetaScalp(), BybitPublic()
-        self.runtime = Runtime(self.api, self.exchange, self.store)
+        self.runtime = Runtime(self.api, self.exchange, self.store, on_status=self._monitor_status)
+
+    def _monitor_status(self, text):
+        self.status = text
 
     def error(self, operation, exc):
         # Exception text may contain DSNs, passwords or HTTP payloads.

@@ -97,6 +97,14 @@ class DesktopService:
             self.flow_state = 'connected'
             self.flow_status = 'Collectors running — feed health and historical continuity NOT verified'
         except asyncio.CancelledError:
+            # Cancellation can interrupt startup after collectors allocated tasks.
+            # Release them before propagating cancellation to the disconnect owner.
+            session, self.session = self.session, None
+            if session is not None:
+                try:
+                    await session.stop()
+                except Exception as cleanup_exc:
+                    self.error('Cancelled flow cleanup', cleanup_exc)
             raise
         except Exception as exc:
             self.bridge.invalidate(symbols)

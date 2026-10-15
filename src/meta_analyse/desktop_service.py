@@ -73,6 +73,7 @@ class DesktopService:
 
     def connect_flow(self, symbols, level):
         if (self.closing or self.flow_state in ('connecting', 'connected', 'stopping')
+                or self.flow_task is not None and not self.flow_task.done()
                 or self.disconnect_task is not None and not self.disconnect_task.done()):
             return
         self.flow_state = 'connecting'

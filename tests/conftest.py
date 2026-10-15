@@ -28,3 +28,23 @@ def postgres_store():
         with psycopg.connect(admin_dsn, autocommit=True) as conn:
             conn.execute(sql.SQL('DROP DATABASE {} WITH (FORCE)').format(sql.Identifier(name)))
             conn.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(role)))
+
+
+@pytest.fixture(scope='session')
+def app():
+    # Keep one application alive until every Qt test and all worker threads end.
+    # Delete widgets on the Qt thread before interpreter shutdown; allowing Python
+    # cycle collection to do this after QApplication teardown aborts on Windows.
+    import gc
+    from PySide6.QtCore import QCoreApplication, QEvent
+    from PySide6.QtWidgets import QApplication
+    application = QApplication.instance() or QApplication([])
+    yield application
+    for widget in application.topLevelWidgets():
+        widget.close()
+        widget.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    application.processEvents()
+    gc.collect()
+    import shiboken6
+    shiboken6.delete(application)

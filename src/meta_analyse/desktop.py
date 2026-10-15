@@ -4,6 +4,7 @@ import asyncio
 import os
 import sys
 import threading
+from dataclasses import replace
 from PySide6.QtCore import QTimer, QObject, Signal, Slot, Qt
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLabel, QListWidget, QMessageBox, QDoubleSpinBox, QCheckBox, QTabWidget,
@@ -26,6 +27,8 @@ class Window(QWidget):
         self.resize(1000, 690)
         self.loop = asyncio.new_event_loop()
         self._closing = False
+        self._submission_lock = threading.Lock()
+        self._worker_stopped = threading.Event()
         self._closed = False
         self._snapshot = DesktopSnapshot()
         self.signals = WorkerSignals(self)
@@ -106,14 +109,23 @@ class Window(QWidget):
         self.refresh()
     def _thread_main(self):
         asyncio.set_event_loop(self.loop)
-        self.service.initialize()
-        self.loop.create_task(self.service.publish_loop())
         try:
+            self.service.initialize()
+            self.loop.create_task(self.service.publish_loop())
             self.loop.run_forever()
+        except Exception as exc:
+            self.signals.error.emit(f'Worker initialization failed ({type(exc).__name__})')
         finally:
-            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-            self.loop.run_until_complete(self.loop.shutdown_default_executor())
-            self.loop.close()
+            # Block submissions before draining, including construction failure.
+            with self._submission_lock:
+                self._worker_stopped.set()
+            try:
+                self.loop.run_until_complete(self._shutdown())
+                self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+                self.loop.run_until_complete(self.loop.shutdown_default_executor())
+            finally:
+                self.loop.close()
+
     @Slot(object)
     def _receive_snapshot(self, snapshot):
         if not self._closing:
@@ -122,12 +134,14 @@ class Window(QWidget):
     @Slot(str)
     def _receive_error(self, message):
         if not self._closing:
+            self._snapshot = replace(self._snapshot, status=message)
             self.status.setText(message)
     def schedule(self, task):
-        if self._closing:
-            task.close()
-            return None
-        future = asyncio.run_coroutine_threadsafe(task, self.loop)
+        with self._submission_lock:
+            if self._closing or self._worker_stopped.is_set():
+                task.close()
+                return None
+            future = asyncio.run_coroutine_threadsafe(task, self.loop)
         def done(f):
             if f.cancelled():
                 return
@@ -211,7 +225,8 @@ class Window(QWidget):
         self._closed = True
         self.close()
     def closeEvent(self, event):
-        if self._closed:
+        if self._closed or self._worker_stopped.is_set() and not self.worker.is_alive():
+            self.timer.stop()
             event.accept()
             return
         event.ignore()
@@ -224,8 +239,10 @@ class Window(QWidget):
         self.timer.timeout.disconnect()
         self.timer.timeout.connect(self._finish_close)
         self.timer.start(20)
-        future = asyncio.run_coroutine_threadsafe(self._shutdown(), self.loop)
-        future.add_done_callback(lambda _f: self.loop.call_soon_threadsafe(self.loop.stop))
+        with self._submission_lock:
+            if not self._worker_stopped.is_set():
+                future = asyncio.run_coroutine_threadsafe(self._shutdown(), self.loop)
+                future.add_done_callback(lambda _f: self.loop.call_soon_threadsafe(self.loop.stop))
 
 
 def main():

@@ -189,7 +189,10 @@ class DesktopService:
         self.closing = True
         await self.disconnect_flow()
         if self.runtime:
-            self.runtime.stop()
+            try:
+                self.runtime.stop()
+            except Exception as exc:
+                self.error('Monitor shutdown', exc)
         if self.monitor_task:
             self.monitor_task.cancel()
             await asyncio.gather(self.monitor_task, return_exceptions=True)

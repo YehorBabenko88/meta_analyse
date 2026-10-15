@@ -75,6 +75,8 @@ class Window(QWidget):
         self.analysis = AnalysisCoordinator({})
         self.flow_bridge = FlowBridge()
         self.live_session = None
+        self.flow_start_error = None
+        self.flow_starting = False
         flow = QWidget()
         flow_layout = QVBoxLayout(flow)
         flow_layout.addWidget(QLabel("Order flow diagnostics — read-only; data are unverified until live feeds connect"))
@@ -143,6 +145,8 @@ class Window(QWidget):
         if self.live_session is not None:
             QMessageBox.information(self, "Already running", "Flow session is already running.")
             return
+        self.flow_start_error = None
+        self.flow_starting = True
         self.connect_flow_button.setEnabled(False)
         self.flow_status.setText("Connecting; historical continuity remains unverified")
         self.schedule(self._start_flow(selected, Decimal(str(self.level_price.value()))))
@@ -162,10 +166,12 @@ class Window(QWidget):
                     session.select_level(symbol, level)
             await session.start()
             self.live_session = session
+            self.flow_starting = False
         except Exception as exc:
             self.flow_bridge.invalidate(symbols)
             print("Flow startup failed:", exc, file=sys.stderr)
             self.flow_start_error = str(exc)
+            self.flow_starting = False
 
     async def _invalidate_flow(self, symbols, reason):
         self.flow_bridge.invalidate(symbols)
@@ -190,6 +196,11 @@ class Window(QWidget):
             self.list.addItems(self.runtime.symbols)
             for i in range(self.list.count()):
                 self.list.item(i).setSelected(self.list.item(i).text() in selected)
+        if self.flow_start_error:
+            self.flow_status.setText("Connection failed: " + self.flow_start_error[:180])
+            self.connect_flow_button.setEnabled(True)
+        elif self.live_session is not None:
+            self.flow_status.setText("Streams connected — historical continuity NOT verified")
         rows = self.flow_bridge.snapshot()
         self.flow_table.setSortingEnabled(False)
         self.flow_table.setRowCount(len(rows))

@@ -19,6 +19,7 @@ class DesktopSnapshot:
     status: str = 'Standby; no exchange orders are ever sent'
     market_events: tuple = ()
     market_gaps: tuple = ()
+    market_ages: tuple = ()
 
 class DesktopService:
     def __init__(self, store, publish):
@@ -159,7 +160,8 @@ class DesktopService:
                      and hasattr(self.session.market, 'telemetry') else None)
         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
                                self.flow_state, self.flow_status, self.status,
-                               telemetry.events if telemetry else (), telemetry.gaps if telemetry else ())
+                               telemetry.events if telemetry else (), telemetry.gaps if telemetry else (),
+                               self.session.market.telemetry.ages() if telemetry else ())
 
     async def check_health(self):
         if self.flow_state != 'connected' or self.session is None:

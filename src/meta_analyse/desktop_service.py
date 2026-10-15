@@ -154,7 +154,9 @@ class DesktopService:
             stats.append((symbol, str(len(fills)), str(sum(f.net > 0 for f in fills)),
                           str(round(sum((f.net for f in fills), Decimal(0)), 4)),
                           engine.positions[symbol].side if symbol in engine.positions else '-'))
-        telemetry = self.session.market.telemetry.snapshot() if self.session is not None and hasattr(self.session.market, 'telemetry') else None
+        telemetry = (self.session.market.telemetry.snapshot()
+                     if self.flow_state == 'connected' and self.session is not None
+                     and hasattr(self.session.market, 'telemetry') else None)
         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
                                self.flow_state, self.flow_status, self.status,
                                telemetry.events if telemetry else (), telemetry.gaps if telemetry else ())

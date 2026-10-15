@@ -40,3 +40,32 @@ async def test_diagnostics_color_transitions_and_disconnect(monkeypatch, app):
     finally:
         window.close()
         await until(app, lambda: not window.worker.is_alive() and not window.isVisible())
+
+@pytest.mark.asyncio
+async def test_diagnostics_sorting_preserves_feed_identity(monkeypatch, app):
+    monkeypatch.delenv("META_ANALYSE_DSN", raising=False)
+    window = Window()
+    window.show()
+    try:
+        await until(app, lambda: window.worker.is_alive())
+        window._snapshot = DesktopSnapshot(
+            flow_state="connected",
+            market_events=(("orderbook:BTCUSDT", 5), ("orderbook:ETHUSDT", 9)),
+            market_ages=(("orderbook:BTCUSDT", 0.5), ("orderbook:ETHUSDT", 12.0)),
+        )
+        window.repaint_state()
+        table = window.diagnostics_table
+        table.sortItems(0, 1)  # Reverse symbol order.
+        window._snapshot = replace(window._snapshot,
+            market_events=(("orderbook:BTCUSDT", 7), ("orderbook:ETHUSDT", 10)),
+            market_ages=(("orderbook:BTCUSDT", 11.0), ("orderbook:ETHUSDT", 1.0)))
+        window.repaint_state()
+        rows = {table.item(i, 0).text(): i for i in range(table.rowCount())}
+        assert table.item(rows["orderbook:BTCUSDT"], 1).text() == "7"
+        assert table.item(rows["orderbook:BTCUSDT"], 4).text() == "STALE"
+        assert table.item(rows["orderbook:ETHUSDT"], 1).text() == "10"
+        assert table.item(rows["orderbook:ETHUSDT"], 4).text() == "FRESH"
+        assert table.item(rows["orderbook:BTCUSDT"], 4).foreground().color().name() == freshness_colors(11.0)[0].lower()
+    finally:
+        window.close()
+        await until(app, lambda: not window.worker.is_alive() and not window.isVisible())

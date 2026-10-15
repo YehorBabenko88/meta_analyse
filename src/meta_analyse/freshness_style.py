@@ -1,5 +1,5 @@
 """Palette for locally observed feed freshness (not exchange latency)."""
-from .freshness import freshness_state
+from .freshness import freshness_state, freshness_for_feed
 
 FRESHNESS_COLORS = {
     "FRESH": ("#61D095", "#153529"),
@@ -10,3 +10,6 @@ FRESHNESS_COLORS = {
 
 def freshness_colors(age_seconds):
     return FRESHNESS_COLORS[freshness_state(age_seconds)]
+
+def freshness_colors_for_feed(feed_key, age_seconds):
+    return FRESHNESS_COLORS[freshness_for_feed(feed_key, age_seconds)]

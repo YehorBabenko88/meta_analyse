@@ -83,3 +83,23 @@ async def test_failed_collector_is_reported_and_other_tasks_are_drained():
     assert 'hidden' not in service.snapshot().flow_status
     assert sibling.done()
     await service.close()
+@pytest.mark.asyncio
+async def test_monitor_reports_offline_retries_without_exposing_error_text():
+    from meta_analyse.runtime import Runtime
+    statuses = []
+    class Offline:
+        async def discover(self):
+            raise ConnectionError('password=hidden')
+    runtime = Runtime(Offline(), None, on_status=statuses.append)
+    task = asyncio.create_task(runtime.run())
+    try:
+        for _ in range(20):
+            if statuses:
+                break
+            await asyncio.sleep(.01)
+        assert statuses and 'ConnectionError' in statuses[-1]
+        assert 'hidden' not in statuses[-1]
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    assert not runtime.running

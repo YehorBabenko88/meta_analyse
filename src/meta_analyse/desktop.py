@@ -96,6 +96,9 @@ class Window(QWidget):
         self.connect_flow_button = QPushButton("Connect selected flow")
         self.connect_flow_button.clicked.connect(self.connect_flow)
         controls_row.addWidget(self.connect_flow_button)
+        self.stop_flow_button = QPushButton("Disconnect flow")
+        self.stop_flow_button.clicked.connect(self.disconnect_flow)
+        controls_row.addWidget(self.stop_flow_button)
         flow_layout.addLayout(controls_row)
         self.tabs.addTab(flow, "Order flow")
         self.timer = QTimer(self)
@@ -176,6 +179,24 @@ class Window(QWidget):
     async def _invalidate_flow(self, symbols, reason):
         self.flow_bridge.invalidate(symbols)
 
+    def disconnect_flow(self):
+        if self.live_session is None:
+            self.flow_status.setText("No active flow session")
+            self.connect_flow_button.setEnabled(True)
+            return
+        self.schedule(self._stop_flow())
+
+    async def _stop_flow(self):
+        session = self.live_session
+        if session is None:
+            return
+        try:
+            await session.stop()
+        finally:
+            self.live_session = None
+            self.flow_bridge.invalidate(list(session.analysis.tapes))
+            self.flow_start_error = None
+
     def toggle_paper(self, enabled):
         self.runtime.paper.enabled = enabled
 
@@ -201,6 +222,9 @@ class Window(QWidget):
             self.connect_flow_button.setEnabled(True)
         elif self.live_session is not None:
             self.flow_status.setText("Streams connected — historical continuity NOT verified")
+        elif not self.flow_starting:
+            self.connect_flow_button.setEnabled(True)
+            self.flow_status.setText("Disconnected — data marked UNVERIFIED")
         rows = self.flow_bridge.snapshot()
         self.flow_table.setSortingEnabled(False)
         self.flow_table.setRowCount(len(rows))

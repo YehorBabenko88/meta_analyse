@@ -120,6 +120,13 @@ class Window(QWidget):
         controls_row.addWidget(self.stop_flow_button)
         flow_layout.addLayout(controls_row)
         self.tabs.addTab(flow, "Order flow")
+        diagnostics = QWidget()
+        diagnostics_layout = QVBoxLayout(diagnostics)
+        diagnostics_layout.addWidget(QLabel("Persisted feed events and reported gaps; not proof of exchange completeness"))
+        self.diagnostics_table = QTableWidget(0, 3)
+        self.diagnostics_table.setHorizontalHeaderLabels(["Feed / symbol", "Persisted events", "Reported gaps"])
+        diagnostics_layout.addWidget(self.diagnostics_table)
+        self.tabs.addTab(diagnostics, "Diagnostics")
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.repaint_state)
         self.timer.start(1500)
@@ -251,6 +258,25 @@ class Window(QWidget):
             finally:
                 table.setSortingEnabled(sorting)
                 table.setUpdatesEnabled(updates)
+        event_counts = dict(self._snapshot.market_events)
+        gap_counts = dict(self._snapshot.market_gaps)
+        keys = sorted(event_counts.keys() | gap_counts.keys())
+        if self.diagnostics_table.rowCount() != len(keys) or any(
+            self.diagnostics_table.item(i, 0) is None or
+            self.diagnostics_table.item(i, 0).text() != key
+            for i, key in enumerate(keys)
+        ):
+            self.diagnostics_table.setRowCount(len(keys))
+            for i, key in enumerate(keys):
+                self.diagnostics_table.setItem(i, 0, QTableWidgetItem(key))
+        for i, key in enumerate(keys):
+            for col, value in ((1, str(event_counts.get(key, 0))),
+                               (2, str(gap_counts.get(key, 0)))):
+                item = self.diagnostics_table.item(i, col)
+                if item is None:
+                    self.diagnostics_table.setItem(i, col, QTableWidgetItem(value))
+                elif item.text() != value:
+                    item.setText(value)
         self.stats.setRowCount(len(self._snapshot.stats))
         for row, values in enumerate(self._snapshot.stats):
             for col, value in enumerate(values):

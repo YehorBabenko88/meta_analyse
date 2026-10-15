@@ -7,11 +7,12 @@ from .analysis_coordinator import AnalysisCoordinator
 from .market_health import MarketHealthMonitor
 
 class AnalysisSession:
-    def __init__(self,store,exchange,tick_sizes,*,on_update=None,on_gap=None):
+    def __init__(self,store,exchange,tick_sizes,*,on_update=None,on_gap=None,on_book_update=None):
         self.analysis=AnalysisCoordinator(tick_sizes)
         self.health=MarketHealthMonitor()
         self.on_update=on_update
         self.on_gap=on_gap
+        self.on_book_update=on_book_update
         self.raw=RawPipeline(store,tick_sizes,
                              on_execution=self._execution,on_gap=self._trade_gap)
         self.market=MarketCollector(store,exchange,
@@ -40,6 +41,8 @@ class AnalysisSession:
         await self.analysis.book(symbol,book,timestamp_ms)
         if book.valid:
             self.health.book(symbol)
+            if self.on_book_update:
+                await self.on_book_update(symbol)
         else:
             self.health.gap("orderbook",[symbol])
 

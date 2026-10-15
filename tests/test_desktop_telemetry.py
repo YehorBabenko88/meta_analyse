@@ -54,3 +54,32 @@ def test_reconnect_uses_new_session_counters_not_previous():
     service.session=SimpleNamespace(market=SimpleNamespace(telemetry=second))
     service.flow_state="connected"
     assert service.snapshot().market_events==(("orderbook:ETHUSDT",1),)
+
+def test_persisted_ages_hidden_during_failure_and_reset_on_reconnect():
+    """Never leak a previous session's freshness into a new connection."""
+    service = DesktopService(None, lambda snapshot: None)
+    service.runtime = SimpleNamespace(
+        symbols=[], paper=SimpleNamespace(fills=[], positions={}))
+    first = MarketTelemetry()
+    first.observe("orderbook", "BTCUSDT")
+    first.gap("orderbook", "BTCUSDT")
+    service.session = SimpleNamespace(market=SimpleNamespace(telemetry=first))
+    service.flow_state = "connected"
+    first_snapshot = service.snapshot()
+    assert len(first_snapshot.market_ages) == 1
+    assert first_snapshot.market_ages[0][0] == "orderbook:BTCUSDT"
+    for state in ("stopping", "failed", "disconnected", "connecting"):
+        service.flow_state = state
+        hidden = service.snapshot()
+        assert hidden.market_events == ()
+        assert hidden.market_gaps == ()
+        assert hidden.market_ages == ()
+    second = MarketTelemetry()
+    second.gap("orderbook", "ETHUSDT")
+    service.session = SimpleNamespace(market=SimpleNamespace(telemetry=second))
+    service.flow_state = "connected"
+    new_snapshot = service.snapshot()
+    assert new_snapshot.market_events == ()
+    assert new_snapshot.market_ages == ()
+    assert new_snapshot.market_gaps == (("orderbook:ETHUSDT", 1),)
+    assert first_snapshot.market_events == (("orderbook:BTCUSDT", 1),)

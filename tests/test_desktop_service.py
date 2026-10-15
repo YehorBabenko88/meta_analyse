@@ -295,3 +295,33 @@ async def test_multiple_collector_failures_report_one_and_drain_all_tasks():
     await service.check_health()
     assert service.flow_state == "failed"
     await service.close()
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode,expected", [
+    ("normal", "NoneType"),
+    ("cancelled", "CancelledError"),
+])
+async def test_collector_normal_exit_or_cancellation_marks_feed_failed(mode, expected):
+    """A collector ending without an exception is not a healthy running feed."""
+    from meta_analyse.analysis_session import AnalysisSession
+    service = DesktopService(None, lambda snapshot: None)
+    session = AnalysisSession(None, None, {'BTCUSDT': D('.5')})
+    async def normal():
+        return None
+    async def waiting():
+        await asyncio.Event().wait()
+    ended = asyncio.create_task(normal() if mode == "normal" else waiting())
+    sibling = asyncio.create_task(waiting())
+    session.raw.tasks.append(ended)
+    session.market.tasks.append(sibling)
+    service.session, service.flow_state = session, "connected"
+    await asyncio.sleep(0)
+    if mode == "cancelled":
+        ended.cancel()
+        await asyncio.gather(ended, return_exceptions=True)
+    await service.check_health()
+    assert service.flow_state == "failed"
+    assert expected in service.flow_status
+    assert service.session is None
+    assert sibling.done()
+    await service.close()

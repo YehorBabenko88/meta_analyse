@@ -6,6 +6,7 @@ from decimal import Decimal
 from .raw_trades import RawTradeStream
 from .raw_store import RawStore
 from .integrity import ExecutionAggregator
+from .health import HealthTracker
 
 LOG = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ class RawPipeline:
         self.db = RawStore(store)
         self.aggregators = {s: ExecutionAggregator(tick) for s, tick in tick_sizes.items()}
         self.on_closed = on_closed
+        self.health = HealthTracker()
         self.stop_event = asyncio.Event()
         self.streams = []
         self.tasks = []
@@ -26,6 +28,7 @@ class RawPipeline:
         inserted = await asyncio.to_thread(self.db.save, event)
         if not inserted:
             return
+        self.health.record(event)
         before = len(aggregator.closed)
         aggregator.accept(event)
         for symbol, minute, quality in aggregator.closed[before:]:
@@ -38,6 +41,7 @@ class RawPipeline:
         # Fail closed if DB is unavailable; never report continuity.
         await asyncio.to_thread(self.db.gap, symbols, reason)
         for symbol in symbols:
+            self.health.gap(symbol)
             if symbol in self.aggregators:
                 self.aggregators[symbol].gap([symbol], reason)
 

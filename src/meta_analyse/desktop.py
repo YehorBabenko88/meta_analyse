@@ -123,6 +123,8 @@ class Window(QWidget):
         diagnostics = QWidget()
         diagnostics_layout = QVBoxLayout(diagnostics)
         diagnostics_layout.addWidget(QLabel("Persisted feed events and reported gaps; not proof of exchange completeness"))
+        self.diagnostics_state = QLabel("Disconnected — counters hidden")
+        diagnostics_layout.addWidget(self.diagnostics_state)
         self.diagnostics_table = QTableWidget(0, 3)
         self.diagnostics_table.setHorizontalHeaderLabels(["Feed / symbol", "Persisted events", "Reported gaps"])
         diagnostics_layout.addWidget(self.diagnostics_table)
@@ -258,6 +260,11 @@ class Window(QWidget):
             finally:
                 table.setSortingEnabled(sorting)
                 table.setUpdatesEnabled(updates)
+        self.diagnostics_state.setText(
+            "Connected — session counters (not exchange completeness)"
+            if self._snapshot.flow_state == "connected"
+            else f"{self._snapshot.flow_state.capitalize()} — counters hidden"
+        )
         event_counts = dict(self._snapshot.market_events)
         gap_counts = dict(self._snapshot.market_gaps)
         keys = sorted(event_counts.keys() | gap_counts.keys())

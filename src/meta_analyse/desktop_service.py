@@ -182,7 +182,8 @@ class DesktopService:
             if self.disconnect_task is not None and not self.disconnect_task.done():
                 return
             await self.disconnect_flow()
-            if self.closing:
+            # A newer connection may have started after cleanup completed.
+            if self.closing or self.flow_state != 'disconnected':
                 return
             self.flow_state = 'failed'
             self.flow_status = f'Collector stopped ({type(exc).__name__}); data UNVERIFIED'

@@ -20,6 +20,7 @@ from .trader_theme import TRADER_QSS
 from .flow_bridge import FlowBridge
 from .analysis_session import AnalysisSession
 from .flow_style import flow_cell_style
+from .flow_diff import changed_rows
 
 class Window(QWidget):
     def __init__(self):
@@ -103,6 +104,7 @@ class Window(QWidget):
         controls_row.addWidget(self.stop_flow_button)
         flow_layout.addLayout(controls_row)
         self.tabs.addTab(flow, "Order flow")
+        self._previous_flow_rows = ()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.repaint_state)
         self.timer.start(1500)
@@ -236,18 +238,23 @@ class Window(QWidget):
             self.connect_flow_button.setEnabled(True)
             self.flow_status.setText("Disconnected — data marked UNVERIFIED")
         rows = self.flow_bridge.snapshot()
-        self.flow_table.setSortingEnabled(False)
-        self.flow_table.setRowCount(len(rows))
-        for row, entry in enumerate(rows):
-            values = (entry.symbol, entry.level, entry.poc, entry.delta,
-                      entry.tape_rate, entry.quality, entry.spread, entry.imbalance, entry.wall)
-            for col, value in enumerate(values):
-                item = QTableWidgetItem(value)
-                foreground, background = flow_cell_style(col, value, entry.quality)
-                item.setForeground(QBrush(QColor(foreground)))
-                item.setBackground(QBrush(QColor(background)))
-                self.flow_table.setItem(row, col, item)
-        self.flow_table.setSortingEnabled(True)
+        changed, rebuild = changed_rows(self._previous_flow_rows, rows)
+        if rebuild or changed:
+            self.flow_table.setSortingEnabled(False)
+            if rebuild:
+                self.flow_table.setRowCount(len(rows))
+            for row in changed:
+                entry = rows[row]
+                values = (entry.symbol, entry.level, entry.poc, entry.delta,
+                          entry.tape_rate, entry.quality, entry.spread, entry.imbalance, entry.wall)
+                for col, value in enumerate(values):
+                    item = QTableWidgetItem(value)
+                    foreground, background = flow_cell_style(col, value, entry.quality)
+                    item.setForeground(QBrush(QColor(foreground)))
+                    item.setBackground(QBrush(QColor(background)))
+                    self.flow_table.setItem(row, col, item)
+            self.flow_table.setSortingEnabled(True)
+            self._previous_flow_rows = rows
         engine = self.runtime.paper
         symbols = sorted(set(self.runtime.symbols) | {f.symbol for f in engine.fills})
         self.stats.setRowCount(len(symbols))

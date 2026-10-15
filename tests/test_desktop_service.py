@@ -103,3 +103,27 @@ async def test_monitor_reports_offline_retries_without_exposing_error_text():
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
     assert not runtime.running
+@pytest.mark.asyncio
+async def test_duplicate_disconnect_keeps_stopping_until_cleanup_finishes():
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        async def stop(self):
+            entered.set()
+            await release.wait()
+    service.session = Session()
+    service.flow_state = 'connected'
+    first = asyncio.create_task(service.disconnect_flow())
+    await entered.wait()
+    second = asyncio.create_task(service.disconnect_flow())
+    await asyncio.sleep(0)
+    try:
+        assert service.flow_state == 'stopping'
+        assert not second.done()
+        service.connect_flow(['BTCUSDT'], D('100'))
+        assert service.flow_task is None
+    finally:
+        release.set()
+        await asyncio.gather(first, second)
+    assert service.flow_state == 'disconnected'
+    await service.close()

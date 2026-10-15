@@ -44,3 +44,26 @@ def test_offline_snapshot_is_rendered_on_qt_thread(app, monkeypatch):
     finally:
         window.close()
         pump(app, lambda: not window.worker.is_alive() and not window.isVisible())
+def test_close_while_flow_metadata_is_pending_cancels_connection(app, monkeypatch):
+    import threading
+    from meta_analyse import instruments
+    entered = threading.Event()
+    async def metadata(exchange):
+        entered.set()
+        await asyncio.Event().wait()
+    async def watchlist(self, *args):
+        return ['BTCUSDT']
+    monkeypatch.setenv('META_ANALYSE_DSN', 'invalid dsn')
+    monkeypatch.setattr(instruments, 'instruments', metadata)
+    monkeypatch.setattr(BybitPublic, 'top_volatile', watchlist)
+    window = Window()
+    window.show()
+    pump(app, lambda: window.list.count() == 1)
+    window.list.item(0).setSelected(True)
+    window.connect_flow()
+    pump(app, entered.is_set)
+    window.close()
+    pump(app, lambda: not window.worker.is_alive() and not window.isVisible())
+    assert window.service.session is None
+    assert window.service.flow_task is None
+    assert window.loop.is_closed()

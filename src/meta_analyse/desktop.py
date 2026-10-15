@@ -16,6 +16,7 @@ from .trader_theme import TRADER_QSS
 from .desktop_service import DesktopService, DesktopSnapshot
 from .flow_style import flow_cell_style
 from .flow_diff import changed_rows
+from .freshness import freshness_state
 
 
 class FlowTableItem(QTableWidgetItem):
@@ -125,8 +126,8 @@ class Window(QWidget):
         diagnostics_layout.addWidget(QLabel("Persisted feed events and reported gaps; not proof of exchange completeness"))
         self.diagnostics_state = QLabel("Disconnected — counters hidden")
         diagnostics_layout.addWidget(self.diagnostics_state)
-        self.diagnostics_table = QTableWidget(0, 4)
-        self.diagnostics_table.setHorizontalHeaderLabels(["Feed / symbol", "Persisted events", "Reported gaps", "Last persisted age (s)"])
+        self.diagnostics_table = QTableWidget(0, 5)
+        self.diagnostics_table.setHorizontalHeaderLabels(["Feed / symbol", "Persisted events", "Reported gaps", "Last persisted age (s)", "Freshness"])
         diagnostics_layout.addWidget(self.diagnostics_table)
         self.tabs.addTab(diagnostics, "Diagnostics")
         self.timer = QTimer(self)
@@ -280,7 +281,8 @@ class Window(QWidget):
         for i, key in enumerate(keys):
             for col, value in ((1, str(event_counts.get(key, 0))),
                                (2, str(gap_counts.get(key, 0))),
-                               (3, f"{ages[key]:.1f}" if key in ages else "—")):
+                               (3, f"{ages[key]:.1f}" if key in ages else "—"),
+                               (4, freshness_state(ages.get(key)))):
                 item = self.diagnostics_table.item(i, col)
                 if item is None:
                     self.diagnostics_table.setItem(i, col, QTableWidgetItem(value))

@@ -15,3 +15,13 @@ def freshness_state(age_seconds: float | None, *, delayed_after: float = 2.0, st
     if age_seconds < stale_after:
         return "DELAYED"
     return "STALE"
+
+def freshness_for_feed(feed_key: str, age_seconds: float | None) -> str:
+    """Source-aware age thresholds; age measures local persistence, not Bybit latency.
+
+    Orderbooks are streamed, while open-interest is polled approximately every
+    five minutes. Unknown sources use the conservative streaming defaults.
+    """
+    if feed_key.startswith("open_interest:"):
+        return freshness_state(age_seconds, delayed_after=360.0, stale_after=600.0)
+    return freshness_state(age_seconds)

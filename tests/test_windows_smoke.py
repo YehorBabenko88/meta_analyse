@@ -96,7 +96,14 @@ async def test_windows_qt_mock_network_postgres_disconnect_restart(postgres_stor
             window.connect_flow()  # duplicate requests must be harmless
             window.start()
             window.start()
-            await until(app, lambda: counter['trade'] >= 2 and window.flow_table.rowCount() == 1)
+            def persisted(trades, books):
+                with postgres_store.connect() as conn:
+                    return (conn.execute('SELECT count(*) FROM meta_analyse.executions').fetchone()[0] >= trades
+                            and conn.execute('SELECT count(*) FROM meta_analyse.orderbook_observations').fetchone()[0] >= books
+                            and conn.execute('SELECT count(*) FROM meta_analyse.open_interest_samples').fetchone()[0] >= 1)
+            # A peer accepting/sending a frame isn't proof the worker committed it.
+            # Wait for both reconnect trades before deliberately cancelling feeds.
+            await until(app, lambda: counter['trade'] >= 2 and window.flow_table.rowCount() == 1 and persisted(2, 1))
             with postgres_store.connect() as conn:
                 assert conn.execute('SELECT count(*) FROM meta_analyse.executions').fetchone()[0] >= 1
                 assert conn.execute('SELECT count(*) FROM meta_analyse.orderbook_observations').fetchone()[0] >= 1
@@ -108,12 +115,7 @@ async def test_windows_qt_mock_network_postgres_disconnect_restart(postgres_stor
             assert window.flow_table.item(0, 5).text() == 'UNVERIFIED'
             window.connect_flow()
             await until(app, lambda: counter['trade'] >= 3 and window._snapshot.flow_state == 'connected')
-            def persisted_restart():
-                with postgres_store.connect() as conn:
-                    return (conn.execute('SELECT count(*) FROM meta_analyse.executions').fetchone()[0] >= 3
-                            and conn.execute('SELECT count(*) FROM meta_analyse.orderbook_observations').fetchone()[0] >= 2
-                            and conn.execute('SELECT count(*) FROM meta_analyse.open_interest_samples').fetchone()[0] >= 1)
-            await until(app, persisted_restart)
+            await until(app, lambda: persisted(3, 2))
             assert counter['terminal'] == 1, window._snapshot.status
             assert all(method == 'GET' for method, _ in http_calls)
         finally:

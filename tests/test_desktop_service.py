@@ -521,3 +521,40 @@ async def test_cancelled_startup_cleanup_error_still_finishes_disconnect(monkeyp
     assert "Cancelled flow cleanup failed (OSError)" in service.status
     assert "password" not in service.status
     await service.close()
+
+@pytest.mark.asyncio
+async def test_reconnect_after_failed_startup_creates_fresh_session(monkeypatch):
+    """A failed startup must not leave stale state blocking the next attempt."""
+    from meta_analyse import instruments
+    from meta_analyse import desktop_service as desktop_module
+    from types import SimpleNamespace
+    async def metadata(exchange):
+        return {"BTCUSDT": SimpleNamespace(tick_size=D(".5"))}
+    sessions = []
+    class Session:
+        def __init__(self, *args, **kwargs):
+            self.index = len(sessions)
+            self.stopped = False
+            sessions.append(self)
+        async def start(self):
+            if self.index == 0:
+                raise OSError("initial failure")
+        async def stop(self):
+            self.stopped = True
+    monkeypatch.setattr(instruments, "instruments", metadata)
+    monkeypatch.setattr(desktop_module, "AnalysisSession", Session)
+    service = DesktopService(None, lambda snapshot: None)
+    service.connect_flow(["BTCUSDT"], D("0"))
+    await service.flow_task
+    assert service.flow_state == "failed"
+    assert sessions[0].stopped
+    assert service.session is None
+    service.connect_flow(["BTCUSDT"], D("0"))
+    await service.flow_task
+    assert service.flow_state == "connected"
+    assert service.session is sessions[1]
+    assert sessions[1] is not sessions[0]
+    await service.disconnect_flow()
+    assert sessions[1].stopped
+    assert service.flow_state == "disconnected"
+    await service.close()

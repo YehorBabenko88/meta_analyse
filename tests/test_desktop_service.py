@@ -491,3 +491,33 @@ async def test_disconnect_during_partial_session_start_cleans_allocated_session(
     assert service.flow_state == "disconnected"
     assert service.flow_task is None
     await service.close()
+
+@pytest.mark.asyncio
+async def test_cancelled_startup_cleanup_error_still_finishes_disconnect(monkeypatch):
+    """Cleanup exceptions on cancellation must not strand the disconnect owner."""
+    from meta_analyse import instruments
+    from meta_analyse import desktop_service as desktop_module
+    from types import SimpleNamespace
+    entered = asyncio.Event()
+    async def metadata(exchange):
+        return {"BTCUSDT": SimpleNamespace(tick_size=D(".5"))}
+    class BrokenSession:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def start(self):
+            entered.set()
+            await asyncio.Event().wait()
+        async def stop(self):
+            raise OSError("password=hidden")
+    monkeypatch.setattr(instruments, "instruments", metadata)
+    monkeypatch.setattr(desktop_module, "AnalysisSession", BrokenSession)
+    service = DesktopService(None, lambda snapshot: None)
+    service.connect_flow(["BTCUSDT"], D("0"))
+    await entered.wait()
+    await service.disconnect_flow()
+    assert service.flow_state == "disconnected"
+    assert service.session is None
+    assert service.flow_task is None
+    assert "Cancelled flow cleanup failed (OSError)" in service.status
+    assert "password" not in service.status
+    await service.close()

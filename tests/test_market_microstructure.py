@@ -19,7 +19,7 @@ def test_book_requires_snapshot_and_resets_on_replay():
 
 def test_ephemeral_wall_warning_is_not_spoofing_verdict():
     b=OrderBook("BTCUSDT")
-    b.apply(bookmsg("snapshot",1,1,[["99","2000"]],[["101","1"]]))
+    b.apply(bookmsg("snapshot",1,1,[["99","2000"],["98","1"]],[["101","1"]]))
     w=WallTracker(min_notional=D("100000"))
     assert not w.observe(b,1000)
     b.apply(bookmsg("delta",2,2,[["99","0"]],[]))

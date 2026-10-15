@@ -17,6 +17,8 @@ class DesktopSnapshot:
     flow_state: str = 'disconnected'
     flow_status: str = 'Disconnected — data marked UNVERIFIED'
     status: str = 'Standby; no exchange orders are ever sent'
+    market_events: tuple = ()
+    market_gaps: tuple = ()
 
 class DesktopService:
     def __init__(self, store, publish):
@@ -152,8 +154,10 @@ class DesktopService:
             stats.append((symbol, str(len(fills)), str(sum(f.net > 0 for f in fills)),
                           str(round(sum((f.net for f in fills), Decimal(0)), 4)),
                           engine.positions[symbol].side if symbol in engine.positions else '-'))
+        telemetry = self.session.market.telemetry.snapshot() if self.session is not None and hasattr(self.session.market, 'telemetry') else None
         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
-                               self.flow_state, self.flow_status, self.status)
+                               self.flow_state, self.flow_status, self.status,
+                               telemetry.events if telemetry else (), telemetry.gaps if telemetry else ())
 
     async def check_health(self):
         if self.flow_state != 'connected' or self.session is None:

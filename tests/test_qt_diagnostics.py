@@ -70,3 +70,37 @@ async def test_diagnostics_sorting_preserves_feed_identity(monkeypatch, app):
     finally:
         window.close()
         await until(app, lambda: not window.worker.is_alive() and not window.isVisible())
+
+@pytest.mark.asyncio
+async def test_diagnostics_feed_add_remove_and_new_session(monkeypatch, app):
+    monkeypatch.delenv("META_ANALYSE_DSN", raising=False)
+    window = Window()
+    window.show()
+    try:
+        await until(app, lambda: window.worker.is_alive())
+        def update(events, ages, state="connected"):
+            window._snapshot = DesktopSnapshot(
+                flow_state=state, market_events=events, market_ages=ages)
+            window.repaint_state()
+            table = window.diagnostics_table
+            return {table.item(i, 0).text(): (
+                table.item(i, 1).text(), table.item(i, 4).text())
+                for i in range(table.rowCount())}
+        first = update((("orderbook:BTCUSDT", 50),),
+                       (("orderbook:BTCUSDT", 0.1),))
+        assert first == {"orderbook:BTCUSDT": ("50", "FRESH")}
+        second = update((("orderbook:BTCUSDT", 51), ("orderbook:ETHUSDT", 1)),
+                        (("orderbook:BTCUSDT", 3.0), ("orderbook:ETHUSDT", 0.0)))
+        assert second == {"orderbook:BTCUSDT": ("51", "DELAYED"),
+                          "orderbook:ETHUSDT": ("1", "FRESH")}
+        assert update((), (), state="disconnected") == {}
+        # A fresh connection must not retain counters or colors from old session.
+        assert update((("orderbook:ETHUSDT", 1),),
+                      (("orderbook:ETHUSDT", 11.0),)) == {
+                          "orderbook:ETHUSDT": ("1", "STALE")}
+        assert update((("orderbook:ETHUSDT", 2),),
+                      (("orderbook:ETHUSDT", 0.0),)) == {
+                          "orderbook:ETHUSDT": ("2", "FRESH")}
+    finally:
+        window.close()
+        await until(app, lambda: not window.worker.is_alive() and not window.isVisible())

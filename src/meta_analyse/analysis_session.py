@@ -9,6 +9,10 @@ from .book_summary import summarize_book
 
 class AnalysisSession:
     def __init__(self,store,exchange,tick_sizes,*,on_update=None,on_gap=None,on_book_update=None):
+        if not tick_sizes or any(not tick.is_finite() or tick <= 0 for tick in tick_sizes.values()):
+            raise ValueError("tick sizes must be finite and positive")
+        self._lifecycle_lock = asyncio.Lock()
+        self._startup = None
         self.analysis=AnalysisCoordinator(tick_sizes)
         self.health=MarketHealthMonitor()
         self.on_update=on_update
@@ -56,17 +60,39 @@ class AnalysisSession:
             await self.on_gap(symbols,reason)
 
     async def start(self):
-        if self.started:
-            raise RuntimeError("session already running")
-        await self.raw.start()
-        try:
-            await self.market.start(list(self.analysis.tapes))
-        except BaseException:
-            await self.raw.stop()
-            raise
-        self.started=True
+        async with self._lifecycle_lock:
+            if self.started:
+                raise RuntimeError("session already running")
+            self._startup = asyncio.current_task()
+            try:
+                await self.raw.start()
+                await self.market.start(list(self.analysis.tapes))
+                self.started = True
+            except BaseException:
+                # Both collectors may have allocated resources before failing.
+                await self._cleanup()
+                raise
+            finally:
+                self._startup = None
+
+    async def _cleanup(self):
+        self.started = False
+        results = await asyncio.gather(self.market.stop(), self.raw.stop(), return_exceptions=True)
+        symbols = list(self.analysis.tapes)
+        await self.analysis.gap(symbols, "session stopped")
+        await self.analysis.book_gap(symbols, "session stopped")
+        self.health.gap("trades", symbols)
+        self.health.gap("orderbook", symbols)
+        if self.on_gap:
+            await self.on_gap(symbols, "session stopped")
+        for result in results:
+            if isinstance(result, BaseException):
+                raise result
 
     async def stop(self):
-        await self.market.stop()
-        await self.raw.stop()
-        self.started=False
+        startup = self._startup
+        if startup is not None and startup is not asyncio.current_task():
+            startup.cancel()
+            await asyncio.gather(startup, return_exceptions=True)
+        async with self._lifecycle_lock:
+            await self._cleanup()

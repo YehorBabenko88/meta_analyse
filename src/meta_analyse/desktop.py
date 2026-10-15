@@ -82,10 +82,10 @@ class Window(QWidget):
         flow_layout.addWidget(QLabel("Order flow diagnostics — read-only; data are unverified until live feeds connect"))
         self.flow_status = QLabel("No validated trade/orderbook stream attached")
         flow_layout.addWidget(self.flow_status)
-        self.flow_table = QTableWidget(0, 6)
+        self.flow_table = QTableWidget(0, 9)
         self.flow_table.setAlternatingRowColors(True)
         self.flow_table.setSortingEnabled(True)
-        self.flow_table.setHorizontalHeaderLabels(["Symbol", "Level", "POC", "Delta", "Tape trades/s", "Quality"])
+        self.flow_table.setHorizontalHeaderLabels(["Symbol", "Level", "POC", "Delta", "Tape/s", "Quality", "Spread ticks", "Book imbalance", "Nearby wall"])
         flow_layout.addWidget(self.flow_table)
         controls_row = QHBoxLayout()
         self.level_price = QDoubleSpinBox()
@@ -181,8 +181,8 @@ class Window(QWidget):
         await self.flow_bridge.update(symbol,footprint,tape)
         self.flow_bridge.trade_observed(symbol)
 
-    async def _flow_book(self,symbol):
-        self.flow_bridge.book_observed(symbol)
+    async def _flow_book(self,symbol,summary):
+        self.flow_bridge.book_observed(symbol,summary)
 
     async def _invalidate_flow(self, symbols, reason):
         self.flow_bridge.invalidate(symbols)
@@ -238,7 +238,7 @@ class Window(QWidget):
         self.flow_table.setRowCount(len(rows))
         for row, entry in enumerate(rows):
             values = (entry.symbol, entry.level, entry.poc, entry.delta,
-                      entry.tape_rate, entry.quality)
+                      entry.tape_rate, entry.quality, entry.spread, entry.imbalance, entry.wall)
             for col, value in enumerate(values):
                 self.flow_table.setItem(row, col, QTableWidgetItem(value))
         self.flow_table.setSortingEnabled(True)

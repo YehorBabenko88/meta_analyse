@@ -1,13 +1,13 @@
 # Windows lifecycle audit — 2026-10-15
 
-Scope: `docs/CODEX_HANDOFF.md`. Base `feat/metascalp-companion-v01` at `528467d32dba06b350819c6fed5de8af926adb70`; own branch `codex/windows-lifecycle-audit`. No merge, force push, production changes, real orders or MetaScalp level writes.
+Scope: `docs/CODEX_HANDOFF.md`. Initial base `528467d32dba06b350819c6fed5de8af926adb70`; reconciled with `feat/metascalp-companion-v01` at `69b45d047a5f14fbaa497575b4e55e14ab7c25f7`. With explicit user authorization, publish rebased work as `codex/windows-lifecycle-audit-v2`; original branch/PR #2 history remains intact. No merge, force push, production changes, real orders or MetaScalp level writes.
 
 ## Environment and evidence
 
 - Actual workstation: Windows 11 Pro 10.0.26300, isolated Python 3.12.15, PySide6 6.12.0, psycopg 3.3.6, websockets 15.0.1.
 - Machine initially had Python 3.14 only and no PostgreSQL. Python 3.12 was provisioned with uv; PostgreSQL 17.6 portable binaries and temporary cluster live under scratch `work/`. No system PostgreSQL service installed.
 - PostgreSQL binds loopback only. Tests create random databases and owner roles and drop only those test resources. Application DDL/DML stays in `meta_analyse`; a `public.audit_sentinel` row is verified unchanged.
-- Baseline: **63 passed**. Expanded suite: **87 tests**, including actual Windows Qt and PostgreSQL integration. Final native exit and CI evidence appear below.
+- Baseline: **63 passed**. Expanded suite after incorporating upstream tests: **96 tests**, including actual Windows Qt and PostgreSQL integration. Final native exit and CI evidence appear below.
 - Native Qt `windows` plugin: actual window displayed with stylesheet, deterministic offline message rendered, screenshot captured, asynchronous close completed, worker stopped and loop closed. Automated GUI tests also run offscreen on Windows.
 - Installer executed twice against the same isolated path containing a space; final imports and `pip check` succeeded. Failure regression invokes real PowerShell and pip on an invalid source checkout.
 
@@ -28,7 +28,7 @@ Scope: `docs/CODEX_HANDOFF.md`. Base `feat/metascalp-companion-v01` at `528467d3
 | Medium | Unbounded DB connection/query/lock waits. | Five-second connection, statement and lock timeouts; actual PostgreSQL settings asserted. |
 | High | Installer reports success and creates launcher after native pip failure. | Check every native exit, verify Python 3.12/import, reuse venv, create launcher only after success. Real failure regression. |
 | Medium | Deployment dependency ranges drift; CI lacks DB and actual Qt lifecycle tests. | Tested transitive versions in `requirements.lock`; installer/CI use constraints. Windows/Linux offscreen+PostgreSQL jobs upload logs/JUnit. |
-| High | Windows CI prints passing assertions but Python aborts during native Qt finalization. | One session QApplication; explicitly dispose widgets and native application before interpreter finalization. Native exit remains mandatory. |
+| High | Windows CI prints passing assertions but Python aborts during native Qt finalization. | One session QApplication; explicitly dispose widgets and native application and explicitly dispose the native QApplication before interpreter finalization. Native exit remains mandatory. |
 
 Support edits to `storage.py`, `raw_store.py` and `market_store.py` fix the reproduced schema race. `runtime.py` reports connectivity and clears running state on cancellation. Excluded files `feed_watchdog.py`, `flow_bridge.py`, `orderbook.py`, `footprint.py` and microstructure algorithms were not edited.
 
@@ -80,6 +80,8 @@ Installer writes no credentials/DSN to launcher or configuration. Keep the sourc
 ## CI and final results
 
 Initial run: https://github.com/YehorBabenko88/meta_analyse/actions/runs/38763408831 . Linux passed; Windows assertions passed (85) but process failed during Qt finalization. This was investigated as a real failure, not bypassed. Explicit native QApplication disposal gave four consecutive clean exits in independent reproduction; full corrected verification is recorded here after CI completes.
+
+A subsequent Windows run (38764445003) exposed a smoke-fixture race: it disconnected after the peer sent its second frame but before the worker committed it, then expected three durable rows. The test now waits on durable DB counts before intentional cancellation, preserving its assertions without arbitrary sleeps.
 
 Workflow artifacts contain test output, JUnit and the Windows isolated PostgreSQL log. PR and final run links will be added after corrected runs finish.
 

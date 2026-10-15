@@ -29,7 +29,7 @@ class AnalysisSession:
             self.health.execution(event.symbol)
         else:
             self.health.gap("trades",[event.symbol])
-        if self.on_update:
+        if self.on_update and footprint is not None:
             await self.on_update(event.symbol,footprint.snapshot(),tape)
 
     async def _trade_gap(self,symbols,reason):

@@ -380,3 +380,23 @@ async def test_manual_disconnect_owns_cleanup_before_health_failure_reporting():
     assert service.flow_status.startswith("Disconnected")
     assert service.session is None
     await service.close()
+
+@pytest.mark.asyncio
+async def test_health_failure_does_not_overwrite_new_connection_after_cleanup():
+    """A reconnect between cleanup completion and health reporting wins."""
+    service = DesktopService(None, lambda snapshot: None)
+    async def failed():
+        raise RuntimeError("collector stopped")
+    ended = asyncio.create_task(failed())
+    session = type("Session", (), {})()
+    session.raw = type("Raw", (), {"tasks": [ended]})()
+    session.market = type("Market", (), {"tasks": []})()
+    service.session, service.flow_state = session, "connected"
+    await asyncio.sleep(0)
+    async def cleanup_then_reconnect():
+        service.session = None
+        service.flow_state = "connecting"
+    service.disconnect_flow = cleanup_then_reconnect
+    await service.check_health()
+    assert service.flow_state == "connecting"
+    assert service.flow_status != "Collector stopped (RuntimeError); data UNVERIFIED"

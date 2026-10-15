@@ -32,16 +32,24 @@ CREATE TABLE IF NOT EXISTS meta_analyse.checkpoints (
 );
 """
 
+def initialize_schema(store, ddl):
+    # IF NOT EXISTS alone races on PostgreSQL catalogs across independent clients.
+    # Transaction-scoped, shared by every Meta Analyse schema initializer.
+    with store.connect() as conn:
+        conn.execute("SELECT pg_advisory_xact_lock(%s)", (0x4D455441414E414C,))
+        conn.execute(ddl)
+
+
 class Store:
     def __init__(self, dsn):
         self.dsn = dsn
 
     def connect(self):
-        return psycopg.connect(self.dsn)
+        return psycopg.connect(self.dsn, connect_timeout=5,
+                               options="-c statement_timeout=5000 -c lock_timeout=5000")
 
     def initialize(self):
-        with self.connect() as conn:
-            conn.execute(SCHEMA)
+        initialize_schema(self, SCHEMA)
 
     def candle_batch(self, symbol, tf, candles, complete=True):
         with self.connect() as conn:

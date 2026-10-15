@@ -1,6 +1,7 @@
 """Append-only executions with idempotent conflict handling and quality flags."""
 from __future__ import annotations
 from psycopg.types.json import Jsonb
+from .storage import initialize_schema
 
 DDL = """
 CREATE SCHEMA IF NOT EXISTS meta_analyse;
@@ -30,8 +31,7 @@ class RawStore:
         self.store = store
 
     def initialize(self):
-        with self.store.connect() as conn:
-            conn.execute(DDL)
+        initialize_schema(self.store, DDL)
 
     def save(self, execution) -> bool:
         from datetime import datetime, timezone

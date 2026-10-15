@@ -2,6 +2,7 @@
 from __future__ import annotations
 from datetime import datetime,timezone
 from psycopg.types.json import Jsonb
+from .storage import initialize_schema
 
 DDL="""
 CREATE SCHEMA IF NOT EXISTS meta_analyse;
@@ -32,8 +33,7 @@ class MarketStore:
         self.store=store
 
     def initialize(self):
-        with self.store.connect() as conn:
-            conn.execute(DDL)
+        initialize_schema(self.store, DDL)
 
     def book(self,symbol,book,exchange_ms):
         if not book.valid or not exchange_ms or book.update_id is None or book.sequence is None:

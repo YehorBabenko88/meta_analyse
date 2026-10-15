@@ -28,7 +28,7 @@ def test_close_during_startup_drains_worker_and_closes_loop(app, monkeypatch):
     before = time.monotonic()
     window.close()
     assert time.monotonic() - before < .25
-    pump(app, lambda: not window.worker.is_alive())
+    pump(app, lambda: not window.worker.is_alive() and not window.isVisible())
     assert window.loop.is_closed()
     assert not window.isVisible()
 
@@ -43,4 +43,4 @@ def test_offline_snapshot_is_rendered_on_qt_thread(app, monkeypatch):
         assert QThread.currentThread() == window.thread()
     finally:
         window.close()
-        pump(app, lambda: not window.worker.is_alive())
+        pump(app, lambda: not window.worker.is_alive() and not window.isVisible())

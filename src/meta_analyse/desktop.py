@@ -208,8 +208,8 @@ class Window(QWidget):
                 self.flow_table.setRowCount(len(rows))
             for row in changed:
                 entry = rows[row]
-            values = (entry.symbol, entry.level, entry.poc, entry.delta,
-                      entry.tape_rate, entry.quality, entry.spread, entry.imbalance, entry.wall)
+                values = (entry.symbol, entry.level, entry.poc, entry.delta,
+                          entry.tape_rate, entry.quality, entry.spread, entry.imbalance, entry.wall)
                 for col, value in enumerate(values):
                     item = QTableWidgetItem(value)
                     foreground, background = flow_cell_style(col, value, entry.quality)

@@ -128,6 +128,7 @@ class Window(QWidget):
         self.diagnostics_state = QLabel("Disconnected — counters hidden")
         diagnostics_layout.addWidget(self.diagnostics_state)
         self.diagnostics_table = QTableWidget(0, 5)
+        self.diagnostics_table.setSortingEnabled(True)
         self.diagnostics_table.setHorizontalHeaderLabels(["Feed / symbol", "Persisted events", "Reported gaps", "Last persisted age (s)", "Freshness"])
         diagnostics_layout.addWidget(self.diagnostics_table)
         self.tabs.addTab(diagnostics, "Diagnostics")
@@ -271,31 +272,37 @@ class Window(QWidget):
         gap_counts = dict(self._snapshot.market_gaps)
         ages = dict(self._snapshot.market_ages)
         keys = sorted(event_counts.keys() | gap_counts.keys() | ages.keys())
-        if self.diagnostics_table.rowCount() != len(keys) or any(
-            self.diagnostics_table.item(i, 0) is None or
-            self.diagnostics_table.item(i, 0).text() != key
-            for i, key in enumerate(keys)
-        ):
-            self.diagnostics_table.setRowCount(len(keys))
-            for i, key in enumerate(keys):
-                self.diagnostics_table.setItem(i, 0, QTableWidgetItem(key))
-        for i, key in enumerate(keys):
-            for col, value in ((1, str(event_counts.get(key, 0))),
-                               (2, str(gap_counts.get(key, 0))),
-                               (3, f"{ages[key]:.1f}" if key in ages else "—"),
-                               (4, freshness_state(ages.get(key)))):
-                item = self.diagnostics_table.item(i, col)
-                if item is None:
-                    item = QTableWidgetItem(value)
-                    self.diagnostics_table.setItem(i, col, item)
-                elif item.text() != value:
-                    item.setText(value)
-                if col == 4:
-                    foreground, background = freshness_colors(ages.get(key))
-                    if item.foreground().color().name() != foreground.lower():
-                        item.setForeground(QBrush(QColor(foreground)))
-                    if item.background().color().name() != background.lower():
-                        item.setBackground(QBrush(QColor(background)))
+        table = self.diagnostics_table
+        sorting = table.isSortingEnabled()
+        table.setSortingEnabled(False)
+        try:
+            current_keys = {table.item(i, 0).text(): i for i in range(table.rowCount())
+                            if table.item(i, 0) is not None}
+            if set(current_keys) != set(keys) or len(current_keys) != table.rowCount():
+                table.setRowCount(len(keys))
+                for i, key in enumerate(keys):
+                    table.setItem(i, 0, QTableWidgetItem(key))
+                current_keys = {key: i for i, key in enumerate(keys)}
+            for key in keys:
+                i = current_keys[key]
+                for col, value in ((1, str(event_counts.get(key, 0))),
+                                   (2, str(gap_counts.get(key, 0))),
+                                   (3, f"{ages[key]:.1f}" if key in ages else "—"),
+                                   (4, freshness_state(ages.get(key)))):
+                    item = table.item(i, col)
+                    if item is None:
+                        item = QTableWidgetItem(value)
+                        table.setItem(i, col, item)
+                    elif item.text() != value:
+                        item.setText(value)
+                    if col == 4:
+                        foreground, background = freshness_colors(ages.get(key))
+                        if item.foreground().color().name() != foreground.lower():
+                            item.setForeground(QBrush(QColor(foreground)))
+                        if item.background().color().name() != background.lower():
+                            item.setBackground(QBrush(QColor(background)))
+        finally:
+            table.setSortingEnabled(sorting)
         self.stats.setRowCount(len(self._snapshot.stats))
         for row, values in enumerate(self._snapshot.stats):
             for col, value in enumerate(values):

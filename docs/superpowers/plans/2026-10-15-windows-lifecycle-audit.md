@@ -23,4 +23,4 @@ Close while metadata/DB starts; double start/stop; cleanup after partial failure
 
 Ruling: user explicitly requested autonomous execution; proceed without plan approval. Fresh clone provides isolation without a second checkout.
 
-Review ledger: independent review found overlapping disconnect and client-construction failures; both reproduced and fixed. Windows CI exposed native QApplication finalization crash despite passing assertions; explicit fixture teardown fixed it, with clean native exit verified. Final CI and PR evidence pending.
+Review ledger: independent review found overlapping disconnect and client-construction failures; both reproduced and fixed. Windows CI exposed native QApplication finalization crash despite passing assertions; explicit fixture teardown fixed it, with clean native exit verified. Published new branch codex/windows-lifecycle-audit-v2 and PR #3 after user authorized preserving old history instead of force push. Reconciled base69b45d0 preserving book/health/color behavior. Rebased local suite96 passed with native exit0; PR CI is completing.

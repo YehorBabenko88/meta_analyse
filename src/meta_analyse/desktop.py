@@ -4,23 +4,22 @@ import asyncio
 import os
 import sys
 import threading
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, QObject, Signal, Slot, Qt
 from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLabel, QListWidget, QMessageBox, QDoubleSpinBox, QCheckBox, QTabWidget,
                                QTableWidget, QTableWidgetItem)
-from .ports import MetaScalp
-from .exchange import BybitPublic
-from .runtime import Runtime
 from .storage import Store
-from .analysis_coordinator import AnalysisCoordinator
-from .liquidity import large_levels
 from decimal import Decimal
 from .trader_theme import TRADER_QSS
-from .flow_bridge import FlowBridge
-from .analysis_session import AnalysisSession
+from .desktop_service import DesktopService, DesktopSnapshot
 from .flow_style import flow_cell_style
-from .flow_diff import changed_rows
+
+
+class WorkerSignals(QObject):
+    snapshot = Signal(object)
+    error = Signal(str)
+
 
 class Window(QWidget):
     def __init__(self):
@@ -28,13 +27,16 @@ class Window(QWidget):
         self.setWindowTitle("Meta Analyse — read-only / paper")
         self.resize(1000, 690)
         self.loop = asyncio.new_event_loop()
-        self.api = MetaScalp()
-        self.exchange = BybitPublic()
+        self._closing = False
+        self._closed = False
+        self._snapshot = DesktopSnapshot()
+        self.signals = WorkerSignals(self)
+        self.signals.snapshot.connect(self._receive_snapshot, Qt.ConnectionType.QueuedConnection)
+        self.signals.error.connect(self._receive_error, Qt.ConnectionType.QueuedConnection)
         dsn = os.getenv("META_ANALYSE_DSN", "")
         self.store = Store(dsn) if dsn else None
-        self.runtime = Runtime(self.api, self.exchange, self.store)
-        self.worker = threading.Thread(target=self._thread_main, daemon=True)
-        self.worker.start()
+        self.service = DesktopService(self.store, self.signals.snapshot.emit)
+        self.worker = threading.Thread(target=self._thread_main, name="meta-analyse-worker", daemon=False)
         self.tabs = QTabWidget()
         root = QVBoxLayout(self)
         root.addWidget(self.tabs)
@@ -75,11 +77,6 @@ class Window(QWidget):
         self.stats.setHorizontalHeaderLabels(["Symbol", "Trades", "Wins", "Net PnL $", "Open position"])
         controls.addWidget(self.stats)
         self.tabs.addTab(paper, "Paper results")
-        self.analysis = AnalysisCoordinator({})
-        self.flow_bridge = FlowBridge()
-        self.live_session = None
-        self.flow_start_error = None
-        self.flow_starting = False
         flow = QWidget()
         flow_layout = QVBoxLayout(flow)
         flow_layout.addWidget(QLabel("Order flow diagnostics — read-only; data are unverified until live feeds connect"))
@@ -104,178 +101,138 @@ class Window(QWidget):
         controls_row.addWidget(self.stop_flow_button)
         flow_layout.addLayout(controls_row)
         self.tabs.addTab(flow, "Order flow")
-        self._previous_flow_rows = ()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.repaint_state)
         self.timer.start(1500)
+        self.worker.start()
         self.refresh()
-
     def _thread_main(self):
         asyncio.set_event_loop(self.loop)
-        self.loop.run_forever()
-
+        self.service.initialize()
+        self.loop.create_task(self.service.publish_loop())
+        try:
+            self.loop.run_forever()
+        finally:
+            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+            self.loop.run_until_complete(self.loop.shutdown_default_executor())
+            self.loop.close()
+    @Slot(object)
+    def _receive_snapshot(self, snapshot):
+        if not self._closing:
+            self._snapshot = snapshot
+            self.repaint_state()
+    @Slot(str)
+    def _receive_error(self, message):
+        if not self._closing:
+            self.status.setText(message)
     def schedule(self, task):
+        if self._closing:
+            task.close()
+            return None
         future = asyncio.run_coroutine_threadsafe(task, self.loop)
         def done(f):
+            if f.cancelled():
+                return
             try:
                 f.result()
             except Exception as exc:
-                print("Background operation failed:", exc, file=sys.stderr)
+                self.signals.error.emit(f'Background operation failed ({type(exc).__name__})')
         future.add_done_callback(done)
         return future
-
     def refresh(self):
-        self.schedule(self.runtime.refresh_watchlist())
-
+        self.schedule(self.service.refresh())
     def open_selected(self):
         selected = [item.text() for item in self.list.selectedItems()]
         if not selected:
             QMessageBox.information(self, "Select tickers", "Select one or several symbols.")
             return
-        self.schedule(self.api.open_combos(selected))
-
+        self.schedule(self.service.open_selected(tuple(selected)))
     def start(self):
-        if self.store:
-            self.schedule(asyncio.to_thread(self.store.initialize))
-        self.schedule(self.runtime.run())
-        self.status.setText("Monitor requested; see console/log for connectivity errors")
-
+        self.schedule(self.service.start_monitor())
     def connect_flow(self):
-        selected = [item.text() for item in self.list.selectedItems()]
+        selected = tuple(item.text() for item in self.list.selectedItems())
         if not self.store:
-            QMessageBox.warning(self, "Database required",
-                                "Set META_ANALYSE_DSN before connecting raw market feeds.")
+            QMessageBox.warning(self, "Database required", "Set META_ANALYSE_DSN before connecting raw market feeds.")
             return
         if not selected or len(selected) > 20:
-            QMessageBox.warning(self, "Selection required", "Select 1–20 markets.")
+            QMessageBox.warning(self, "Selection required", "Select 1-20 markets.")
             return
-        if self.live_session is not None:
-            QMessageBox.information(self, "Already running", "Flow session is already running.")
-            return
-        self.flow_start_error = None
-        self.flow_starting = True
         self.connect_flow_button.setEnabled(False)
-        self.flow_status.setText("Connecting; historical continuity remains unverified")
         self.schedule(self._start_flow(selected, Decimal(str(self.level_price.value()))))
-
     async def _start_flow(self, symbols, level):
-        try:
-            from .instruments import instruments
-            metadata = await instruments(self.exchange)
-            tick_sizes = {s: metadata[s].tick_size for s in symbols if s in metadata}
-            if len(tick_sizes) != len(symbols):
-                raise ValueError("Missing tick sizes for selected symbols")
-            session = AnalysisSession(self.store, self.exchange, tick_sizes,
-                                      on_update=self._flow_execution,
-                                      on_gap=self._invalidate_flow,
-                                      on_book_update=self._flow_book)
-            if level > 0:
-                for symbol in symbols:
-                    session.select_level(symbol, level)
-            await session.start()
-            self.live_session = session
-            self.flow_starting = False
-        except Exception as exc:
-            self.flow_bridge.invalidate(symbols)
-            print("Flow startup failed:", exc, file=sys.stderr)
-            self.flow_start_error = str(exc)
-            self.flow_starting = False
-
-    async def _flow_execution(self,symbol,footprint,tape):
-        await self.flow_bridge.update(symbol,footprint,tape)
-        self.flow_bridge.trade_observed(symbol)
-
-    async def _flow_book(self,symbol,summary):
-        self.flow_bridge.book_observed(symbol,summary)
-
-    async def _invalidate_flow(self, symbols, reason):
-        self.flow_bridge.invalidate(symbols)
-
+        self.service.connect_flow(symbols, level)
     def disconnect_flow(self):
-        if self.live_session is None:
-            self.flow_status.setText("No active flow session")
-            self.connect_flow_button.setEnabled(True)
-            return
+        self.connect_flow_button.setEnabled(False)
         self.schedule(self._stop_flow())
-
     async def _stop_flow(self):
-        session = self.live_session
-        if session is None:
-            return
-        try:
-            await session.stop()
-        finally:
-            self.live_session = None
-            self.flow_bridge.invalidate(list(session.analysis.tapes))
-            self.flow_start_error = None
-
+        await self.service.disconnect_flow()
     def toggle_paper(self, enabled):
-        self.runtime.paper.enabled = enabled
-
+        self.schedule(self.service.configure_paper(enabled=bool(enabled)))
     def update_rules(self):
         if not all(hasattr(self, name) for name in ("threshold", "stop", "fee")):
             return
-        from decimal import Decimal as D
-        engine = self.runtime.paper
-        engine.threshold = D(str(self.threshold.value())) / 100
-        engine.stop_pct = D(str(self.stop.value())) / 100
-        engine.fee_rate = D(str(self.fee.value())) / 100
-
+        rules = tuple(Decimal(str(spin.value())) / 100 for spin in (self.threshold, self.stop, self.fee))
+        self.schedule(self.service.configure_paper(rules=rules))
     def repaint_state(self):
         selected = {item.text() for item in self.list.selectedItems()}
         current = [self.list.item(i).text() for i in range(self.list.count())]
-        if current != self.runtime.symbols:
+        if tuple(current) != self._snapshot.symbols:
             self.list.clear()
-            self.list.addItems(self.runtime.symbols)
+            self.list.addItems(self._snapshot.symbols)
             for i in range(self.list.count()):
                 self.list.item(i).setSelected(self.list.item(i).text() in selected)
-        if self.flow_start_error:
-            self.flow_status.setText("Connection failed: " + self.flow_start_error[:180])
-            self.connect_flow_button.setEnabled(True)
-        elif self.live_session is not None:
-            self.flow_status.setText("Streams connected — historical continuity NOT verified")
-        elif not self.flow_starting:
-            self.connect_flow_button.setEnabled(True)
-            self.flow_status.setText("Disconnected — data marked UNVERIFIED")
-        rows = self.flow_bridge.snapshot()
-        changed, rebuild = changed_rows(self._previous_flow_rows, rows)
-        if rebuild or changed:
-            self.flow_table.setSortingEnabled(False)
-            if rebuild:
-                self.flow_table.setRowCount(len(rows))
-            for row in changed:
-                entry = rows[row]
-                values = (entry.symbol, entry.level, entry.poc, entry.delta,
-                          entry.tape_rate, entry.quality, entry.spread, entry.imbalance, entry.wall)
-                for col, value in enumerate(values):
-                    item = QTableWidgetItem(value)
-                    foreground, background = flow_cell_style(col, value, entry.quality)
-                    item.setForeground(QBrush(QColor(foreground)))
-                    item.setBackground(QBrush(QColor(background)))
-                    self.flow_table.setItem(row, col, item)
-            self.flow_table.setSortingEnabled(True)
-            self._previous_flow_rows = rows
-        engine = self.runtime.paper
-        symbols = sorted(set(self.runtime.symbols) | {f.symbol for f in engine.fills})
-        self.stats.setRowCount(len(symbols))
-        for i, symbol in enumerate(symbols):
-            fills = [f for f in engine.fills if f.symbol == symbol]
-            values = [symbol, str(len(fills)), str(sum(f.net > 0 for f in fills)),
-                      str(round(sum((f.net for f in fills), __import__('decimal').Decimal(0)), 4)),
-                      engine.positions[symbol].side if symbol in engine.positions else "-"]
-            for j, value in enumerate(values):
-                self.stats.setItem(i, j, QTableWidgetItem(value))
-
+        self.status.setText(self._snapshot.status)
+        self.flow_status.setText(self._snapshot.flow_status)
+        self.connect_flow_button.setEnabled(self._snapshot.flow_state in ('disconnected', 'failed'))
+        self.stop_flow_button.setEnabled(self._snapshot.flow_state in ('connecting', 'connected', 'failed'))
+        rows = self._snapshot.flow_rows
+        self.flow_table.setSortingEnabled(False)
+        self.flow_table.setRowCount(len(rows))
+        for row, entry in enumerate(rows):
+            values = (entry.symbol, entry.level, entry.poc, entry.delta,
+                      entry.tape_rate, entry.quality, entry.spread, entry.imbalance, entry.wall)
+            for col, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                foreground, background = flow_cell_style(col, value, entry.quality)
+                item.setForeground(QBrush(QColor(foreground)))
+                item.setBackground(QBrush(QColor(background)))
+                self.flow_table.setItem(row, col, item)
+        self.flow_table.setSortingEnabled(True)
+        self.stats.setRowCount(len(self._snapshot.stats))
+        for row, values in enumerate(self._snapshot.stats):
+            for col, value in enumerate(values):
+                self.stats.setItem(row, col, QTableWidgetItem(value))
+    async def _shutdown(self):
+        # Cancel outstanding refresh, metadata and publish operations first.
+        current = asyncio.current_task()
+        tasks = [task for task in asyncio.all_tasks() if task is not current]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await self.service.close()
+    def _finish_close(self):
+        if self.worker.is_alive():
+            return
+        self.timer.stop()
+        self._closed = True
+        self.close()
     def closeEvent(self, event):
-        self.runtime.stop()
-        if self.live_session is not None:
-            future = asyncio.run_coroutine_threadsafe(self.live_session.stop(), self.loop)
-            try:
-                future.result(timeout=5)
-            except Exception as exc:
-                print("Flow shutdown failed:", exc, file=sys.stderr)
-        self.loop.call_soon_threadsafe(self.loop.stop)
-        super().closeEvent(event)
+        if self._closed:
+            event.accept()
+            return
+        event.ignore()
+        if self._closing:
+            return
+        self._closing = True
+        self.setEnabled(False)
+        self.status.setText("Closing connections...")
+        self.timer.stop()
+        self.timer.timeout.disconnect()
+        self.timer.timeout.connect(self._finish_close)
+        self.timer.start(20)
+        future = asyncio.run_coroutine_threadsafe(self._shutdown(), self.loop)
+        future.add_done_callback(lambda _f: self.loop.call_soon_threadsafe(self.loop.stop))
+
 
 def main():
     app = QApplication(sys.argv)
@@ -283,6 +240,7 @@ def main():
     window = Window()
     window.show()
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

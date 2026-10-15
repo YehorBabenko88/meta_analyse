@@ -5,6 +5,7 @@ import os
 import sys
 import threading
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLabel, QListWidget, QMessageBox, QDoubleSpinBox, QCheckBox, QTabWidget,
                                QTableWidget, QTableWidgetItem)
@@ -18,6 +19,7 @@ from decimal import Decimal
 from .trader_theme import TRADER_QSS
 from .flow_bridge import FlowBridge
 from .analysis_session import AnalysisSession
+from .flow_style import flow_cell_style
 
 class Window(QWidget):
     def __init__(self):
@@ -240,7 +242,11 @@ class Window(QWidget):
             values = (entry.symbol, entry.level, entry.poc, entry.delta,
                       entry.tape_rate, entry.quality, entry.spread, entry.imbalance, entry.wall)
             for col, value in enumerate(values):
-                self.flow_table.setItem(row, col, QTableWidgetItem(value))
+                item = QTableWidgetItem(value)
+                foreground, background = flow_cell_style(col, value, entry.quality)
+                item.setForeground(QBrush(QColor(foreground)))
+                item.setBackground(QBrush(QColor(background)))
+                self.flow_table.setItem(row, col, item)
         self.flow_table.setSortingEnabled(True)
         engine = self.runtime.paper
         symbols = sorted(set(self.runtime.symbols) | {f.symbol for f in engine.fills})

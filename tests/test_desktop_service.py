@@ -136,7 +136,7 @@ async def test_collector_crash_invalidates_telemetry_and_allows_reconnect():
     from types import SimpleNamespace
     service = DesktopService(None, lambda snapshot: None)
     service.runtime = SimpleNamespace(
-        symbols=[], paper=SimpleNamespace(fills=[], positions={}))
+        symbols=[], paper=SimpleNamespace(fills=[], positions={}), stop=lambda: None)
     session = AnalysisSession(None, None, {'BTCUSDT': D('.5')})
     session.market.telemetry.observe("orderbook", "BTCUSDT")
     session.market.telemetry.gap("orderbook", "BTCUSDT")

@@ -245,3 +245,27 @@ async def test_close_drains_monitor_and_clients_if_runtime_stop_raises():
     assert service.monitor_task.done()
     assert "RuntimeError" in service.status
     assert "password" not in service.status
+
+@pytest.mark.asyncio
+async def test_close_releases_clients_when_session_stop_fails():
+    """A collector teardown exception must not prevent API client closure."""
+    service = DesktopService(None, lambda snapshot: None)
+    events = []
+    class Session:
+        async def stop(self):
+            events.append("session-stop")
+            raise RuntimeError("token=private")
+    class Client:
+        def __init__(self, name):
+            self.name = name
+        async def close(self):
+            events.append(self.name)
+    service.session = Session()
+    service.flow_state = "connected"
+    service.api, service.exchange = Client("api-close"), Client("exchange-close")
+    await service.close()
+    assert events == ["session-stop", "api-close", "exchange-close"]
+    assert service.flow_state == "disconnected"
+    assert service.session is None
+    assert "token=private" not in service.status
+    assert "RuntimeError" in service.status

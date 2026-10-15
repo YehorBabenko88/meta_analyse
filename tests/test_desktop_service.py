@@ -168,3 +168,31 @@ async def test_collector_crash_invalidates_telemetry_and_allows_reconnect():
     service.session = None
     service.flow_state = "disconnected"
     await service.close()
+
+@pytest.mark.asyncio
+async def test_reconnect_rejected_while_disconnect_task_is_pending_even_if_state_failed():
+    """An old cleanup must never erase a newly created session."""
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        async def stop(self):
+            entered.set()
+            await release.wait()
+    old_session = Session()
+    service.session = old_session
+    service.flow_state = "connected"
+    disconnect = asyncio.create_task(service.disconnect_flow())
+    await entered.wait()
+    try:
+        # A competing health callback can change the visible state while
+        # the disconnect task is still draining the previous session.
+        service.flow_state = "failed"
+        service.connect_flow(["BTCUSDT"], D("100"))
+        assert service.flow_task is None
+        assert service.session is old_session
+    finally:
+        release.set()
+        await disconnect
+    assert service.session is None
+    assert service.flow_state == "disconnected"
+    await service.close()

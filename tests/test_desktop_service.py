@@ -423,7 +423,7 @@ async def test_partial_start_failure_stops_session_before_allowing_reconnect(mon
     monkeypatch.setattr(instruments, "instruments", metadata)
     monkeypatch.setattr(desktop_module, "AnalysisSession", PartialSession)
     service = DesktopService(None, lambda snapshot: None)
-    service.connect_flow(["BTCUSDT"], D("100"))
+    service.connect_flow(["BTCUSDT"], D("0"))
     await entered.wait()
     assert service.flow_state == "failed"
     first_task = service.flow_task

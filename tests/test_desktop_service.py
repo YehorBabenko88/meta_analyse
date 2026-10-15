@@ -558,3 +558,29 @@ async def test_reconnect_after_failed_startup_creates_fresh_session(monkeypatch)
     assert sessions[1].stopped
     assert service.flow_state == "disconnected"
     await service.close()
+
+@pytest.mark.asyncio
+async def test_concurrent_disconnect_requests_share_single_cleanup():
+    """Concurrent callers must await one shutdown, not stop the session twice."""
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        calls = 0
+        async def stop(self):
+            self.calls += 1
+            entered.set()
+            await release.wait()
+    session = Session()
+    service.session = session
+    service.flow_state = "connected"
+    first = asyncio.create_task(service.disconnect_flow())
+    await entered.wait()
+    second = asyncio.create_task(service.disconnect_flow())
+    await asyncio.sleep(0)
+    assert session.calls == 1
+    release.set()
+    await asyncio.gather(first, second)
+    assert session.calls == 1
+    assert service.flow_state == "disconnected"
+    assert service.session is None
+    await service.close()

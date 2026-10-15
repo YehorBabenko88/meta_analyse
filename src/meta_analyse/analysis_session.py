@@ -5,6 +5,7 @@ from .pipeline import RawPipeline
 from .market_collector import MarketCollector
 from .analysis_coordinator import AnalysisCoordinator
 from .market_health import MarketHealthMonitor
+from .book_summary import summarize_book
 
 class AnalysisSession:
     def __init__(self,store,exchange,tick_sizes,*,on_update=None,on_gap=None,on_book_update=None):
@@ -42,7 +43,9 @@ class AnalysisSession:
         if book.valid:
             self.health.book(symbol)
             if self.on_book_update:
-                await self.on_book_update(symbol)
+                level=self.analysis.levels.get(symbol)
+                summary=summarize_book(book,self.analysis.footprints.tick_sizes[symbol],level)
+                await self.on_book_update(symbol,summary)
         else:
             self.health.gap("orderbook",[symbol])
 

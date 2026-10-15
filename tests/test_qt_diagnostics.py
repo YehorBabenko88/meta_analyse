@@ -104,3 +104,43 @@ async def test_diagnostics_feed_add_remove_and_new_session(monkeypatch, app):
     finally:
         window.close()
         await until(app, lambda: not window.worker.is_alive() and not window.isVisible())
+
+@pytest.mark.asyncio
+async def test_diagnostics_mixed_feed_cadences_and_sort(monkeypatch, app):
+    """Qt must classify identical ages differently for stream and polled feeds."""
+    monkeypatch.delenv("META_ANALYSE_DSN", raising=False)
+    window = Window()
+    window.show()
+    try:
+        await until(app, lambda: window.worker.is_alive())
+        table = window.diagnostics_table
+        window._snapshot = DesktopSnapshot(
+            flow_state="connected",
+            market_events=(("orderbook:BTCUSDT", 100), ("open_interest:BTCUSDT", 2)),
+            market_ages=(("orderbook:BTCUSDT", 300.0),
+                         ("open_interest:BTCUSDT", 300.0)),
+        )
+        window.repaint_state()
+        table.sortItems(0, Qt.SortOrder.DescendingOrder)
+        rows = {table.item(i, 0).text(): i for i in range(table.rowCount())}
+        assert table.item(rows["orderbook:BTCUSDT"], 4).text() == "STALE"
+        assert table.item(rows["open_interest:BTCUSDT"], 4).text() == "FRESH"
+        window._snapshot = replace(
+            window._snapshot,
+            market_ages=(("orderbook:BTCUSDT", 0.0),
+                         ("open_interest:BTCUSDT", 400.0)),
+        )
+        window.repaint_state()
+        rows = {table.item(i, 0).text(): i for i in range(table.rowCount())}
+        assert table.item(rows["orderbook:BTCUSDT"], 4).text() == "FRESH"
+        assert table.item(rows["open_interest:BTCUSDT"], 4).text() == "DELAYED"
+        from meta_analyse.freshness_style import freshness_colors_for_feed
+        for key, age in (("orderbook:BTCUSDT", 0.0),
+                         ("open_interest:BTCUSDT", 400.0)):
+            item = table.item(rows[key], 4)
+            fg, bg = freshness_colors_for_feed(key, age)
+            assert item.foreground().color().name() == fg.lower()
+            assert item.background().color().name() == bg.lower()
+    finally:
+        window.close()
+        await until(app, lambda: not window.worker.is_alive() and not window.isVisible())

@@ -269,3 +269,29 @@ async def test_close_releases_clients_when_session_stop_fails():
     assert service.session is None
     assert "token=private" not in service.status
     assert "RuntimeError" in service.status
+
+@pytest.mark.asyncio
+async def test_multiple_collector_failures_report_one_and_drain_all_tasks():
+    """Simultaneous worker crashes should yield one failed state, no leaked tasks."""
+    from meta_analyse.analysis_session import AnalysisSession
+    service = DesktopService(None, lambda snapshot: None)
+    session = AnalysisSession(None, None, {'BTCUSDT': D('.5')})
+    async def fail(message):
+        raise OSError(message)
+    first = asyncio.create_task(fail("password=first"))
+    second = asyncio.create_task(fail("token=second"))
+    pending = asyncio.create_task(asyncio.Event().wait())
+    session.raw.tasks.extend([first, pending])
+    session.market.tasks.append(second)
+    service.session, service.flow_state = session, "connected"
+    await asyncio.sleep(0)
+    await service.check_health()
+    assert service.flow_state == "failed"
+    assert "OSError" in service.flow_status
+    assert "password" not in service.flow_status
+    assert "token" not in service.flow_status
+    assert service.session is None
+    assert first.done() and second.done() and pending.done()
+    await service.check_health()
+    assert service.flow_state == "failed"
+    await service.close()

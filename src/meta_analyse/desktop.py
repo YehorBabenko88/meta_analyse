@@ -16,8 +16,8 @@ from .trader_theme import TRADER_QSS
 from .desktop_service import DesktopService, DesktopSnapshot
 from .flow_style import flow_cell_style
 from .flow_diff import changed_rows
-from .freshness import freshness_state
-from .freshness_style import freshness_colors
+from .freshness import freshness_for_feed
+from .freshness_style import freshness_colors_for_feed
 
 
 class FlowTableItem(QTableWidgetItem):
@@ -288,7 +288,7 @@ class Window(QWidget):
                 for col, value in ((1, str(event_counts.get(key, 0))),
                                    (2, str(gap_counts.get(key, 0))),
                                    (3, f"{ages[key]:.1f}" if key in ages else "—"),
-                                   (4, freshness_state(ages.get(key)))):
+                                   (4, freshness_for_feed(key, ages.get(key)))):
                     item = table.item(i, col)
                     if item is None:
                         item = QTableWidgetItem(value)
@@ -296,7 +296,7 @@ class Window(QWidget):
                     elif item.text() != value:
                         item.setText(value)
                     if col == 4:
-                        foreground, background = freshness_colors(ages.get(key))
+                        foreground, background = freshness_colors_for_feed(key, ages.get(key))
                         if item.foreground().color().name() != foreground.lower():
                             item.setForeground(QBrush(QColor(foreground)))
                         if item.background().color().name() != background.lower():

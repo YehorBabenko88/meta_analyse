@@ -1,6 +1,7 @@
 """Qt diagnostics table transitions with immutable worker snapshots."""
 import asyncio
 from dataclasses import replace
+from PySide6.QtCore import Qt
 import pytest
 from meta_analyse.desktop import Window
 from meta_analyse.desktop_service import DesktopSnapshot
@@ -55,7 +56,7 @@ async def test_diagnostics_sorting_preserves_feed_identity(monkeypatch, app):
         )
         window.repaint_state()
         table = window.diagnostics_table
-        table.sortItems(0, 1)  # Reverse symbol order.
+        table.sortItems(0, Qt.SortOrder.DescendingOrder)  # Reverse symbol order.
         window._snapshot = replace(window._snapshot,
             market_events=(("orderbook:BTCUSDT", 7), ("orderbook:ETHUSDT", 10)),
             market_ages=(("orderbook:BTCUSDT", 11.0), ("orderbook:ETHUSDT", 1.0)))

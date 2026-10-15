@@ -6,9 +6,10 @@ from .market_collector import MarketCollector
 from .analysis_coordinator import AnalysisCoordinator
 
 class AnalysisSession:
-    def __init__(self,store,exchange,tick_sizes,*,on_update=None):
+    def __init__(self,store,exchange,tick_sizes,*,on_update=None,on_gap=None):
         self.analysis=AnalysisCoordinator(tick_sizes)
         self.on_update=on_update
+        self.on_gap=on_gap
         self.raw=RawPipeline(store,tick_sizes,
                              on_execution=self._execution,on_gap=self._trade_gap)
         self.market=MarketCollector(store,exchange,
@@ -25,12 +26,16 @@ class AnalysisSession:
 
     async def _trade_gap(self,symbols,reason):
         await self.analysis.gap(symbols,reason)
+        if self.on_gap:
+            await self.on_gap(symbols,reason)
 
     async def _book(self,symbol,book,timestamp_ms):
         await self.analysis.book(symbol,book,timestamp_ms)
 
     async def _book_gap(self,symbols,reason):
         await self.analysis.book_gap(symbols,reason)
+        if self.on_gap:
+            await self.on_gap(symbols,reason)
 
     async def start(self):
         if self.started:

@@ -16,7 +16,7 @@ async def test_session_routes_trade_into_footprint_and_tape():
     session=AnalysisSession(None,None,{"BTCUSDT":D("0.5")},on_update=on_update)
     session.select_level("BTCUSDT",D("100"))
     await session._execution(trade(),contiguous=True)
-    assert seen[0][1]["prices"]["100"]["buy"]=="2"
+    assert seen[0][1]["prices"]["100.0"]["buy"]=="2"
     assert seen[0][2].trusted
     await session._trade_gap(["BTCUSDT"],"disconnect")
     assert not session.analysis.clock.align("BTCUSDT",1000).valid

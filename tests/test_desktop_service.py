@@ -64,3 +64,22 @@ async def test_monitor_double_start_and_close_cancel_tasks():
     task = service.monitor_task
     await service.close()
     assert task.done()
+@pytest.mark.asyncio
+async def test_failed_collector_is_reported_and_other_tasks_are_drained():
+    service = DesktopService(None, lambda snapshot: None)
+    from meta_analyse.analysis_session import AnalysisSession
+    s = AnalysisSession(None, None, {'BTCUSDT': D('.5')})
+    async def fail():
+        raise OSError('secret=hidden')
+    task = asyncio.create_task(fail())
+    sibling = asyncio.create_task(asyncio.Event().wait())
+    s.raw.tasks.append(task)
+    s.market.tasks.append(sibling)
+    service.session, service.flow_state = s, 'connected'
+    await asyncio.sleep(0)
+    await service.check_health()
+    assert service.snapshot().flow_state == 'failed'
+    assert 'OSError' in service.snapshot().flow_status
+    assert 'hidden' not in service.snapshot().flow_status
+    assert sibling.done()
+    await service.close()

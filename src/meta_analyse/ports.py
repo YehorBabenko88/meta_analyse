@@ -47,17 +47,17 @@ class MetaScalp:
         return await self.request("POST", "/api/combo", json={"tickers": symbols, "activate": True})
 
     async def levels(self, connection: int, ticker: str):
-        return await self.request("GET", f"/api/connections/{connection}/signal-levels", params={"Ticker": ticker})
+        return await self.request("GET", f"/api/connections/{connection}/user-levels", params={"Ticker": ticker})
 
     async def add_level(self, connection: int, ticker: str, price: str, rule: str, note: str):
         if rule not in ("LessThanEqual", "GreaterThanEqual"):
-            raise ValueError("bad trigger rule")
-        return await self.request("POST", f"/api/connections/{connection}/signal-levels", json={
-            "ticker": ticker, "price": price, "triggerRule": rule, "note": note,
+            raise ValueError("invalid legacy level direction")
+        return await self.request("POST", f"/api/connections/{connection}/user-levels", json={
+            "ticker": ticker, "price": price, "name": "Meta Analyse", "note": note,
             "lineStyle": "Dashed", "lineThickness": 1, "lineColor": "#E0AA44"})
 
     async def remove_level(self, connection: int, level_id: int):
-        return await self.request("DELETE", f"/api/connections/{connection}/signal-levels/{level_id}")
+        return await self.request("DELETE", f"/api/connections/{connection}/user-levels/{level_id}")
 
     async def close(self):
         await self.client.aclose()

@@ -24,6 +24,17 @@ The original audit remains in `docs/CODEX_WINDOWS_AUDIT.md`. This follow-up does
 - Close with twenty instruments, two trade plus two book sockets and all forty subscribed topics. Block real DB persistence at its boundary, verify Qt timer dispatch while cleanup waits, release DB operation, verify worker/loop/clients close. Repeat with disconnect already in progress.
 - Local actual Windows 11/Python 3.12.15/PySide6 6.12.0/PostgreSQL 17.6: full reconciled suite **114 passed in 76.11s, native exit 0**. Corrected Linux cleanup-barrier test subsequently passed both variants locally. CI supplies authoritative exact-head cross-platform results and artifacts.
 
+## Cross-platform CI
+
+PR follow-up: [#4](https://github.com/YehorBabenko88/meta_analyse/pull/4). Source head `e6630727772f531ed3307163075fe1a777de985e` passed both jobs in [pull-request run38770835567](https://github.com/YehorBabenko88/meta_analyse/actions/runs/38770835567). Base advanced without conflicts to `9be7041091979551068715f96141cf4ca38fcdcc`; the PR merge validation includes its three additional collector-telemetry tests, explaining the difference from the local114-test suite.
+
+| CI job | Regression result | 3s offscreen UI callbacks/s | Render p95 | Snapshot-to-render p95 | CPU, one-core equivalent |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Windows | 117 passed,31.49s | 19,967 | 5.861ms | 5.996ms | 34.3% |
+| Linux | 116 passed,1 Windows-only skip,9.91s | 19,997 | 3.399ms | 3.566ms | 26.7% |
+
+Both benchmark processes closed workers/loops. These runner diagnostics are not directly comparable to native workstation timings because duration, platform plugin, CPU and scheduling differ. There are no hardware-specific timing pass thresholds. All four push/pull-request checks and subsequent documentation commits are visible on the PR; retained artifacts contain the exact per-head evidence.
+
 ## Native Windows performance
 
 Ten-second runs, twenty symbols, target 20,000 synthetic execution callbacks/s, normal 10Hz immutable publication, actual native Qt `windows` plugin. The worker invokes the real bridge callback; the Qt loop handles queued snapshots, a 10ms heartbeat and actual table updates. Runs are sequential, not competing benchmark processes. Each run also performs 300 iterations per microbenchmark case. Full reference replaces every cell, matching the previous full-repaint strategy; it is a controlled reference, not execution of broken commit897d3062.

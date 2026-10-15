@@ -462,3 +462,32 @@ async def test_failed_partial_start_cleanup_error_is_sanitized(monkeypatch):
     assert "password" not in service.status
     assert "token" not in service.status
     await service.close()
+
+@pytest.mark.asyncio
+async def test_disconnect_during_partial_session_start_cleans_allocated_session(monkeypatch):
+    """Cancellation after session construction must invoke session.stop()."""
+    from meta_analyse import instruments
+    from meta_analyse import desktop_service as desktop_module
+    from types import SimpleNamespace
+    entered, stopped = asyncio.Event(), asyncio.Event()
+    async def metadata(exchange):
+        return {"BTCUSDT": SimpleNamespace(tick_size=D(".5"))}
+    class PartialSession:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def start(self):
+            entered.set()
+            await asyncio.Event().wait()
+        async def stop(self):
+            stopped.set()
+    monkeypatch.setattr(instruments, "instruments", metadata)
+    monkeypatch.setattr(desktop_module, "AnalysisSession", PartialSession)
+    service = DesktopService(None, lambda snapshot: None)
+    service.connect_flow(["BTCUSDT"], D("0"))
+    await entered.wait()
+    await service.disconnect_flow()
+    assert stopped.is_set()
+    assert service.session is None
+    assert service.flow_state == "disconnected"
+    assert service.flow_task is None
+    await service.close()

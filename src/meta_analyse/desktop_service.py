@@ -115,6 +115,10 @@ class DesktopService:
         self.bridge.invalidate(symbols)
 
     async def disconnect_flow(self):
+        if (self.flow_state == 'disconnected' and self.session is None
+                and (self.flow_task is None or self.flow_task.done())
+                and (self.disconnect_task is None or self.disconnect_task.done())):
+            return
         # Repeated clicks join one cleanup; they cannot publish disconnected early
         # or queue a second stop that accidentally cancels a later new session.
         if self.disconnect_task is None or self.disconnect_task.done():

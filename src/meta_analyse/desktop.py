@@ -18,6 +18,18 @@ from .flow_style import flow_cell_style
 from .flow_diff import changed_rows
 
 
+class FlowTableItem(QTableWidgetItem):
+    """Numeric market values sort by value; symbols/placeholders sort as text."""
+    def __lt__(self, other):
+        try:
+            left, right = Decimal(self.text()), Decimal(other.text())
+            if left.is_finite() and right.is_finite():
+                return left < right
+        except ArithmeticError:
+            pass
+        return self.text() < other.text()
+
+
 class WorkerSignals(QObject):
     snapshot = Signal(object)
     error = Signal(str)
@@ -203,21 +215,39 @@ class Window(QWidget):
         rows = self._snapshot.flow_rows
         changed, rebuild = changed_rows(getattr(self, "_previous_flow_rows", ()), rows)
         if rebuild or changed:
-            self.flow_table.setSortingEnabled(False)
-            if rebuild:
-                self.flow_table.setRowCount(len(rows))
-            for row in changed:
-                entry = rows[row]
-                values = (entry.symbol, entry.level, entry.poc, entry.delta,
-                          entry.tape_rate, entry.quality, entry.spread, entry.imbalance, entry.wall)
-                for col, value in enumerate(values):
-                    item = QTableWidgetItem(value)
-                    foreground, background = flow_cell_style(col, value, entry.quality)
-                    item.setForeground(QBrush(QColor(foreground)))
-                    item.setBackground(QBrush(QColor(background)))
-                    self.flow_table.setItem(row, col, item)
-            self.flow_table.setSortingEnabled(True)
-            self._previous_flow_rows = rows
+            table = self.flow_table
+            sorting = table.isSortingEnabled()
+            updates = table.updatesEnabled()
+            table.setUpdatesEnabled(False)
+            table.setSortingEnabled(False)
+            try:
+                if rebuild:
+                    table.setRowCount(len(rows))
+                    positions = {entry.symbol: i for i, entry in enumerate(rows)}
+                else:
+                    # Sorting changes visual positions without changing snapshot order.
+                    positions = {table.item(i, 0).text(): i for i in range(table.rowCount())}
+                for index in changed:
+                    entry = rows[index]
+                    row = positions[entry.symbol]
+                    values = (entry.symbol, entry.level, entry.poc, entry.delta,
+                              entry.tape_rate, entry.quality, entry.spread, entry.imbalance, entry.wall)
+                    for col, value in enumerate(values):
+                        item = table.item(row, col)
+                        if item is None:
+                            item = FlowTableItem(value)
+                            table.setItem(row, col, item)
+                        elif item.text() != value:
+                            item.setText(value)
+                        foreground, background = flow_cell_style(col, value, entry.quality)
+                        if item.foreground().color().name() != foreground.lower():
+                            item.setForeground(QBrush(QColor(foreground)))
+                        if item.background().color().name() != background.lower():
+                            item.setBackground(QBrush(QColor(background)))
+                self._previous_flow_rows = rows
+            finally:
+                table.setSortingEnabled(sorting)
+                table.setUpdatesEnabled(updates)
         self.stats.setRowCount(len(self._snapshot.stats))
         for row, values in enumerate(self._snapshot.stats):
             for col, value in enumerate(values):

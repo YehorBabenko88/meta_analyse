@@ -286,7 +286,8 @@ class Window(QWidget):
                                (4, freshness_state(ages.get(key)))):
                 item = self.diagnostics_table.item(i, col)
                 if item is None:
-                    self.diagnostics_table.setItem(i, col, QTableWidgetItem(value))
+                    item = QTableWidgetItem(value)
+                    self.diagnostics_table.setItem(i, col, item)
                 elif item.text() != value:
                     item.setText(value)
                 if col == 4:

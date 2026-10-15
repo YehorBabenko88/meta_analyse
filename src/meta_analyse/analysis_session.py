@@ -4,10 +4,12 @@ import asyncio
 from .pipeline import RawPipeline
 from .market_collector import MarketCollector
 from .analysis_coordinator import AnalysisCoordinator
+from .market_health import MarketHealthMonitor
 
 class AnalysisSession:
     def __init__(self,store,exchange,tick_sizes,*,on_update=None,on_gap=None):
         self.analysis=AnalysisCoordinator(tick_sizes)
+        self.health=MarketHealthMonitor()
         self.on_update=on_update
         self.on_gap=on_gap
         self.raw=RawPipeline(store,tick_sizes,
@@ -21,19 +23,29 @@ class AnalysisSession:
 
     async def _execution(self,event,*,contiguous):
         footprint,tape=await self.analysis.execution(event,contiguous=contiguous)
+        if contiguous:
+            self.health.execution(event.symbol)
+        else:
+            self.health.gap("trades",[event.symbol])
         if self.on_update:
             await self.on_update(event.symbol,footprint.snapshot(),tape)
 
     async def _trade_gap(self,symbols,reason):
         await self.analysis.gap(symbols,reason)
+        self.health.gap("trades",symbols)
         if self.on_gap:
             await self.on_gap(symbols,reason)
 
     async def _book(self,symbol,book,timestamp_ms):
         await self.analysis.book(symbol,book,timestamp_ms)
+        if book.valid:
+            self.health.book(symbol)
+        else:
+            self.health.gap("orderbook",[symbol])
 
     async def _book_gap(self,symbols,reason):
         await self.analysis.book_gap(symbols,reason)
+        self.health.gap("orderbook",symbols)
         if self.on_gap:
             await self.on_gap(symbols,reason)
 

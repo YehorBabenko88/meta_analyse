@@ -17,6 +17,7 @@ from .desktop_service import DesktopService, DesktopSnapshot
 from .flow_style import flow_cell_style
 from .flow_diff import changed_rows
 from .freshness import freshness_state
+from .freshness_style import freshness_colors
 
 
 class FlowTableItem(QTableWidgetItem):
@@ -288,6 +289,12 @@ class Window(QWidget):
                     self.diagnostics_table.setItem(i, col, QTableWidgetItem(value))
                 elif item.text() != value:
                     item.setText(value)
+                if col == 4:
+                    foreground, background = freshness_colors(ages.get(key))
+                    if item.foreground().color().name() != foreground.lower():
+                        item.setForeground(QBrush(QColor(foreground)))
+                    if item.background().color().name() != background.lower():
+                        item.setBackground(QBrush(QColor(background)))
         self.stats.setRowCount(len(self._snapshot.stats))
         for row, values in enumerate(self._snapshot.stats):
             for col, value in enumerate(values):

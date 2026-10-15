@@ -176,6 +176,8 @@ class DesktopService:
         if ended is not None:
             exc = asyncio.CancelledError() if ended.cancelled() else ended.exception()
             await self.disconnect_flow()
+            if self.closing:
+                return
             self.flow_state = 'failed'
             self.flow_status = f'Collector stopped ({type(exc).__name__}); data UNVERIFIED'
 

@@ -615,3 +615,30 @@ async def test_cancelled_disconnect_waiter_does_not_cancel_shared_cleanup():
     assert service.flow_state == "disconnected"
     assert service.session is None
     await service.close()
+
+@pytest.mark.asyncio
+async def test_close_joins_in_progress_disconnect_without_second_stop():
+    """Application close must await an existing manual disconnect."""
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        calls = 0
+        async def stop(self):
+            self.calls += 1
+            entered.set()
+            await release.wait()
+    session = Session()
+    service.session = session
+    service.flow_state = "connected"
+    manual = asyncio.create_task(service.disconnect_flow())
+    await entered.wait()
+    closing = asyncio.create_task(service.close())
+    await asyncio.sleep(0)
+    assert service.closing
+    assert not closing.done()
+    assert session.calls == 1
+    release.set()
+    await asyncio.gather(manual, closing)
+    assert session.calls == 1
+    assert service.session is None
+    assert service.flow_state == "disconnected"

@@ -17,6 +17,7 @@ from .liquidity import large_levels
 from decimal import Decimal
 from .trader_theme import TRADER_QSS
 from .flow_bridge import FlowBridge
+from .analysis_session import AnalysisSession
 
 class Window(QWidget):
     def __init__(self):
@@ -73,6 +74,7 @@ class Window(QWidget):
         self.tabs.addTab(paper, "Paper results")
         self.analysis = AnalysisCoordinator({})
         self.flow_bridge = FlowBridge()
+        self.live_session = None
         flow = QWidget()
         flow_layout = QVBoxLayout(flow)
         flow_layout.addWidget(QLabel("Order flow diagnostics — read-only; data are unverified until live feeds connect"))
@@ -83,6 +85,16 @@ class Window(QWidget):
         self.flow_table.setSortingEnabled(True)
         self.flow_table.setHorizontalHeaderLabels(["Symbol", "Level", "POC", "Delta", "Tape trades/s", "Quality"])
         flow_layout.addWidget(self.flow_table)
+        controls_row = QHBoxLayout()
+        self.level_price = QDoubleSpinBox()
+        self.level_price.setDecimals(6)
+        self.level_price.setMaximum(1000000000)
+        self.level_price.setPrefix("Level: ")
+        controls_row.addWidget(self.level_price)
+        self.connect_flow_button = QPushButton("Connect selected flow")
+        self.connect_flow_button.clicked.connect(self.connect_flow)
+        controls_row.addWidget(self.connect_flow_button)
+        flow_layout.addLayout(controls_row)
         self.tabs.addTab(flow, "Order flow")
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.repaint_state)
@@ -118,6 +130,45 @@ class Window(QWidget):
             self.schedule(asyncio.to_thread(self.store.initialize))
         self.schedule(self.runtime.run())
         self.status.setText("Monitor requested; see console/log for connectivity errors")
+
+    def connect_flow(self):
+        selected = [item.text() for item in self.list.selectedItems()]
+        if not self.store:
+            QMessageBox.warning(self, "Database required",
+                                "Set META_ANALYSE_DSN before connecting raw market feeds.")
+            return
+        if not selected or len(selected) > 20:
+            QMessageBox.warning(self, "Selection required", "Select 1–20 markets.")
+            return
+        if self.live_session is not None:
+            QMessageBox.information(self, "Already running", "Flow session is already running.")
+            return
+        self.connect_flow_button.setEnabled(False)
+        self.flow_status.setText("Connecting; historical continuity remains unverified")
+        self.schedule(self._start_flow(selected, Decimal(str(self.level_price.value()))))
+
+    async def _start_flow(self, symbols, level):
+        try:
+            from .instruments import instruments
+            metadata = await instruments(self.exchange)
+            tick_sizes = {s: metadata[s].tick_size for s in symbols if s in metadata}
+            if len(tick_sizes) != len(symbols):
+                raise ValueError("Missing tick sizes for selected symbols")
+            session = AnalysisSession(self.store, self.exchange, tick_sizes,
+                                      on_update=self.flow_bridge.update,
+                                      on_gap=self._invalidate_flow)
+            if level > 0:
+                for symbol in symbols:
+                    session.select_level(symbol, level)
+            await session.start()
+            self.live_session = session
+        except Exception as exc:
+            self.flow_bridge.invalidate(symbols)
+            print("Flow startup failed:", exc, file=sys.stderr)
+            self.flow_start_error = str(exc)
+
+    async def _invalidate_flow(self, symbols, reason):
+        self.flow_bridge.invalidate(symbols)
 
     def toggle_paper(self, enabled):
         self.runtime.paper.enabled = enabled
@@ -161,6 +212,12 @@ class Window(QWidget):
 
     def closeEvent(self, event):
         self.runtime.stop()
+        if self.live_session is not None:
+            future = asyncio.run_coroutine_threadsafe(self.live_session.stop(), self.loop)
+            try:
+                future.result(timeout=5)
+            except Exception as exc:
+                print("Flow shutdown failed:", exc, file=sys.stderr)
         self.loop.call_soon_threadsafe(self.loop.stop)
         super().closeEvent(event)
 

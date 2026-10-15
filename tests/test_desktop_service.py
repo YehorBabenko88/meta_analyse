@@ -196,3 +196,23 @@ async def test_reconnect_rejected_while_disconnect_task_is_pending_even_if_state
     assert service.session is None
     assert service.flow_state == "disconnected"
     await service.close()
+
+@pytest.mark.asyncio
+async def test_idle_disconnect_is_idempotent_and_does_not_replace_cleanup_task():
+    service = DesktopService(None, lambda snapshot: None)
+    assert service.flow_state == "disconnected"
+    assert service.disconnect_task is None
+    await service.disconnect_flow()
+    await service.disconnect_flow()
+    assert service.disconnect_task is None
+    assert service.flow_state == "disconnected"
+    # An idle disconnect must not interfere with a later startup.
+    service.flow_state = "connecting"
+    async def pending():
+        await asyncio.Event().wait()
+    service.flow_task = asyncio.create_task(pending())
+    await asyncio.sleep(0)
+    await service.disconnect_flow()
+    assert service.flow_task is None
+    assert service.flow_state == "disconnected"
+    await service.close()

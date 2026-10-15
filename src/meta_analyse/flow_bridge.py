@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from threading import Lock
+from .market_health import MarketHealthMonitor
 
 @dataclass(frozen=True)
 class FlowRow:
@@ -16,6 +17,7 @@ class FlowBridge:
     def __init__(self):
         self._lock=Lock()
         self._rows={}
+        self.health=MarketHealthMonitor()
 
     async def update(self,symbol,footprint,tape):
         if tape is None:
@@ -30,11 +32,26 @@ class FlowBridge:
         with self._lock:
             self._rows[symbol]=row
 
+    def trade_observed(self,symbol):
+        self.health.execution(symbol)
+
+    def book_observed(self,symbol):
+        self.health.book(symbol)
+
+    def source_gap(self,source,symbols):
+        self.health.gap(source,symbols)
+
     def snapshot(self):
         with self._lock:
-            return tuple(self._rows[key] for key in sorted(self._rows))
+            rows=tuple(self._rows[key] for key in sorted(self._rows))
+        health={entry.symbol:entry for entry in self.health.snapshot([r.symbol for r in rows])}
+        return tuple(FlowRow(row.symbol,row.level,row.poc,row.delta,row.tape_rate,
+                             "UNVERIFIED" if row.quality=="UNVERIFIED"
+                             else health[row.symbol].combined) for row in rows)
 
     def invalidate(self,symbols):
+        self.health.gap("trades",symbols)
+        self.health.gap("orderbook",symbols)
         with self._lock:
             for symbol in symbols:
                 old=self._rows.get(symbol)

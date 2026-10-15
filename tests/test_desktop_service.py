@@ -400,3 +400,65 @@ async def test_health_failure_does_not_overwrite_new_connection_after_cleanup():
     await service.check_health()
     assert service.flow_state == "connecting"
     assert service.flow_status != "Collector stopped (RuntimeError); data UNVERIFIED"
+
+@pytest.mark.asyncio
+async def test_partial_start_failure_stops_session_before_allowing_reconnect(monkeypatch):
+    from meta_analyse import instruments
+    from meta_analyse import desktop_service as desktop_module
+    from types import SimpleNamespace
+    entered, release = asyncio.Event(), asyncio.Event()
+    events = []
+    async def metadata(exchange):
+        return {"BTCUSDT": SimpleNamespace(tick_size=D(".5"))}
+    class PartialSession:
+        def __init__(self, *args, **kwargs):
+            events.append("created")
+        async def start(self):
+            events.append("start")
+            raise RuntimeError("password=hidden")
+        async def stop(self):
+            events.append("stop")
+            entered.set()
+            await release.wait()
+    monkeypatch.setattr(instruments, "instruments", metadata)
+    monkeypatch.setattr(desktop_module, "AnalysisSession", PartialSession)
+    service = DesktopService(None, lambda snapshot: None)
+    service.connect_flow(["BTCUSDT"], D("100"))
+    await entered.wait()
+    assert service.flow_state == "failed"
+    first_task = service.flow_task
+    service.connect_flow(["BTCUSDT"], D("100"))
+    assert service.flow_task is first_task
+    assert events == ["created", "start", "stop"]
+    release.set()
+    await first_task
+    assert service.session is None
+    assert service.flow_state == "failed"
+    assert "password" not in service.flow_status
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_failed_partial_start_cleanup_error_is_sanitized(monkeypatch):
+    from meta_analyse import instruments
+    from meta_analyse import desktop_service as desktop_module
+    from types import SimpleNamespace
+    async def metadata(exchange):
+        return {"BTCUSDT": SimpleNamespace(tick_size=D(".5"))}
+    class BrokenSession:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def start(self):
+            raise OSError("token=private")
+        async def stop(self):
+            raise RuntimeError("password=private")
+    monkeypatch.setattr(instruments, "instruments", metadata)
+    monkeypatch.setattr(desktop_module, "AnalysisSession", BrokenSession)
+    service = DesktopService(None, lambda snapshot: None)
+    service.connect_flow(["BTCUSDT"], D("100"))
+    await service.flow_task
+    assert service.flow_state == "failed"
+    assert service.session is None
+    assert "Flow startup cleanup failed (RuntimeError)" in service.status
+    assert "password" not in service.status
+    assert "token" not in service.status
+    await service.close()

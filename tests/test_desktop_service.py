@@ -353,3 +353,30 @@ async def test_close_during_collector_failure_does_not_restore_failed_state():
     assert service.flow_state == "disconnected"
     assert service.flow_status.startswith("Disconnected")
     assert service.session is None
+
+@pytest.mark.asyncio
+async def test_manual_disconnect_owns_cleanup_before_health_failure_reporting():
+    """A completed worker must not override an already-started manual stop."""
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        def __init__(self):
+            async def failed():
+                raise RuntimeError("collector crashed")
+            self.raw = type("Raw", (), {"tasks": [asyncio.create_task(failed())]})()
+            self.market = type("Market", (), {"tasks": []})()
+        async def stop(self):
+            entered.set()
+            await release.wait()
+    service.session = Session()
+    service.flow_state = "connected"
+    await asyncio.sleep(0)
+    manual = asyncio.create_task(service.disconnect_flow())
+    await entered.wait()
+    await service.check_health()
+    release.set()
+    await manual
+    assert service.flow_state == "disconnected"
+    assert service.flow_status.startswith("Disconnected")
+    assert service.session is None
+    await service.close()

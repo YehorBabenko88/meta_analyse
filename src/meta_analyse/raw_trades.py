@@ -54,7 +54,7 @@ class RawTradeStream:
         while not stop.is_set():
             try:
                 async with websockets.connect(self.url, ping_interval=20, ping_timeout=15,
-                                              max_queue=1024, max_size=8_388_608) as ws:
+                                              max_queue=1024, max_size=8_388_608, close_timeout=2) as ws:
                     await ws.send(json.dumps({"op": "subscribe", "args": [
                         f"publicTrade.{symbol}" for symbol in symbols]}))
                     await self.on_gap(symbols, "connect_or_reconnect: historical tick continuity unverified")

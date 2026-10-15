@@ -24,4 +24,4 @@ testpaths = ["tests"]
 
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
-filterwarnings = ["error::ResourceWarning"]
+filterwarnings = ["error::ResourceWarning", "error::pytest.PytestUnraisableExceptionWarning", "error::pytest.PytestUnhandledThreadExceptionWarning"]

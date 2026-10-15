@@ -21,13 +21,16 @@ from .flow_diff import changed_rows
 class FlowTableItem(QTableWidgetItem):
     """Numeric market values sort by value; symbols/placeholders sort as text."""
     def __lt__(self, other):
-        try:
-            left, right = Decimal(self.text()), Decimal(other.text())
-            if left.is_finite() and right.is_finite():
-                return left < right
-        except ArithmeticError:
-            pass
-        return self.text() < other.text()
+        def key(text):
+            try:
+                number = Decimal(text)
+                if number.is_finite():
+                    return (0, number)
+            except ArithmeticError:
+                pass
+            return (1, text)
+        return key(self.text()) < key(other.text())
+
 
 
 class WorkerSignals(QObject):
@@ -253,13 +256,15 @@ class Window(QWidget):
             for col, value in enumerate(values):
                 self.stats.setItem(row, col, QTableWidgetItem(value))
     async def _shutdown(self):
-        # Cancel outstanding refresh, metadata and publish operations first.
+        # Let owners finish their one cancellation/closing handshake first.
+        # Cancelling every asyncio task here a second time can interrupt an
+        # already-running disconnect and abandon the WebSocket transport.
+        await self.service.close()
         current = asyncio.current_task()
         tasks = [task for task in asyncio.all_tasks() if task is not current]
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
-        await self.service.close()
     def _finish_close(self):
         if self.worker.is_alive():
             return

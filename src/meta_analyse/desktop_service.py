@@ -142,8 +142,20 @@ class DesktopService:
         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
                                self.flow_state, self.flow_status, self.status)
 
+    async def check_health(self):
+        if self.flow_state != 'connected' or self.session is None:
+            return
+        tasks = self.session.raw.tasks + self.session.market.tasks
+        ended = next((task for task in tasks if task.done()), None)
+        if ended is not None:
+            exc = asyncio.CancelledError() if ended.cancelled() else ended.exception()
+            await self.disconnect_flow()
+            self.flow_state = 'failed'
+            self.flow_status = f'Collector stopped ({type(exc).__name__}); data UNVERIFIED'
+
     async def publish_loop(self):
         while True:
+            await self.check_health()
             self.publish(self.snapshot())
             await asyncio.sleep(.1)
 

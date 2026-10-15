@@ -706,3 +706,23 @@ async def test_close_records_second_client_shutdown_failure():
     assert "Client shutdown failed (RuntimeError)" in service.status
     assert "api_key" not in service.status
     assert "private" not in service.status
+
+@pytest.mark.asyncio
+async def test_both_client_shutdown_failures_are_attempted_and_sanitized():
+    """Failure of both client closes must not abort the service shutdown."""
+    service = DesktopService(None, lambda snapshot: None)
+    calls = []
+    class FailingClient:
+        def __init__(self, name):
+            self.name = name
+        async def close(self):
+            calls.append(self.name)
+            raise RuntimeError(f"{self.name} secret=private")
+    service.api = FailingClient("api")
+    service.exchange = FailingClient("exchange")
+    await service.close()
+    assert calls == ["api", "exchange"]
+    assert service.closing
+    assert "Client shutdown failed (RuntimeError)" in service.status
+    assert "secret" not in service.status
+    assert "private" not in service.status

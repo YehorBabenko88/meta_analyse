@@ -72,8 +72,8 @@ class BybitPublic:
             if earliest >= cursor:
                 break
             cursor = earliest - 1
-            if len(raw) < 1000:
-                break
+            # A short page is not proof of exhausted exchange history.
+            # Continue until the API returns no older candles or reaches start_ms.
             await asyncio.sleep(.12)
 
     async def close(self):

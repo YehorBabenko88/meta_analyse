@@ -102,7 +102,12 @@ class DesktopService:
             self.flow_state = 'failed'
             self.flow_status = f'Connection failed ({type(exc).__name__}); data UNVERIFIED'
             self.error('Flow startup', exc)
-            self.session = None
+            session, self.session = self.session, None
+            if session is not None:
+                try:
+                    await session.stop()
+                except Exception as cleanup_exc:
+                    self.error('Flow startup cleanup', cleanup_exc)
 
     async def _flow_execution(self, symbol, footprint, tape):
         await self.bridge.update(symbol, footprint, tape)

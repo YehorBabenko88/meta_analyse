@@ -1,5 +1,6 @@
 """Strict execution ordering and minute provenance, no invented ticks."""
 from dataclasses import dataclass
+from collections import deque
 from datetime import datetime, timezone
 from decimal import Decimal
 from .raw_trades import RawExecution
@@ -20,6 +21,8 @@ class ExecutionAggregator:
         self.minutes = {}
         self.closed = []
         self.seen: set[tuple[str, str]] = set()
+        self._seen_order = deque()
+        self.max_seen = 100000
 
     def gap(self, symbols: list[str], reason: str):
         for symbol in symbols:
@@ -57,5 +60,8 @@ class ExecutionAggregator:
         else:
             current.add(t)
         self.seen.add(key)
+        self._seen_order.append(key)
+        if len(self._seen_order) > self.max_seen:
+            self.seen.discard(self._seen_order.popleft())
         q.last_timestamp_ms = e.timestamp_ms
         return current

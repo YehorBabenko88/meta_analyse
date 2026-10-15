@@ -36,3 +36,21 @@ def test_disconnecting_hides_previous_feed_counters():
         service.flow_state=state
         assert service.snapshot().market_events==()
         assert service.snapshot().market_gaps==()
+
+def test_reconnect_uses_new_session_counters_not_previous():
+    service=DesktopService(None,lambda snapshot:None)
+    service.runtime=SimpleNamespace(symbols=[],paper=SimpleNamespace(fills=[],positions={}))
+    first=MarketTelemetry()
+    first.observe("orderbook","BTCUSDT")
+    first.observe("orderbook","BTCUSDT")
+    service.session=SimpleNamespace(market=SimpleNamespace(telemetry=first))
+    service.flow_state="connected"
+    assert service.snapshot().market_events==(("orderbook:BTCUSDT",2),)
+    service.flow_state="disconnected"
+    service.session=None
+    assert service.snapshot().market_events==()
+    second=MarketTelemetry()
+    second.observe("orderbook","ETHUSDT")
+    service.session=SimpleNamespace(market=SimpleNamespace(telemetry=second))
+    service.flow_state="connected"
+    assert service.snapshot().market_events==(("orderbook:ETHUSDT",1),)

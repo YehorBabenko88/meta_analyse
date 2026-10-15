@@ -642,3 +642,22 @@ async def test_close_joins_in_progress_disconnect_without_second_stop():
     assert session.calls == 1
     assert service.session is None
     assert service.flow_state == "disconnected"
+
+@pytest.mark.asyncio
+async def test_connect_is_rejected_once_close_begins(monkeypatch):
+    """Closing is terminal: no new flow task or session may be created."""
+    from meta_analyse import instruments
+    calls = []
+    async def metadata(exchange):
+        calls.append("metadata")
+        return {}
+    monkeypatch.setattr(instruments, "instruments", metadata)
+    service = DesktopService(None, lambda snapshot: None)
+    await service.close()
+    assert service.closing
+    service.connect_flow(["BTCUSDT"], D("0"))
+    await asyncio.sleep(0)
+    assert not calls
+    assert service.flow_task is None
+    assert service.session is None
+    assert service.flow_state == "disconnected"

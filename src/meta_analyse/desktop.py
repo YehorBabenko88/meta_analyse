@@ -15,6 +15,8 @@ from .storage import Store
 from .analysis_coordinator import AnalysisCoordinator
 from .liquidity import large_levels
 from decimal import Decimal
+from .trader_theme import TRADER_QSS
+from .flow_bridge import FlowBridge
 
 class Window(QWidget):
     def __init__(self):
@@ -70,12 +72,15 @@ class Window(QWidget):
         controls.addWidget(self.stats)
         self.tabs.addTab(paper, "Paper results")
         self.analysis = AnalysisCoordinator({})
+        self.flow_bridge = FlowBridge()
         flow = QWidget()
         flow_layout = QVBoxLayout(flow)
         flow_layout.addWidget(QLabel("Order flow diagnostics — read-only; data are unverified until live feeds connect"))
         self.flow_status = QLabel("No validated trade/orderbook stream attached")
         flow_layout.addWidget(self.flow_status)
         self.flow_table = QTableWidget(0, 6)
+        self.flow_table.setAlternatingRowColors(True)
+        self.flow_table.setSortingEnabled(True)
         self.flow_table.setHorizontalHeaderLabels(["Symbol", "Level", "POC", "Delta", "Tape trades/s", "Quality"])
         flow_layout.addWidget(self.flow_table)
         self.tabs.addTab(flow, "Order flow")
@@ -134,15 +139,15 @@ class Window(QWidget):
             self.list.addItems(self.runtime.symbols)
             for i in range(self.list.count()):
                 self.list.item(i).setSelected(self.list.item(i).text() in selected)
-        self.flow_table.setRowCount(len(self.analysis.footprints.current))
-        for row, (symbol, footprint) in enumerate(sorted(self.analysis.footprints.current.items())):
-            tape = self.analysis.tapes.get(symbol)
-            quality = self.analysis.clock.align(symbol, footprint.last_ts or 0)
-            values = [symbol, str(self.analysis.levels.get(symbol, "-")),
-                      str(footprint.poc or "-"), str(footprint.delta),
-                      "-", "verified" if quality.valid and footprint.trusted else "UNVERIFIED"]
+        rows = self.flow_bridge.snapshot()
+        self.flow_table.setSortingEnabled(False)
+        self.flow_table.setRowCount(len(rows))
+        for row, entry in enumerate(rows):
+            values = (entry.symbol, entry.level, entry.poc, entry.delta,
+                      entry.tape_rate, entry.quality)
             for col, value in enumerate(values):
                 self.flow_table.setItem(row, col, QTableWidgetItem(value))
+        self.flow_table.setSortingEnabled(True)
         engine = self.runtime.paper
         symbols = sorted(set(self.runtime.symbols) | {f.symbol for f in engine.fills})
         self.stats.setRowCount(len(symbols))
@@ -161,6 +166,7 @@ class Window(QWidget):
 
 def main():
     app = QApplication(sys.argv)
+    app.setStyleSheet(TRADER_QSS)
     window = Window()
     window.show()
     sys.exit(app.exec())

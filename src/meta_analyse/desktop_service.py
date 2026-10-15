@@ -72,7 +72,8 @@ class DesktopService:
         self.monitor_task = asyncio.create_task(run())
 
     def connect_flow(self, symbols, level):
-        if self.closing or self.flow_state in ('connecting', 'connected', 'stopping'):
+        if (self.closing or self.flow_state in ('connecting', 'connected', 'stopping')
+                or self.disconnect_task is not None and not self.disconnect_task.done()):
             return
         self.flow_state = 'connecting'
         self.flow_status = 'Connecting; historical continuity remains unverified'

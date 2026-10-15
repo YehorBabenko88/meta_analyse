@@ -17,6 +17,7 @@ class CollectorService:
         self.pipeline=None
         self.running=False
         self.current=()
+        self.refresh_errors=0
 
     async def run(self):
         self.running=True
@@ -41,6 +42,7 @@ class CollectorService:
                 except asyncio.CancelledError:
                     raise
                 except Exception:
+                    self.refresh_errors += 1
                     LOG.exception("Collector refresh failed; existing stream preserved")
                 await asyncio.sleep(self.refresh_seconds)
         finally:

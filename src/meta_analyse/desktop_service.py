@@ -28,9 +28,11 @@ class DesktopService:
         self.flow_status = 'Disconnected — data marked UNVERIFIED'
         self.status = 'Standby; no exchange orders are ever sent'
         self.closing = False
+        self.disconnect_task = None
 
     def initialize(self):
-        self.api, self.exchange = MetaScalp(), BybitPublic()
+        self.api = MetaScalp()
+        self.exchange = BybitPublic()
         self.runtime = Runtime(self.api, self.exchange, self.store, on_status=self._monitor_status)
 
     def _monitor_status(self, text):
@@ -109,18 +111,26 @@ class DesktopService:
         self.bridge.invalidate(symbols)
 
     async def disconnect_flow(self):
+        # Repeated clicks join one cleanup; they cannot publish disconnected early
+        # or queue a second stop that accidentally cancels a later new session.
+        if self.disconnect_task is None or self.disconnect_task.done():
+            self.disconnect_task = asyncio.create_task(self._disconnect_flow())
+        await asyncio.shield(self.disconnect_task)
+
+    async def _disconnect_flow(self):
         self.flow_state = 'stopping'
         task, self.flow_task = self.flow_task, None
         if task is not None:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
-        session, self.session = self.session, None
+        session = self.session
         try:
             if session is not None:
                 await session.stop()
         except Exception as exc:
             self.error('Flow shutdown', exc)
         finally:
+            self.session = None
             self.bridge.invalidate([row.symbol for row in self.bridge.snapshot()])
             self.flow_state = 'disconnected'
             self.flow_status = 'Disconnected — data marked UNVERIFIED'

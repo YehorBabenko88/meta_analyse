@@ -22,8 +22,7 @@ async def until(app, predicate, timeout=10):
     assert predicate(), 'smoke state did not settle'
 
 @pytest.mark.asyncio
-async def test_windows_qt_mock_network_postgres_disconnect_restart(postgres_store, monkeypatch):
-    app = QApplication.instance() or QApplication([])
+async def test_windows_qt_mock_network_postgres_disconnect_restart(postgres_store, monkeypatch, app):
     http_calls, ws_calls = [], []
     def http(request):
         http_calls.append((request.method, request.url.path))

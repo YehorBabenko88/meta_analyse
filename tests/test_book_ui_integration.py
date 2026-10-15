@@ -9,7 +9,7 @@ from meta_analyse.tape_velocity import TapeSnapshot
 def _book():
     book=OrderBook("BTCUSDT")
     assert book.apply({"type":"snapshot","data":{"s":"BTCUSDT","u":10,"seq":10,
-        "b":[["99","2000"],["98","1"]],"a":[["101","1000"],["102","1"]]}})
+        "b":[["99","2000"],["98","1"],["97","1"]],"a":[["101","1000"],["102","1"],["103","1"]]}})
     return book
 
 def test_book_summary_spread_and_nearby_wall():
@@ -17,8 +17,8 @@ def test_book_summary_spread_and_nearby_wall():
     summary=summarize_book(book,D("1"),D("100"))
     assert summary.valid
     assert summary.spread_ticks==D("2")
-    assert summary.bid_notional==D("198098")
-    assert summary.ask_notional==D("101102")
+    assert summary.bid_notional==D("198195")
+    assert summary.ask_notional==D("101205")
     assert summary.largest_nearby
     assert summary.largest_nearby[0].side=="bid"
 

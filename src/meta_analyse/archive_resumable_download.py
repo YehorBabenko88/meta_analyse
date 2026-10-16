@@ -58,10 +58,10 @@ async def download_resumable(session, url: str, destination: str | Path, *,
             with partial.open("ab" if state is not None else "wb") as stream:
                 try:
                     async for chunk in response.content.iter_chunked(chunk_bytes):
-                        transferred += len(chunk)
-                        if transferred > expected:
+                        if transferred + len(chunk) > expected:
                             raise ValueError("archive response exceeds declared range")
                         stream.write(chunk)
+                        transferred += len(chunk)
                 except BaseException as exc:
                     # Preserve cancellation semantics after durable checkpointing.
                     transfer_error = exc

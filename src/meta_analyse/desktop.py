@@ -9,7 +9,7 @@ from PySide6.QtCore import QTimer, QObject, Signal, Slot, Qt
 from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLabel, QListWidget, QMessageBox, QDoubleSpinBox, QCheckBox, QTabWidget,
-                               QTableWidget, QTableWidgetItem, QAbstractItemView)
+                               QTableWidget, QTableWidgetItem, QAbstractItemView, QProgressBar)
 from .storage import Store
 from decimal import Decimal
 from .trader_theme import TRADER_QSS
@@ -64,12 +64,12 @@ class Window(QWidget):
         market = QWidget()
         layout = QVBoxLayout(market)
         layout.addWidget(QLabel("Top-20 Bybit USDT perpetual, 24h absolute move; min $1m turnover"))
-        self.market_table = QTableWidget(0, 6)
+        self.market_table = QTableWidget(0, 7)
         self.market_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.market_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.market_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.market_table.setSortingEnabled(True)
-        self.market_table.setHorizontalHeaderLabels(["Symbol", "24h change", "24h turnover $", "OI contracts", "OI change 5m", "OI change 1h"])
+        self.market_table.setHorizontalHeaderLabels(["Symbol", "24h change", "24h turnover $", "OI contracts", "OI change 5m", "OI change 1h", "History readiness"])
         layout.addWidget(self.market_table)
         actions = QHBoxLayout()
         for name, fn in (("Refresh symbols", self.refresh), ("Open selected MetaScalp combos", self.open_selected),
@@ -243,6 +243,15 @@ class Window(QWidget):
                         table.setItem(i, j, FlowTableItem(value))
                     elif cell.text() != value:
                         cell.setText(value)
+                # No false 100%: historical ticks/trades and candle coverage are
+                # not yet verified by the live market overview endpoint.
+                bar = table.cellWidget(i, 6)
+                if bar is None:
+                    bar = QProgressBar(table)
+                    bar.setRange(0, 100)
+                    bar.setValue(0)
+                    bar.setFormat('Not verified')
+                    table.setCellWidget(i, 6, bar)
         finally:
             table.setSortingEnabled(sorting)
             if selected:

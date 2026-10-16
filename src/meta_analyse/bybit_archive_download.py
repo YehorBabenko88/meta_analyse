@@ -10,8 +10,6 @@ from pathlib import Path
 import os
 from urllib.parse import urlparse
 
-import aiohttp
-
 from .history_parallel import bounded_map
 
 
@@ -25,7 +23,7 @@ def validate_archive_url(url: str) -> None:
         raise ValueError("archive URL must not contain credentials or query")
 
 
-async def download_archive(session: aiohttp.ClientSession, url: str, destination: str | Path,
+async def download_archive(session, url: str, destination: str | Path,
                            *, max_bytes: int = 2_000_000_000, chunk_bytes: int = 1 << 20) -> Path:
     validate_archive_url(url)
     if max_bytes < 1 or chunk_bytes < 1:
@@ -59,6 +57,7 @@ async def download_archive(session: aiohttp.ClientSession, url: str, destination
 
 async def download_many(archives: list[tuple[str, str | Path]], *,
                         concurrency: int = 4, max_bytes: int = 2_000_000_000):
+    import aiohttp  # optional download-only dependency; core app and tests can import without it
     timeout = aiohttp.ClientTimeout(total=None, sock_connect=20, sock_read=120)
     connector = aiohttp.TCPConnector(limit=max(1, concurrency))
     async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:

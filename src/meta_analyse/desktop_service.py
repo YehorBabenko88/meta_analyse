@@ -38,6 +38,7 @@ class DesktopService:
         self.oi_history = {}
         self.overview_updated = 0.0
         self.overview_task = None
+        self.overview_lock = None
 
     def initialize(self):
         self.api = MetaScalp()
@@ -70,6 +71,12 @@ class DesktopService:
             pass
 
     async def refresh_overview(self):
+        if self.overview_lock is None:
+            self.overview_lock = asyncio.Lock()
+        async with self.overview_lock:
+            return await self._refresh_overview_locked()
+
+    async def _refresh_overview_locked(self):
         symbols = tuple(self.runtime.symbols)
         rows = await self.exchange.market_overview(symbols)
         now = time.monotonic()

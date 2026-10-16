@@ -24,3 +24,11 @@ def test_missing_hash_in_legacy_sidecar_rejected(tmp_path):
     sidecar.write_text('{"url": "' + URL +
                        '", "etag": "\\"v1\\"", "total_bytes": 10, "offset": 3}')
     assert read_partial(dest, URL) is None
+
+
+def test_checkpoint_url_mismatch_rejected(tmp_path):
+    dest = tmp_path / "archive.csv.gz"
+    partial, _ = partial_paths(dest)
+    partial.write_bytes(b"abc")
+    save_partial(dest, URL, ResumeState(3, '"v1"', 10))
+    assert read_partial(dest, URL.replace("BTCUSDT", "ETHUSDT")) is None

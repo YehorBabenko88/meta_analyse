@@ -1,6 +1,7 @@
 """Worker-owned desktop services. Only frozen value snapshots cross into Qt."""
 from __future__ import annotations
 import asyncio
+import time
 from dataclasses import dataclass
 from decimal import Decimal
 from .analysis_session import AnalysisSession
@@ -20,6 +21,7 @@ class DesktopSnapshot:
     market_events: tuple = ()
     market_gaps: tuple = ()
     market_ages: tuple = ()
+    overview: tuple = ()
 
 class DesktopService:
     def __init__(self, store, publish):
@@ -32,6 +34,9 @@ class DesktopService:
         self.status = 'Standby; no exchange orders are ever sent'
         self.closing = False
         self.disconnect_task = None
+        self.overview = {}
+        self.oi_history = {}
+        self.overview_updated = 0.0
 
     def initialize(self):
         self.api = MetaScalp()
@@ -48,9 +53,21 @@ class DesktopService:
     async def refresh(self):
         try:
             await self.runtime.refresh_watchlist()
+            await self.refresh_overview()
             self.status = 'Symbols refreshed; read-only / paper'
         except Exception as exc:
             self.error('Refresh', exc)
+
+    async def refresh_overview(self):
+        symbols = tuple(self.runtime.symbols)
+        rows = await self.exchange.market_overview(symbols)
+        now = time.monotonic()
+        for symbol, (_, _, oi) in rows.items():
+            history = self.oi_history.setdefault(symbol, [])
+            history.append((now, oi))
+            self.oi_history[symbol] = [(t, value) for t, value in history if now - t <= 3900]
+        self.overview = rows
+        self.overview_updated = now
 
     async def open_selected(self, symbols):
         try:
@@ -177,10 +194,23 @@ class DesktopService:
         telemetry = (self.session.market.telemetry.snapshot()
                      if self.flow_state == 'connected' and self.session is not None
                      and hasattr(self.session.market, 'telemetry') else None)
+        overview = []
+        now = time.monotonic()
+        for symbol in symbols:
+            row = self.overview.get(symbol)
+            if row is None:
+                overview.append((symbol, 'N/A', 'N/A', 'N/A', 'N/A', 'N/A'))
+                continue
+            change, turnover, oi = row
+            history = self.oi_history.get(symbol, [])
+            def delta(seconds):
+                prior = next((value for t, value in reversed(history) if now - t >= seconds), None)
+                return f'{(oi / prior - 1) * 100:+.2f}%' if prior and prior > 0 else 'N/A'
+            overview.append((symbol, f'{change:+.2f}%', f'{turnover:,.0f}', f'{oi:,.0f}', delta(300), delta(3600)))
         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
                                self.flow_state, self.flow_status, self.status,
                                telemetry.events if telemetry else (), telemetry.gaps if telemetry else (),
-                               self.session.market.telemetry.ages() if telemetry else ())
+                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview))
 
     async def check_health(self):
         if self.flow_state != 'connected' or self.session is None:
@@ -204,6 +234,12 @@ class DesktopService:
 
     async def publish_loop(self):
         while True:
+            if self.runtime and self.runtime.symbols and time.monotonic() - self.overview_updated >= 300:
+                try:
+                    await self.refresh_overview()
+                except Exception as exc:
+                    self.error('Market overview', exc)
+                    self.overview_updated = time.monotonic()
             await self.check_health()
             self.publish(self.snapshot())
             await asyncio.sleep(.1)

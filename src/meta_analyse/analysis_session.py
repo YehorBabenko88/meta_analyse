@@ -14,6 +14,7 @@ class AnalysisSession:
         self._lifecycle_lock = asyncio.Lock()
         self._startup = None
         self._stop_task = None
+        self._needs_cleanup = False
         self.analysis=AnalysisCoordinator(tick_sizes)
         self.health=MarketHealthMonitor()
         self.on_update=on_update
@@ -70,6 +71,7 @@ class AnalysisSession:
             if self.started:
                 raise RuntimeError("session already running")
             self._startup = asyncio.current_task()
+            self._needs_cleanup = True
             try:
                 await self.raw.start()
                 await self.market.start(list(self.analysis.tapes))
@@ -82,6 +84,9 @@ class AnalysisSession:
                 self._startup = None
 
     async def _cleanup(self):
+        if not self._needs_cleanup:
+            return
+        self._needs_cleanup = False
         self.started = False
         results = await asyncio.gather(self.market.stop(), self.raw.stop(), return_exceptions=True)
         symbols = list(self.analysis.tapes)

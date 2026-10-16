@@ -328,20 +328,27 @@ class Window(QWidget):
         self.orderflow_history_status.setText(self._snapshot.orderflow_status)
         history_rows = self._snapshot.orderflow_rows
         history_table = self.orderflow_history_table
-        history_table.setSortingEnabled(False)
-        try:
-            history_table.setRowCount(len(history_rows))
-            for row_index, entry in enumerate(history_rows):
-                values = (entry.bucket, entry.buy, entry.sell, entry.delta,
-                          entry.cumulative_delta, entry.imbalance, entry.quality)
-                for column, value in enumerate(values):
-                    item = history_table.item(row_index, column)
-                    if item is None:
-                        history_table.setItem(row_index, column, FlowTableItem(value))
-                    elif item.text() != value:
-                        item.setText(value)
-        finally:
-            history_table.setSortingEnabled(True)
+        history_changed = history_rows != getattr(self, "_previous_orderflow_history_rows", ())
+        if history_changed:
+            was_sorting = history_table.isSortingEnabled()
+            was_updating = history_table.updatesEnabled()
+            history_table.setUpdatesEnabled(False)
+            history_table.setSortingEnabled(False)
+            try:
+                history_table.setRowCount(len(history_rows))
+                for row_index, entry in enumerate(history_rows):
+                    values = (entry.bucket, entry.buy, entry.sell, entry.delta,
+                              entry.cumulative_delta, entry.imbalance, entry.quality)
+                    for column, value in enumerate(values):
+                        item = history_table.item(row_index, column)
+                        if item is None:
+                            history_table.setItem(row_index, column, FlowTableItem(value))
+                        elif item.text() != value:
+                            item.setText(value)
+                self._previous_orderflow_history_rows = history_rows
+            finally:
+                history_table.setSortingEnabled(was_sorting)
+                history_table.setUpdatesEnabled(was_updating)
         self.diagnostics_state.setText(
             "Connected — session counters (not exchange completeness)"
             if self._snapshot.flow_state == "connected"

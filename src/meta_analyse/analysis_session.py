@@ -84,7 +84,10 @@ class AnalysisSession:
                 self._startup = None
 
     async def _cleanup(self):
-        if not self._needs_cleanup:
+        # Sessions reconstructed by health monitoring may already own collector
+        # tasks even when start() was not called on this instance.
+        if (not self._needs_cleanup and not self.started
+                and not self.raw.tasks and not self.market.tasks):
             return
         self._needs_cleanup = False
         self.started = False

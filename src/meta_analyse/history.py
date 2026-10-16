@@ -48,7 +48,7 @@ def yearly_from_daily(candles: list[Candle], now: datetime | None = None) -> lis
     return out
 
 async def collect_history(exchange, store, symbol: str, timeframe: str,
-                          listing_ms: int, end_ms: int) -> dict:
+                          listing_ms: int, end_ms: int, on_progress=None) -> dict:
     """Backfill all API-returned pages; report bounds and gaps, never fabricate coverage."""
     count = 0
     first = None
@@ -58,6 +58,8 @@ async def collect_history(exchange, store, symbol: str, timeframe: str,
             continue
         store.candle_batch(symbol, timeframe, page)
         count += len(page)
+        if on_progress is not None:
+            on_progress(symbol, timeframe, count)
         low = min(c.start for c in page)
         high = max(c.start for c in page)
         first = low if first is None else min(first, low)

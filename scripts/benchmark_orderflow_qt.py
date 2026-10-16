@@ -29,17 +29,23 @@ def measure(rows: int) -> dict:
     elapsed = time.perf_counter() - started
     # Model the frequent snapshot path: unchanged immutable rows must
     # skip the expensive per-cell population entirely.
-    snapshot = tuple(range(rows))
+    snapshot = tuple((str(i), *values[1:]) for i in range(rows))
     previous = snapshot
     started_unchanged = time.perf_counter()
-    unchanged = snapshot is not previous and snapshot != previous
-    unchanged_seconds = time.perf_counter() - started_unchanged
-    assert not unchanged
+    for _ in range(1000):
+        unchanged = snapshot is not previous and snapshot != previous
+        assert not unchanged
+    unchanged_seconds = (time.perf_counter() - started_unchanged) / 1000
+    copied = tuple(list(snapshot))
+    started_equal = time.perf_counter()
+    equal_changed = copied is not previous and copied != previous
+    equal_seconds = time.perf_counter() - started_equal
+    assert not equal_changed
     assert table.rowCount() == rows
     assert table.item(rows - 1, 6).text() == "UNVERIFIED"
     table.close()
     app.processEvents()
-    return {"rows": rows, "cells": rows * 7, "populate_seconds": round(elapsed, 4), "unchanged_snapshot_seconds": round(unchanged_seconds, 8)}
+    return {"rows": rows, "cells": rows * 7, "populate_seconds": round(elapsed, 4), "unchanged_snapshot_seconds": round(unchanged_seconds, 8), "equal_copy_compare_seconds": round(equal_seconds, 8)}
 
 
 def main():

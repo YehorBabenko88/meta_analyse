@@ -67,6 +67,11 @@ class Window(QWidget):
         self.list = QListWidget()
         self.list.setSelectionMode(QListWidget.MultiSelection)
         layout.addWidget(self.list)
+        self.market_table = QTableWidget(0, 6)
+        self.market_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.market_table.setSortingEnabled(True)
+        self.market_table.setHorizontalHeaderLabels(["Symbol", "24h change", "24h turnover $", "OI contracts", "OI change 5m", "OI change 1h"])
+        layout.addWidget(self.market_table)
         actions = QHBoxLayout()
         for name, fn in (("Refresh symbols", self.refresh), ("Open selected MetaScalp combos", self.open_selected),
                          ("Start monitoring", self.start)):
@@ -226,6 +231,21 @@ class Window(QWidget):
             for i in range(self.list.count()):
                 self.list.item(i).setSelected(self.list.item(i).text() in selected)
         self.status.setText(self._snapshot.status)
+        overview = self._snapshot.overview
+        table = self.market_table
+        sorting = table.isSortingEnabled()
+        table.setSortingEnabled(False)
+        try:
+            table.setRowCount(len(overview))
+            for i, values in enumerate(overview):
+                for j, value in enumerate(values):
+                    cell = table.item(i, j)
+                    if cell is None:
+                        table.setItem(i, j, FlowTableItem(value))
+                    elif cell.text() != value:
+                        cell.setText(value)
+        finally:
+            table.setSortingEnabled(sorting)
         self.flow_status.setText(self._snapshot.flow_status)
         self.connect_flow_button.setEnabled(self._snapshot.flow_state in ('disconnected', 'failed'))
         self.stop_flow_button.setEnabled(self._snapshot.flow_state in ('connecting', 'connected', 'failed'))

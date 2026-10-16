@@ -53,10 +53,19 @@ class DesktopService:
     async def refresh(self):
         try:
             await self.runtime.refresh_watchlist()
-            await self.refresh_overview()
+            # Publish the watchlist without waiting for optional market metrics.
+            self.overview_updated = time.monotonic()
+            asyncio.create_task(self._refresh_overview_safe())
             self.status = 'Symbols refreshed; read-only / paper'
         except Exception as exc:
             self.error('Refresh', exc)
+
+    async def _refresh_overview_safe(self):
+        try:
+            await self.refresh_overview()
+        except Exception:
+            # Overview is optional; missing metrics must not block selection.
+            pass
 
     async def refresh_overview(self):
         symbols = tuple(self.runtime.symbols)

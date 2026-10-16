@@ -81,11 +81,15 @@ class AnalysisSession:
                 # Shield cleanup against a second cancellation while startup is
                 # unwinding; the caller must not abandon collector resources.
                 cleanup = asyncio.create_task(self._cleanup())
-                try:
-                    await asyncio.shield(cleanup)
-                except asyncio.CancelledError:
-                    await asyncio.shield(cleanup)
-                    raise
+                cancelled = False
+                while not cleanup.done():
+                    try:
+                        await asyncio.shield(cleanup)
+                    except asyncio.CancelledError:
+                        cancelled = True
+                cleanup.result()
+                if cancelled:
+                    raise asyncio.CancelledError
                 raise
             finally:
                 self._startup = None

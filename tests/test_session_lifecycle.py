@@ -195,3 +195,32 @@ async def test_repeated_stop_does_not_repeat_gap_or_collector_cleanup():
     await s.stop()
     assert raw.stops == market.stops == 1
     assert len(gaps) == 1
+
+@pytest.mark.asyncio
+async def test_three_startup_cancellations_cannot_abandon_cleanup():
+    class GatedStop(Collector):
+        def __init__(self):
+            super().__init__(asyncio.Event())
+            self.stopping = asyncio.Event()
+            self.release = asyncio.Event()
+        async def stop(self):
+            self.stopping.set()
+            await self.release.wait()
+            await super().stop()
+    raw, market = GatedStop(), Collector()
+    s = session(raw, market)
+    starting = asyncio.create_task(s.start())
+    await raw.entered.wait()
+    starting.cancel()
+    await raw.stopping.wait()
+    try:
+        for _ in range(3):
+            starting.cancel()
+            await asyncio.sleep(0)  # Deliver cancellation, not a timing delay.
+        assert not starting.done(), 'startup abandoned its shielded cleanup'
+        with pytest.raises(RuntimeError):
+            await s.start()
+    finally:
+        raw.release.set()
+        await asyncio.gather(starting, return_exceptions=True)
+        await s.stop()

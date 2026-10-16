@@ -22,6 +22,7 @@ class DesktopSnapshot:
     market_gaps: tuple = ()
     market_ages: tuple = ()
     overview: tuple = ()
+    readiness: tuple = ()
 
 class DesktopService:
     def __init__(self, store, publish):
@@ -39,6 +40,7 @@ class DesktopService:
         self.overview_updated = 0.0
         self.overview_task = None
         self.overview_lock = None
+        self.readiness = {}
 
     def initialize(self):
         self.api = MetaScalp()
@@ -210,6 +212,13 @@ class DesktopService:
         if rules is not None:
             self.runtime.paper.threshold, self.runtime.paper.stop_pct, self.runtime.paper.fee_rate = rules
 
+    def set_readiness(self, symbol, progress):
+        """Accept only a validated Progress object from history coordination."""
+        from .history_progress import Progress
+        if not isinstance(progress, Progress):
+            raise TypeError('readiness requires verified coverage progress')
+        self.readiness[symbol] = progress
+
     def snapshot(self):
         if self.runtime is None:
             return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status)
@@ -240,7 +249,7 @@ class DesktopService:
         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
                                self.flow_state, self.flow_status, self.status,
                                telemetry.events if telemetry else (), telemetry.gaps if telemetry else (),
-                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview))
+                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols))
 
     async def check_health(self):
         if self.flow_state != 'connected' or self.session is None:

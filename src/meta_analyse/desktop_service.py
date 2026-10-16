@@ -37,6 +37,7 @@ class DesktopService:
         self.overview = {}
         self.oi_history = {}
         self.overview_updated = 0.0
+        self.overview_task = None
 
     def initialize(self):
         self.api = MetaScalp()
@@ -55,7 +56,8 @@ class DesktopService:
             await self.runtime.refresh_watchlist()
             # Publish the watchlist without waiting for optional market metrics.
             self.overview_updated = time.monotonic()
-            asyncio.create_task(self._refresh_overview_safe())
+            if self.overview_task is None or self.overview_task.done():
+                self.overview_task = asyncio.create_task(self._refresh_overview_safe())
             self.status = 'Symbols refreshed; read-only / paper'
         except Exception as exc:
             self.error('Refresh', exc)
@@ -267,6 +269,10 @@ class DesktopService:
 
     async def close(self):
         self.closing = True
+        if self.overview_task is not None:
+            self.overview_task.cancel()
+            await asyncio.gather(self.overview_task, return_exceptions=True)
+            self.overview_task = None
         await self.disconnect_flow()
         if self.runtime:
             try:

@@ -13,6 +13,7 @@ import os
 from datetime import date
 from pathlib import Path
 
+from .archive_file_lock import async_archive_file_lock
 from .bybit_archive_audit import audit_trade_gzip
 from .archive_day_boundary import validate_day_audit, utc_day_boundary
 from .bybit_archive_download import download_archive, validate_archive_url
@@ -80,23 +81,24 @@ async def acquire_archive(session, url: str, path: str | Path, *,
     if day is not None:
         utc_day_boundary(day)  # validate before any filesystem or network effects
     path = Path(path)
-    if path.is_file():
-        cached = await asyncio.to_thread(_load_receipt, path, url, day)
-        if cached is not None:
-            return cached
-    transport = download_resumable if resumable else download_archive
-    await transport(session, url, path, max_bytes=max_bytes)
-    audit = await asyncio.to_thread(audit_trade_gzip, path)
-    if not audit.valid:
-        raise ValueError(f"archive rejected: {audit.reason}")
-    if day is not None:
-        validate_day_audit(audit, day)
-    size, digest = await asyncio.to_thread(lambda: (path.stat().st_size, _digest(path)))
-    receipt = ArchiveReceipt(url, digest, size, audit.rows, audit.first_ms,
-                             audit.last_ms, True, False,
-                             day.isoformat() if day else None)
-    await asyncio.to_thread(_write_receipt, path, receipt)
-    return receipt
+    async with async_archive_file_lock(path):
+        if path.is_file():
+            cached = await asyncio.to_thread(_load_receipt, path, url, day)
+            if cached is not None:
+                return cached
+        transport = download_resumable if resumable else download_archive
+        await transport(session, url, path, max_bytes=max_bytes)
+        audit = await asyncio.to_thread(audit_trade_gzip, path)
+        if not audit.valid:
+            raise ValueError(f"archive rejected: {audit.reason}")
+        if day is not None:
+            validate_day_audit(audit, day)
+        size, digest = await asyncio.to_thread(lambda: (path.stat().st_size, _digest(path)))
+        receipt = ArchiveReceipt(url, digest, size, audit.rows, audit.first_ms,
+                                 audit.last_ms, True, False,
+                                 day.isoformat() if day else None)
+        await asyncio.to_thread(_write_receipt, path, receipt)
+        return receipt
 
 
 async def acquire_many(archives: list[tuple[str, str | Path]], *,

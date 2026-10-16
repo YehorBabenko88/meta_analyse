@@ -1,6 +1,12 @@
 from decimal import Decimal
+import pytest
 
 from meta_analyse.orderflow_adapters import StreamingTrades, from_records
+from meta_analyse.orderflow_metrics import Trade
+
+
+def trade(n):
+    return Trade(n, Decimal("10"), Decimal("1"), "buy")
 
 
 def test_historical_records_are_normalized():
@@ -11,10 +17,33 @@ def test_historical_records_are_normalized():
     assert result[0].side == "buy"
 
 
-def test_bounded_stream_tracks_evictions():
+@pytest.mark.parametrize("record", [
+    {"timestamp_ms": True, "price": "10", "volume": "1"},
+    {"timestamp_ms": 1.5, "price": "10", "volume": "1"},
+    {"timestamp_ms": 1, "price": "NaN", "volume": "1"},
+    {"timestamp_ms": 1, "price": "10", "volume": "-1"},
+])
+def test_invalid_record(record):
+    with pytest.raises(ValueError):
+        tuple(from_records([record]))
+
+
+def test_bounded_stream_tracks_evictions_and_gaps():
     stream = StreamingTrades(capacity=2)
-    stream.append("first")
-    stream.append("second")
-    stream.append("third")
-    assert stream.snapshot() == ("second", "third")
+    stream.append(trade(1))
+    stream.append(trade(2))
+    assert stream.continuous
+    stream.append(trade(3))
+    assert stream.snapshot() == (trade(2), trade(3))
     assert stream.dropped == 1
+    assert not stream.continuous
+    stream.reset()
+    assert stream.continuous
+    stream.mark_gap()
+    assert not stream.continuous
+
+
+def test_stream_rejects_unnormalized_input():
+    stream = StreamingTrades()
+    with pytest.raises(TypeError):
+        stream.append("not a trade")

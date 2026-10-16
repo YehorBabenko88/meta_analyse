@@ -230,6 +230,7 @@ class Window(QWidget):
     def repaint_state(self):
         self.status.setText(self._snapshot.status)
         overview = self._snapshot.overview
+        readiness = dict(self._snapshot.readiness)
         table = self.market_table
         sorting = table.isSortingEnabled()
         selected = set(self.selected_symbols())
@@ -252,6 +253,16 @@ class Window(QWidget):
                     bar.setValue(0)
                     bar.setFormat('Not verified')
                     table.setCellWidget(i, 6, bar)
+                progress = readiness.get(values[0])
+                if progress is None or progress.percent is None:
+                    bar.setValue(0)
+                    bar.setFormat('Not verified')
+                    bar.setStyleSheet('')
+                else:
+                    bar.setValue(progress.percent)
+                    bar.setFormat(f'{progress.percent}% — {progress.status}')
+                    color = '#26965c' if progress.percent == 100 and progress.status == 'verified' else '#b58b35'
+                    bar.setStyleSheet(f'QProgressBar::chunk {{ background-color: {color}; }}')
         finally:
             table.setSortingEnabled(sorting)
             if selected:

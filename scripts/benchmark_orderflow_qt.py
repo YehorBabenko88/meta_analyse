@@ -27,11 +27,19 @@ def measure(rows: int) -> dict:
     finally:
         table.setUpdatesEnabled(True)
     elapsed = time.perf_counter() - started
+    # Model the frequent snapshot path: unchanged immutable rows must
+    # skip the expensive per-cell population entirely.
+    snapshot = tuple(range(rows))
+    previous = snapshot
+    started_unchanged = time.perf_counter()
+    unchanged = snapshot is not previous and snapshot != previous
+    unchanged_seconds = time.perf_counter() - started_unchanged
+    assert not unchanged
     assert table.rowCount() == rows
     assert table.item(rows - 1, 6).text() == "UNVERIFIED"
     table.close()
     app.processEvents()
-    return {"rows": rows, "cells": rows * 7, "populate_seconds": round(elapsed, 4)}
+    return {"rows": rows, "cells": rows * 7, "populate_seconds": round(elapsed, 4), "unchanged_snapshot_seconds": round(unchanged_seconds, 8)}
 
 
 def main():

@@ -94,3 +94,13 @@ async def test_wrong_range_does_not_append_partial(tmp_path):
     with pytest.raises(ValueError, match="range"):
         await download_resumable(session, URL, destination)
     assert partial.read_bytes() == b"abc"
+
+
+@pytest.mark.asyncio
+async def test_initial_response_requires_explicit_content_length(tmp_path):
+    destination = tmp_path / "archive.csv.gz"
+    response = Response(200, [b"abcdef"], {"ETag": '"v1"', "Content-Length": "6"})
+    del response.headers["Content-Length"]
+    with pytest.raises(ValueError, match="explicit Content-Length"):
+        await download_resumable(Session([response]), URL, destination)
+    assert not destination.exists()

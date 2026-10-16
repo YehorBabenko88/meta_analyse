@@ -45,6 +45,26 @@ class BybitPublic:
         ranked.sort(reverse=True)
         return [symbol for _, _, symbol in ranked[:count]]
 
+    async def market_overview(self, symbols):
+        """Public 24h change, turnover and OI for selected USDT perpetuals."""
+        result = await self.get("/v5/market/tickers", {"category": "linear"})
+        wanted = set(symbols)
+        rows = {}
+        for row in result.get("list", []):
+            symbol = row.get("symbol")
+            if symbol not in wanted:
+                continue
+            try:
+                last, prev = D(row["lastPrice"]), D(row["prevPrice24h"])
+                turnover = D(row["turnover24h"])
+                oi = D(row["openInterest"])
+                if not all(v.is_finite() for v in (last, prev, turnover, oi)) or prev <= 0:
+                    continue
+                rows[symbol] = ((last / prev - 1) * 100, turnover, oi)
+            except (KeyError, ValueError, ArithmeticError):
+                continue
+        return rows
+
     async def candles(self, symbol: str, timeframe: str, start_ms: int, end_ms: int | None = None):
         """Paged oldest->newest. Caller must persist checkpoints and verify completeness."""
         if timeframe not in INTERVALS:

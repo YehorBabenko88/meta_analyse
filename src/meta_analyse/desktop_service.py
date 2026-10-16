@@ -240,17 +240,17 @@ class DesktopService:
         if rules is not None:
             self.runtime.paper.threshold, self.runtime.paper.stop_pct, self.runtime.paper.fee_rate = rules
 
-    def load_orderflow_records(self, records, interval_ms=60000, *, verified=False):
+    def load_orderflow_records(self, records, interval_ms=60000):
         """Explicit, read-only history adapter; no implicit completeness claim."""
         from .orderflow_adapters import from_records
         from .orderflow_aggregation import aggregate_by_time
         from .orderflow_view import make_rows
         trades = tuple(from_records(records))
         buckets = aggregate_by_time(trades, interval_ms)
-        self.orderflow_rows = make_rows(buckets, quality='VERIFIED' if verified else 'UNVERIFIED')
+        self.orderflow_rows = make_rows(buckets, quality='UNVERIFIED')
         self.orderflow_status = (
             f'{len(trades)} trades, {len(buckets)} intervals; '
-            + ('source verified' if verified else 'historical coverage UNVERIFIED')
+            + 'historical coverage UNVERIFIED'
         )
 
     def set_readiness(self, symbol, progress):

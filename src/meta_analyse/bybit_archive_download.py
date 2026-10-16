@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 import os
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 from .history_parallel import bounded_map
 
@@ -21,6 +21,20 @@ def validate_archive_url(url: str) -> None:
         raise ValueError("unsupported archive path")
     if parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ValueError("archive URL must not contain credentials or query")
+    # Reject encoded separators, traversal and ambiguous URL normalization.
+    # Only the expected archive directory / symbol / filename shape is allowed.
+    if parsed.path != unquote(parsed.path) or "\\\\" in parsed.path:
+        raise ValueError("encoded or ambiguous archive path")
+    parts = parsed.path.split("/")
+    if len(parts) != 4 or parts[0] or parts[1] not in ("trading", "spot"):
+        raise ValueError("invalid archive directory structure")
+    symbol, filename = parts[2], parts[3]
+    if not symbol or not symbol.isascii() or not symbol.isalnum():
+        raise ValueError("invalid archive symbol")
+    if not filename.startswith(symbol) or not filename.endswith(".csv.gz"):
+        raise ValueError("archive filename does not match symbol")
+    if any(ch not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-" for ch in filename):
+        raise ValueError("invalid archive filename")
 
 
 async def download_archive(session, url: str, destination: str | Path,

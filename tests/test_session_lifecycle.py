@@ -171,3 +171,27 @@ async def test_concurrent_stop_and_cancelled_waiter_preserve_cleanup():
     finally:
         raw.release.set()
         await s.stop()
+
+@pytest.mark.asyncio
+async def test_repeated_stop_does_not_repeat_gap_or_collector_cleanup():
+    """Stopping an already stopped session must not emit duplicate gaps."""
+    class CountingCollector(Collector):
+        def __init__(self):
+            super().__init__()
+            self.stops = 0
+        async def stop(self):
+            self.stops += 1
+            await super().stop()
+    raw, market = CountingCollector(), CountingCollector()
+    s = session(raw, market)
+    gaps = []
+    async def gap(symbols, reason):
+        gaps.append((tuple(symbols), reason))
+    s.on_gap = gap
+    await s.start()
+    await s.stop()
+    assert not s.started
+    assert len(gaps) == 1
+    await s.stop()
+    assert raw.stops == market.stops == 1
+    assert len(gaps) == 1

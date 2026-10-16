@@ -89,8 +89,8 @@ async def test_windows_qt_mock_network_postgres_disconnect_restart(postgres_stor
         window = Window()
         window.show()
         try:
-            await until(app, lambda: window.list.count() == 1)
-            window.list.item(0).setSelected(True)
+            await until(app, lambda: window.market_table.rowCount() == 1)
+            window.market_table.selectRow(0)
             window.level_price.setValue(100)
             window.connect_flow()
             window.connect_flow()  # duplicate requests must be harmless

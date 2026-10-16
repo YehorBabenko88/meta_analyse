@@ -9,7 +9,7 @@ from PySide6.QtCore import QTimer, QObject, Signal, Slot, Qt
 from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLabel, QListWidget, QMessageBox, QDoubleSpinBox, QCheckBox, QTabWidget,
-                               QTableWidget, QTableWidgetItem)
+                               QTableWidget, QTableWidgetItem, QAbstractItemView)
 from .storage import Store
 from decimal import Decimal
 from .trader_theme import TRADER_QSS
@@ -104,6 +104,7 @@ class Window(QWidget):
         self.flow_status = QLabel("No validated trade/orderbook stream attached")
         flow_layout.addWidget(self.flow_status)
         self.flow_table = QTableWidget(0, 9)
+        self.flow_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.flow_table.setAlternatingRowColors(True)
         self.flow_table.setSortingEnabled(True)
         self.flow_table.setHorizontalHeaderLabels(["Symbol", "Level", "POC", "Delta", "Tape/s", "Quality", "Spread ticks", "Book imbalance", "Nearby wall"])
@@ -128,6 +129,7 @@ class Window(QWidget):
         self.diagnostics_state = QLabel("Disconnected — counters hidden")
         diagnostics_layout.addWidget(self.diagnostics_state)
         self.diagnostics_table = QTableWidget(0, 5)
+        self.diagnostics_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.diagnostics_table.setSortingEnabled(True)
         self.diagnostics_table.setHorizontalHeaderLabels(["Feed / symbol", "Persisted events", "Reported gaps", "Last persisted age (s)", "Freshness"])
         diagnostics_layout.addWidget(self.diagnostics_table)
@@ -291,7 +293,7 @@ class Window(QWidget):
                                    (4, freshness_for_feed(key, ages.get(key)))):
                     item = table.item(i, col)
                     if item is None:
-                        item = QTableWidgetItem(value)
+                        item = FlowTableItem(value)
                         table.setItem(i, col, item)
                     elif item.text() != value:
                         item.setText(value)

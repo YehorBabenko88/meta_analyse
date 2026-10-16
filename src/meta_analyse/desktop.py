@@ -328,7 +328,10 @@ class Window(QWidget):
         self.orderflow_history_status.setText(self._snapshot.orderflow_status)
         history_rows = self._snapshot.orderflow_rows
         history_table = self.orderflow_history_table
-        history_changed = history_rows != getattr(self, "_previous_orderflow_history_rows", ())
+        # Immutable tuples are reused between snapshots: identity is a fast
+        # path; equality still handles equivalent independently-built snapshots.
+        previous_history = getattr(self, "_previous_orderflow_history_rows", ())
+        history_changed = history_rows is not previous_history and history_rows != previous_history
         if history_changed:
             was_sorting = history_table.isSortingEnabled()
             was_updating = history_table.updatesEnabled()

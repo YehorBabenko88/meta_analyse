@@ -85,7 +85,6 @@ async def async_archive_file_lock(destination: str | Path, *, timeout: float = 1
 
 def _prepare_lock_file(handle):
     """Ensure Windows has a lockable byte without rewriting a held lock."""
-    if os.fstat(handle.fileno()).st_size == 0:
-        handle.seek(0)
-        handle.write(b"0")
-        handle.flush()
+    # Locking a byte beyond EOF is supported by Windows msvcrt.locking;
+    # no shared lock-file writes are necessary.
+    handle.seek(0)

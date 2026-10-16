@@ -54,6 +54,7 @@ async def download_resumable(session, url: str, destination: str | Path, *,
             if total > max_bytes:
                 raise ValueError("archive exceeds maximum allowed bytes")
             transferred = 0
+            transfer_error = None
             with partial.open("ab" if state is not None else "wb") as stream:
                 try:
                     async for chunk in response.content.iter_chunked(chunk_bytes):
@@ -61,9 +62,17 @@ async def download_resumable(session, url: str, destination: str | Path, *,
                         if transferred > expected:
                             raise ValueError("archive response exceeds declared range")
                         stream.write(chunk)
+                except (OSError, ConnectionError, TimeoutError) as exc:
+                    transfer_error = exc
                 finally:
                     stream.flush()
                     os.fsync(stream.fileno())
+            if transfer_error is not None:
+                # Only checkpoint a validated, incomplete prefix. An oversized
+                # or completed transfer is not safe to resume.
+                if 0 < transferred < expected:
+                    save_partial(destination, url, ResumeState(offset + transferred, etag, total))
+                raise transfer_error
             if transferred != expected:
                 # Preserve only bytes that were actually flushed to disk.
                 if transferred > 0:

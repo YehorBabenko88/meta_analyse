@@ -66,3 +66,24 @@ def coverage(segments: list[Segment], start_ms: int, end_ms: int) -> Progress:
     if blocked:
         return Progress(percent if percent < 100 else 99, "source-limited", verified, total)
     return Progress(percent, "verified" if verified == total else "partial", verified, total)
+
+
+def combined_readiness(streams: dict[str, Progress], required: tuple[str, ...] = ("candles", "trades", "ticks")) -> Progress:
+    """Overall readiness cannot exceed the least-covered required feed.
+
+    A missing stream is unknown, not 100%. A source-limited feed blocks
+    readiness even if other streams have complete archives.
+    """
+    if not required:
+        raise ValueError("at least one stream is required")
+    missing = [kind for kind in required if kind not in streams]
+    if missing:
+        return Progress(None, "unknown: " + ", ".join(missing), 0, 0)
+    parts = [streams[kind] for kind in required]
+    if any(part.percent is None for part in parts):
+        return Progress(None, "unknown", 0, 0)
+    percent = min(part.percent for part in parts)
+    limited = any(part.status == "source-limited" for part in parts)
+    if limited:
+        return Progress(min(percent, 99), "source-limited", 0, 0)
+    return Progress(percent, "verified" if percent == 100 and all(p.status == "verified" for p in parts) else "partial", 0, 0)

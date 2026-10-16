@@ -40,6 +40,8 @@ try {
     $env:QT_QPA_PLATFORM = 'offscreen'
     & $Python -m compileall -q src
     if ($LASTEXITCODE -ne 0) { throw 'Compilation failed' }
+    & $Python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir (Join-Path $WorkRoot 'repeat-lifecycle')
+    if ($LASTEXITCODE -ne 0) { throw 'Repeated lifecycle tests failed; see repeat-lifecycle logs' }
     & $Python -m pytest -q --junitxml (Join-Path $WorkRoot 'tests.xml') --basetemp (Join-Path $WorkRoot 'pytest-temp') 2>&1 | Tee-Object -FilePath (Join-Path $WorkRoot 'tests.log')
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed; see tests.log and tests.xml' }
 } finally {

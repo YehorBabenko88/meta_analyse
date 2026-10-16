@@ -48,3 +48,14 @@ def app():
     gc.collect()
     import shiboken6
     shiboken6.delete(application)
+
+@pytest.fixture(autouse=True)
+def no_unmocked_external_http(monkeypatch):
+    """Tests may use MockTransport or real loopback peers, never public TLS."""
+    import httpx
+    original = httpx.AsyncHTTPTransport.handle_async_request
+    async def handle(transport, request):
+        if request.url.host not in ('127.0.0.1', 'localhost', '::1'):
+            raise AssertionError(f'Unmocked external HTTP request: {request.url.host}')
+        return await original(transport, request)
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, 'handle_async_request', handle)

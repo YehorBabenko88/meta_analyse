@@ -74,7 +74,7 @@ class Window(QWidget):
         layout.addWidget(self.market_table)
         actions = QHBoxLayout()
         for name, fn in (("Refresh symbols", self.refresh), ("Open selected MetaScalp combos", self.open_selected),
-                         ("Start monitoring", self.start)):
+                         ("Start monitoring", self.start), ("Find MetaScalp", self.find_metascalp)):
             button = QPushButton(name)
             button.clicked.connect(fn)
             actions.addWidget(button)
@@ -196,6 +196,8 @@ class Window(QWidget):
             QMessageBox.information(self, "Select tickers", "Select one or several symbols.")
             return
         self.schedule(self.service.open_selected(tuple(selected)))
+    def find_metascalp(self):
+        self.schedule(self.service.locate_metascalp())
     def start(self):
         self.schedule(self.service.start_monitor())
     def connect_flow(self):

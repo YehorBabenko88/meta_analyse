@@ -62,16 +62,20 @@ async def download_resumable(session, url: str, destination: str | Path, *,
                         if transferred > expected:
                             raise ValueError("archive response exceeds declared range")
                         stream.write(chunk)
-                except (OSError, ConnectionError, TimeoutError) as exc:
+                except BaseException as exc:
+                    # Preserve cancellation semantics after durable checkpointing.
                     transfer_error = exc
                 finally:
                     stream.flush()
                     os.fsync(stream.fileno())
             if transfer_error is not None:
-                # Only checkpoint a validated, incomplete prefix. An oversized
-                # or completed transfer is not safe to resume.
+                # Never let checkpoint I/O replace the original cancellation or
+                # transport failure; the next run rejects unsaved partial bytes.
                 if 0 < transferred < expected:
-                    save_partial(destination, url, ResumeState(offset + transferred, etag, total))
+                    try:
+                        save_partial(destination, url, ResumeState(offset + transferred, etag, total))
+                    except OSError:
+                        pass
                 raise transfer_error
             if transferred != expected:
                 # Preserve only bytes that were actually flushed to disk.

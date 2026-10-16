@@ -16,6 +16,7 @@ from pathlib import Path
 from .bybit_archive_audit import audit_trade_gzip
 from .archive_day_boundary import validate_day_audit, utc_day_boundary
 from .bybit_archive_download import download_archive, validate_archive_url
+from .archive_resumable_download import download_resumable
 from .history_parallel import bounded_map
 
 
@@ -73,7 +74,8 @@ def _write_receipt(path: Path, receipt: ArchiveReceipt) -> None:
 
 async def acquire_archive(session, url: str, path: str | Path, *,
                           max_bytes: int = 2_000_000_000,
-                          day: date | None = None) -> ArchiveReceipt:
+                          day: date | None = None,
+                          resumable: bool = False) -> ArchiveReceipt:
     validate_archive_url(url)
     if day is not None:
         utc_day_boundary(day)  # validate before any filesystem or network effects
@@ -82,7 +84,8 @@ async def acquire_archive(session, url: str, path: str | Path, *,
         cached = await asyncio.to_thread(_load_receipt, path, url, day)
         if cached is not None:
             return cached
-    await download_archive(session, url, path, max_bytes=max_bytes)
+    transport = download_resumable if resumable else download_archive
+    await transport(session, url, path, max_bytes=max_bytes)
     audit = await asyncio.to_thread(audit_trade_gzip, path)
     if not audit.valid:
         raise ValueError(f"archive rejected: {audit.reason}")
@@ -97,7 +100,8 @@ async def acquire_archive(session, url: str, path: str | Path, *,
 
 
 async def acquire_many(archives: list[tuple[str, str | Path]], *,
-                       concurrency: int = 4, max_bytes: int = 2_000_000_000):
+                       concurrency: int = 4, max_bytes: int = 2_000_000_000,
+                       resumable: bool = False):
     # Two workers must never write the same .partial or audit receipt path.
     # Resolve paths before opening network sessions; reject collisions early.
     destinations = [str(Path(path).resolve()) for _, path in archives]
@@ -108,5 +112,6 @@ async def acquire_many(archives: list[tuple[str, str | Path]], *,
     connector = aiohttp.TCPConnector(limit=max(1, concurrency))
     async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
         async def worker(entry):
-            return await acquire_archive(session, entry[0], entry[1], max_bytes=max_bytes)
+            return await acquire_archive(session, entry[0], entry[1],
+                                         max_bytes=max_bytes, resumable=resumable)
         return await bounded_map(archives, worker, concurrency=concurrency)

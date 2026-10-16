@@ -43,6 +43,15 @@ async def download_resumable(session, url: str, destination: str | Path, *,
                     raise ValueError("expected full archive response")
                 etag = response.headers.get("ETag")
                 total = response.content_length
+                declared = response.headers.get("Content-Length")
+                if declared is None:
+                    raise ValueError("resumable archive requires explicit Content-Length")
+                try:
+                    header_total = int(declared)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("invalid archive Content-Length") from exc
+                if header_total != total:
+                    raise ValueError("archive Content-Length disagrees with response")
                 if not strong_etag(etag) or total is None or total < 1:
                     raise ValueError("resumable archive requires strong ETag and length")
                 if response.headers.get("Content-Encoding", "identity").lower() != "identity":

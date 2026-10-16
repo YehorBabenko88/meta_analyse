@@ -17,7 +17,7 @@ def main():
     environment = dict(os.environ, QT_QPA_PLATFORM='offscreen', PYTHONASYNCIODEBUG='1')
     modules = ['tests/test_desktop_lifecycle.py', 'tests/test_qt_diagnostics.py',
                'tests/test_windows_smoke.py', 'tests/test_desktop_service.py',
-               'tests/test_session_lifecycle.py']
+               'tests/test_session_lifecycle.py', 'tests/test_http_client.py']
     for index in range(1, args.runs + 1):
         run_dir = args.output_dir / f'run-{index:02d}'
         run_dir.mkdir(exist_ok=True)

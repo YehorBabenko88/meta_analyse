@@ -4,13 +4,14 @@ import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal as D
 import httpx
+from .http_client import ManagedAsyncClient
 from .core import Candle
 
 INTERVALS = {"M1": "1", "H1": "60", "D1": "D", "W1": "W", "MO1": "M"}
 
 class BybitPublic:
     def __init__(self, base="https://api.bybit.com"):
-        self.client = httpx.AsyncClient(base_url=base, timeout=20)
+        self.client = ManagedAsyncClient(base_url=base, timeout=20)
 
     async def get(self, path, params=None):
         for attempt in range(4):

@@ -779,22 +779,30 @@ async def test_concurrent_close_waiter_cancellation_does_not_abandon_clients():
     assert events == ['closed']
 
 @pytest.mark.asyncio
-async def test_close_drains_real_loopback_http_and_refuses_late_requests():
-    import httpx
+@pytest.mark.parametrize("scheme", ["http", "https"])
+async def test_close_drains_real_loopback_http_and_refuses_late_requests(scheme):
+    from meta_analyse.http_client import ManagedAsyncClient
     from types import SimpleNamespace
     accepted, disconnected = asyncio.Event(), asyncio.Event()
+    writers = set()
     async def peer(reader, writer):
+        writers.add(writer)
         try:
-            await reader.readuntil(b'\r\n\r\n')
+            if scheme == 'https':
+                await reader.read(1)  # ClientHello; keep TLS handshake pending.
+            else:
+                await reader.readuntil(b'\r\n\r\n')
             accepted.set()
-            assert await reader.read() == b''
+            while await reader.read(65536):
+                pass
         finally:
             writer.close()
             await writer.wait_closed()
             disconnected.set()
+            writers.discard(writer)
     async with await asyncio.start_server(peer, '127.0.0.1', 0) as server:
         port = server.sockets[0].getsockname()[1]
-        client = httpx.AsyncClient(base_url=f'http://127.0.0.1:{port}', trust_env=False)
+        client = ManagedAsyncClient(base_url=f'{scheme}://127.0.0.1:{port}', trust_env=False, verify=False)
         class ExchangeClient:
             async def top_volatile(self):
                 await client.get('/')
@@ -816,3 +824,6 @@ async def test_close_drains_real_loopback_http_and_refuses_late_requests():
             requesting.cancel()
             await asyncio.gather(requesting, return_exceptions=True)
             await client.aclose()
+            for writer in tuple(writers):
+                writer.close()
+                await writer.wait_closed()

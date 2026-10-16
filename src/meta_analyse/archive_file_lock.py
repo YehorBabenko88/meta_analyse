@@ -20,9 +20,7 @@ def archive_file_lock(destination: str | Path, *, timeout: float = 120.0):
     path.parent.mkdir(parents=True, exist_ok=True)
     lock_path = path.with_name(path.name + ".lock")
     with lock_path.open("a+b") as handle:
-        handle.seek(0)
-        handle.write(b"0")
-        handle.flush()
+        _prepare_lock_file(handle)
         deadline = time.monotonic() + timeout
         while True:
             try:
@@ -67,9 +65,7 @@ async def async_archive_file_lock(destination: str | Path, *, timeout: float = 1
     path.parent.mkdir(parents=True, exist_ok=True)
     lock_path = path.with_name(path.name + ".lock")
     with lock_path.open("a+b") as handle:
-        handle.seek(0)
-        handle.write(b"0")
-        handle.flush()
+        _prepare_lock_file(handle)
         deadline = time.monotonic() + timeout
         acquired = False
         try:
@@ -85,3 +81,11 @@ async def async_archive_file_lock(destination: str | Path, *, timeout: float = 1
         finally:
             if acquired:
                 _unlock(handle)
+
+
+def _prepare_lock_file(handle):
+    """Ensure Windows has a lockable byte without rewriting a held lock."""
+    if os.fstat(handle.fileno()).st_size == 0:
+        handle.seek(0)
+        handle.write(b"0")
+        handle.flush()

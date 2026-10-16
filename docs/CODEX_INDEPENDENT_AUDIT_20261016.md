@@ -38,7 +38,15 @@ Disposable databases and roles; loopback WebSockets and GET-only mock HTTP.
   exposed a test-only global wait_for replacement leaking Event.wait coroutines.
   Replaced it with the collector's real stop event; both OI tests then pass with
   RuntimeWarning promoted to error. No production OI change required.
-- GitHub Windows/Linux CI: pending final evidence on PR #5.
+- GitHub CI for code commit `0d34906`: Windows **188 passed** in 39.63 s;
+  Linux **187 passed, 1 skipped** in 16.74 s (Windows-only installer test).
+  Both push and PR workflows succeeded; Windows repeated-install checks passed.
+  Evidence: https://github.com/YehorBabenko88/meta_analyse/actions/runs/38919355280
+  and https://github.com/YehorBabenko88/meta_analyse/actions/runs/38919345539.
+  CI artifacts include JUnit, test logs and performance JSON.
+- CI synthetic render p95: Windows Server 2025 5.926 ms, Linux 4.242 ms;
+  approximately 19,995 callbacks/s, 20 instruments, 10 Hz publication, 3 seconds.
+  Worker/loop closure succeeded on both platforms.
 
 Reproduce with an isolated admin DSN:
 `python -m pytest -vv --basetemp=../audit-temp --junitxml=../audit.xml`

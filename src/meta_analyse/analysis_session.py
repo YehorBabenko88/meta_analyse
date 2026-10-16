@@ -78,7 +78,14 @@ class AnalysisSession:
                 self.started = True
             except BaseException:
                 # Both collectors may have allocated resources before failing.
-                await self._cleanup()
+                # Shield cleanup against a second cancellation while startup is
+                # unwinding; the caller must not abandon collector resources.
+                cleanup = asyncio.create_task(self._cleanup())
+                try:
+                    await asyncio.shield(cleanup)
+                except asyncio.CancelledError:
+                    await asyncio.shield(cleanup)
+                    raise
                 raise
             finally:
                 self._startup = None

@@ -98,6 +98,11 @@ async def acquire_archive(session, url: str, path: str | Path, *,
 
 async def acquire_many(archives: list[tuple[str, str | Path]], *,
                        concurrency: int = 4, max_bytes: int = 2_000_000_000):
+    # Two workers must never write the same .partial or audit receipt path.
+    # Resolve paths before opening network sessions; reject collisions early.
+    destinations = [str(Path(path).resolve()) for _, path in archives]
+    if len(destinations) != len(set(destinations)):
+        raise ValueError("duplicate archive destination in batch")
     import aiohttp
     timeout = aiohttp.ClientTimeout(total=None, sock_connect=20, sock_read=120)
     connector = aiohttp.TCPConnector(limit=max(1, concurrency))

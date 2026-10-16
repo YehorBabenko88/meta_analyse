@@ -304,3 +304,6 @@ class DesktopService:
                     await client.close()
                 except Exception as exc:
                     self.error('Client shutdown', exc)
+        # Windows Proactor transports may complete TLS/socket teardown one
+        # event-loop turn after httpx.aclose(). Drain before closing the loop.
+        await asyncio.sleep(0.05)

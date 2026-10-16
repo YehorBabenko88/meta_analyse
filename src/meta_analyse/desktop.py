@@ -332,12 +332,16 @@ class Window(QWidget):
         # path; equality still handles equivalent independently-built snapshots.
         previous_history = getattr(self, "_previous_orderflow_history_rows", ())
         history_changed = history_rows is not previous_history and history_rows != previous_history
+        # Sorting reorders QTableWidget's physical rows. Updating cells by
+        # index afterwards can leave stale or duplicated values; rebuild
+        # sorted history from scratch whenever its source actually changes.
         if history_changed:
             was_sorting = history_table.isSortingEnabled()
             was_updating = history_table.updatesEnabled()
             history_table.setUpdatesEnabled(False)
             history_table.setSortingEnabled(False)
             try:
+                history_table.setRowCount(0)
                 history_table.setRowCount(len(history_rows))
                 for row_index, entry in enumerate(history_rows):
                     values = (entry.bucket, entry.buy, entry.sell, entry.delta,

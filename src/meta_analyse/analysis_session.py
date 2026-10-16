@@ -13,6 +13,7 @@ class AnalysisSession:
             raise ValueError("tick sizes must be finite and positive")
         self._lifecycle_lock = asyncio.Lock()
         self._startup = None
+        self._stop_task = None
         self.analysis=AnalysisCoordinator(tick_sizes)
         self.health=MarketHealthMonitor()
         self.on_update=on_update
@@ -62,7 +63,8 @@ class AnalysisSession:
     async def start(self):
         # Reject queued starts: otherwise a waiting start can acquire the lock
         # between cancellation of the first startup and stop() cleanup.
-        if self._lifecycle_lock.locked():
+        if (self._lifecycle_lock.locked()
+                or self._stop_task is not None and not self._stop_task.done()):
             raise RuntimeError("session lifecycle operation already in progress")
         async with self._lifecycle_lock:
             if self.started:
@@ -94,6 +96,13 @@ class AnalysisSession:
                 raise result
 
     async def stop(self):
+        # Claim stop ownership before yielding; completion callbacks must not
+        # restart collectors between startup cancellation and cleanup.
+        if self._stop_task is None or self._stop_task.done():
+            self._stop_task = asyncio.create_task(self._stop())
+        await asyncio.shield(self._stop_task)
+
+    async def _stop(self):
         startup = self._startup
         if startup is not None and startup is not asyncio.current_task():
             startup.cancel()

@@ -76,7 +76,7 @@ async def load_peers(monkeypatch):
         yield symbols,state
 
 @pytest.mark.asyncio
-async def test_twenty_connect_disconnect_cycles_drain_collectors(postgres_store,load_peers,monkeypatch,app):
+async def test_fifty_connect_disconnect_cycles_drain_collectors(postgres_store,load_peers,monkeypatch,app):
     symbols,state = load_peers
     monkeypatch.setenv('META_ANALYSE_DSN',postgres_store.dsn)
     window = Window()
@@ -84,9 +84,9 @@ async def test_twenty_connect_disconnect_cycles_drain_collectors(postgres_store,
     try:
         await until(app,lambda: window.list.count()==20)
         # Different selected symbols across cycles also exercise row membership.
-        for cycle in range(20):
+        for cycle in range(50):
             window.list.clearSelection()
-            symbol = symbols[cycle]
+            symbol = symbols[cycle % len(symbols)]
             for i in range(window.list.count()):
                 if window.list.item(i).text()==symbol:
                     window.list.item(i).setSelected(True)

@@ -144,3 +144,23 @@ async def test_diagnostics_mixed_feed_cadences_and_sort(monkeypatch, app):
     finally:
         window.close()
         await until(app, lambda: not window.worker.is_alive() and not window.isVisible())
+
+@pytest.mark.asyncio
+async def test_diagnostics_numeric_sort_and_read_only_tables(monkeypatch, app):
+    from PySide6.QtWidgets import QAbstractItemView
+    monkeypatch.delenv("META_ANALYSE_DSN", raising=False)
+    window = Window()
+    try:
+        assert window.flow_table.editTriggers() == QAbstractItemView.EditTrigger.NoEditTriggers
+        assert window.diagnostics_table.editTriggers() == QAbstractItemView.EditTrigger.NoEditTriggers
+        window._snapshot = DesktopSnapshot(flow_state="connected",
+            market_events=(("orderbook:A", 2), ("orderbook:B", 100), ("orderbook:C", 10)),
+            market_ages=(("orderbook:A", 100.), ("orderbook:B", 10.), ("orderbook:C", 2.)))
+        window.repaint_state()
+        table = window.diagnostics_table
+        for column, expected in ((1, ["2", "10", "100"]), (3, ["2.0", "10.0", "100.0"])):
+            table.sortItems(column, Qt.SortOrder.AscendingOrder)
+            assert [table.item(i, column).text() for i in range(3)] == expected
+    finally:
+        window.close()
+        await until(app, lambda: not window.worker.is_alive() and not window.isVisible())

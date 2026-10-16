@@ -116,3 +116,58 @@ async def test_stop_cannot_be_overtaken_by_a_duplicate_start():
         await asyncio.gather(a, b, stop, return_exceptions=True)
         await raw.stop()
         await market.stop()
+
+@pytest.mark.asyncio
+async def test_completion_callback_restart_cannot_overtake_stop():
+    raw, market = Collector(asyncio.Event()), Collector()
+    s = session(raw, market)
+    first = asyncio.create_task(s.start())
+    await raw.entered.wait()
+    restarts = []
+    first.add_done_callback(lambda _: restarts.append(asyncio.create_task(s.start())))
+    stopping = asyncio.create_task(s.stop())
+    try:
+        await asyncio.wait_for(asyncio.shield(stopping), .2)
+        outcomes = await asyncio.gather(*restarts, return_exceptions=True)
+        assert outcomes and isinstance(outcomes[0], RuntimeError)
+        assert not raw.tasks and not market.tasks and not s.started
+    finally:
+        for task in (first, stopping, *restarts):
+            task.cancel()
+        await asyncio.gather(first, stopping, *restarts, return_exceptions=True)
+        await raw.stop()
+        await market.stop()
+
+@pytest.mark.asyncio
+async def test_concurrent_stop_and_cancelled_waiter_preserve_cleanup():
+    class SlowCollector(Collector):
+        def __init__(self):
+            super().__init__()
+            self.stopping = asyncio.Event()
+            self.release = asyncio.Event()
+            self.stops = 0
+        async def stop(self):
+            self.stops += 1
+            self.stopping.set()
+            await self.release.wait()
+            await super().stop()
+    raw, market = SlowCollector(), Collector()
+    s = session(raw, market)
+    await s.start()
+    first = asyncio.create_task(s.stop())
+    await raw.stopping.wait()
+    second = asyncio.create_task(s.stop())
+    first.cancel()
+    try:
+        await asyncio.gather(first, return_exceptions=True)
+        with pytest.raises(RuntimeError, match='lifecycle'):
+            await s.start()
+        raw.release.set()
+        await asyncio.wait_for(second, 1)
+        assert raw.stops == 1
+        assert not raw.tasks and not market.tasks
+        await s.start()
+        await s.stop()
+    finally:
+        raw.release.set()
+        await s.stop()

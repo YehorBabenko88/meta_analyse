@@ -726,3 +726,93 @@ async def test_both_client_shutdown_failures_are_attempted_and_sanitized():
     assert "Client shutdown failed (RuntimeError)" in service.status
     assert "secret" not in service.status
     assert "private" not in service.status
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('operation', ['refresh', 'refresh_overview', 'locate_metascalp', 'open_selected'])
+async def test_close_drains_requests_before_closing_clients(operation):
+    from types import SimpleNamespace
+    entered = asyncio.Event()
+    events = []
+    async def request(*args):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            events.append('request-drained')
+    class Client:
+        discover = open_combos = market_overview = request
+        async def close(self):
+            events.append('client-closed')
+    service = DesktopService(None, lambda snapshot: None)
+    service.api = service.exchange = Client()
+    service.runtime = SimpleNamespace(symbols=['BTCUSDT'], refresh_watchlist=request, stop=lambda: None)
+    args = (['BTCUSDT'],) if operation == 'open_selected' else ()
+    task = asyncio.create_task(getattr(service, operation)(*args))
+    await entered.wait()
+    try:
+        await service.close()
+        assert task.done(), 'client closed with a request still running'
+        assert events[0] == 'request-drained'
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+@pytest.mark.asyncio
+async def test_concurrent_close_waiter_cancellation_does_not_abandon_clients():
+    entered, release = asyncio.Event(), asyncio.Event()
+    events = []
+    class Client:
+        async def close(self):
+            entered.set()
+            await release.wait()
+            events.append('closed')
+    service = DesktopService(None, lambda snapshot: None)
+    service.api = Client()
+    first = asyncio.create_task(service.close())
+    await entered.wait()
+    second = asyncio.create_task(service.close())
+    first.cancel()
+    await asyncio.gather(first, return_exceptions=True)
+    release.set()
+    await asyncio.wait_for(second, 1)
+    await service.close()
+    assert events == ['closed']
+
+@pytest.mark.asyncio
+async def test_close_drains_real_loopback_http_and_refuses_late_requests():
+    import httpx
+    from types import SimpleNamespace
+    accepted, disconnected = asyncio.Event(), asyncio.Event()
+    async def peer(reader, writer):
+        try:
+            await reader.readuntil(b'\r\n\r\n')
+            accepted.set()
+            assert await reader.read() == b''
+        finally:
+            writer.close()
+            await writer.wait_closed()
+            disconnected.set()
+    async with await asyncio.start_server(peer, '127.0.0.1', 0) as server:
+        port = server.sockets[0].getsockname()[1]
+        client = httpx.AsyncClient(base_url=f'http://127.0.0.1:{port}', trust_env=False)
+        class ExchangeClient:
+            async def top_volatile(self):
+                await client.get('/')
+                return []
+            async def close(self):
+                assert not service._client_tasks
+                await client.aclose()
+        service = DesktopService(None, lambda snapshot: None)
+        service.exchange = ExchangeClient()
+        service.runtime = SimpleNamespace(refresh_watchlist=service.exchange.top_volatile, stop=lambda: None)
+        requesting = asyncio.create_task(service.refresh())
+        try:
+            await asyncio.wait_for(accepted.wait(), 2)
+            await service.close()
+            await asyncio.wait_for(disconnected.wait(), 2)
+            assert requesting.cancelled() and client.is_closed
+            await service.refresh()  # Must not reopen the closed pool.
+        finally:
+            requesting.cancel()
+            await asyncio.gather(requesting, return_exceptions=True)
+            await client.aclose()

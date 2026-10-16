@@ -2,6 +2,7 @@
 from __future__ import annotations
 import asyncio
 import time
+from functools import wraps
 from dataclasses import dataclass
 from decimal import Decimal
 from .analysis_session import AnalysisSession
@@ -24,6 +25,23 @@ class DesktopSnapshot:
     overview: tuple = ()
     readiness: tuple = ()
 
+def _client_operation(method):
+    """Own requests until cancellation/response teardown finishes before aclose."""
+    @wraps(method)
+    async def run(self, *args, **kwargs):
+        if self.closing:
+            return
+        task = asyncio.current_task()
+        owner = task not in self._client_tasks
+        self._client_tasks.add(task)
+        try:
+            return await method(self, *args, **kwargs)
+        finally:
+            if owner:
+                self._client_tasks.discard(task)
+    return run
+
+
 class DesktopService:
     def __init__(self, store, publish):
         self.store, self.publish = store, publish
@@ -34,6 +52,8 @@ class DesktopService:
         self.flow_status = 'Disconnected — data marked UNVERIFIED'
         self.status = 'Standby; no exchange orders are ever sent'
         self.closing = False
+        self._client_tasks = set()
+        self._close_task = None
         self.disconnect_task = None
         self.overview = {}
         self.oi_history = {}
@@ -54,6 +74,7 @@ class DesktopService:
         # Exception text may contain DSNs, passwords or HTTP payloads.
         self.status = f'{operation} failed ({type(exc).__name__}); check connectivity and configuration'
 
+    @_client_operation
     async def refresh(self):
         try:
             await self.runtime.refresh_watchlist()
@@ -72,6 +93,7 @@ class DesktopService:
             # Overview is optional; missing metrics must not block selection.
             pass
 
+    @_client_operation
     async def refresh_overview(self):
         if self.overview_lock is None:
             self.overview_lock = asyncio.Lock()
@@ -89,6 +111,7 @@ class DesktopService:
         self.overview = rows
         self.overview_updated = now
 
+    @_client_operation
     async def locate_metascalp(self):
         from .metascalp_locator import find_metascalp
         try:
@@ -101,6 +124,7 @@ class DesktopService:
             else:
                 self.status = "MetaScalp not found in common Windows locations; API unavailable"
 
+    @_client_operation
     async def open_selected(self, symbols):
         try:
             await self.api.open_combos(symbols)
@@ -284,7 +308,18 @@ class DesktopService:
             await asyncio.sleep(.1)
 
     async def close(self):
-        self.closing = True
+        if self._close_task is None:
+            self.closing = True
+            self._close_task = asyncio.create_task(self._close())
+        await asyncio.shield(self._close_task)
+
+    async def _close(self):
+        # Stop request producers before the pool; otherwise a request can finish
+        # connecting after aclose has already visited the active connections.
+        requests = tuple(self._client_tasks)
+        for task in requests:
+            task.cancel()
+        await asyncio.gather(*requests, return_exceptions=True)
         if self.overview_task is not None:
             self.overview_task.cancel()
             await asyncio.gather(self.overview_task, return_exceptions=True)

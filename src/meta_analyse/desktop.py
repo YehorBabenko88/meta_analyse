@@ -64,11 +64,10 @@ class Window(QWidget):
         market = QWidget()
         layout = QVBoxLayout(market)
         layout.addWidget(QLabel("Top-20 Bybit USDT perpetual, 24h absolute move; min $1m turnover"))
-        self.list = QListWidget()
-        self.list.setSelectionMode(QListWidget.MultiSelection)
-        layout.addWidget(self.list)
         self.market_table = QTableWidget(0, 6)
         self.market_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.market_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.market_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.market_table.setSortingEnabled(True)
         self.market_table.setHorizontalHeaderLabels(["Symbol", "24h change", "24h turnover $", "OI contracts", "OI change 5m", "OI change 1h"])
         layout.addWidget(self.market_table)
@@ -190,8 +189,12 @@ class Window(QWidget):
         return future
     def refresh(self):
         self.schedule(self.service.refresh())
+    def selected_symbols(self):
+        table = self.market_table
+        return [table.item(i.row(), 0).text() for i in table.selectionModel().selectedRows()
+                if table.item(i.row(), 0) is not None]
     def open_selected(self):
-        selected = [item.text() for item in self.list.selectedItems()]
+        selected = self.selected_symbols()
         if not selected:
             QMessageBox.information(self, "Select tickers", "Select one or several symbols.")
             return
@@ -201,7 +204,7 @@ class Window(QWidget):
     def start(self):
         self.schedule(self.service.start_monitor())
     def connect_flow(self):
-        selected = tuple(item.text() for item in self.list.selectedItems())
+        selected = tuple(self.selected_symbols())
         if not self.store:
             QMessageBox.warning(self, "Database required", "Set META_ANALYSE_DSN before connecting raw market feeds.")
             return
@@ -225,17 +228,11 @@ class Window(QWidget):
         rules = tuple(Decimal(str(spin.value())) / 100 for spin in (self.threshold, self.stop, self.fee))
         self.schedule(self.service.configure_paper(rules=rules))
     def repaint_state(self):
-        selected = {item.text() for item in self.list.selectedItems()}
-        current = [self.list.item(i).text() for i in range(self.list.count())]
-        if tuple(current) != self._snapshot.symbols:
-            self.list.clear()
-            self.list.addItems(self._snapshot.symbols)
-            for i in range(self.list.count()):
-                self.list.item(i).setSelected(self.list.item(i).text() in selected)
         self.status.setText(self._snapshot.status)
         overview = self._snapshot.overview
         table = self.market_table
         sorting = table.isSortingEnabled()
+        selected = set(self.selected_symbols())
         table.setSortingEnabled(False)
         try:
             table.setRowCount(len(overview))
@@ -248,6 +245,14 @@ class Window(QWidget):
                         cell.setText(value)
         finally:
             table.setSortingEnabled(sorting)
+            if selected:
+                from PySide6.QtCore import QItemSelection, QItemSelectionModel
+                selection = QItemSelection()
+                for i in range(table.rowCount()):
+                    cell = table.item(i, 0)
+                    if cell is not None and cell.text() in selected:
+                        selection.select(table.model().index(i, 0), table.model().index(i, table.columnCount()-1))
+                table.selectionModel().select(selection, QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows)
         self.flow_status.setText(self._snapshot.flow_status)
         self.connect_flow_button.setEnabled(self._snapshot.flow_state in ('disconnected', 'failed'))
         self.stop_flow_button.setEnabled(self._snapshot.flow_state in ('connecting', 'connected', 'failed'))

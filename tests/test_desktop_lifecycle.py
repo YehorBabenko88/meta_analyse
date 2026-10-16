@@ -86,3 +86,44 @@ def test_client_constructor_failure_is_visible_and_releases_partial_resources(ap
             window.loop.close()
         window._closed = True
         window.close()
+
+@pytest.mark.parametrize('stage', ['raw', 'market'])
+def test_close_during_collector_start_drains_partial_session(app, monkeypatch, stage):
+    import threading
+    from decimal import Decimal
+    from meta_analyse import instruments
+    from meta_analyse.pipeline import RawPipeline
+    from meta_analyse.market_collector import MarketCollector
+    entered = threading.Event()
+    async def metadata(exchange):
+        return {'BTCUSDT': __import__('types').SimpleNamespace(tick_size=Decimal('.5'))}
+    async def watchlist(self, *args):
+        return ['BTCUSDT']
+    async def raw_start(self):
+        if stage == 'raw':
+            entered.set()
+            await asyncio.Event().wait()
+    async def market_start(self, symbols):
+        entered.set()
+        await asyncio.Event().wait()
+    monkeypatch.setenv('META_ANALYSE_DSN', 'invalid dsn')
+    monkeypatch.setattr(instruments, 'instruments', metadata)
+    monkeypatch.setattr(BybitPublic, 'top_volatile', watchlist)
+    monkeypatch.setattr(RawPipeline, 'start', raw_start)
+    monkeypatch.setattr(MarketCollector, 'start', market_start)
+    window = Window()
+    window.show()
+    try:
+        pump(app, lambda: window.list.count() == 1)
+        window.list.item(0).setSelected(True)
+        window.connect_flow()
+        pump(app, entered.is_set)
+        window.close()
+        pump(app, lambda: not window.worker.is_alive() and not window.isVisible())
+        assert window.loop.is_closed()
+        assert window.service.session is None
+        assert window.service.api.client.is_closed
+        assert window.service.exchange.client.is_closed
+    finally:
+        window.close()
+        pump(app, lambda: not window.worker.is_alive() and not window.isVisible())

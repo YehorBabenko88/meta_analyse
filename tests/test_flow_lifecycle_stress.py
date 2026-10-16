@@ -82,14 +82,14 @@ async def test_fifty_connect_disconnect_cycles_drain_collectors(postgres_store,l
     window = Window()
     window.show()
     try:
-        await until(app,lambda: window.list.count()==20)
+        await until(app,lambda: window.market_table.rowCount()==20)
         # Different selected symbols across cycles also exercise row membership.
         for cycle in range(50):
-            window.list.clearSelection()
+            window.market_table.clearSelection()
             symbol = symbols[cycle % len(symbols)]
-            for i in range(window.list.count()):
-                if window.list.item(i).text()==symbol:
-                    window.list.item(i).setSelected(True)
+            for i in range(window.market_table.rowCount()):
+                if window.market_table.item(i, 0).text()==symbol:
+                    window.market_table.selectRow(i)
             window.connect_flow()
             window.connect_flow()
             await until(app,lambda: window._snapshot.flow_state=='connected' and symbol in {r.symbol for r in window._snapshot.flow_rows})
@@ -129,8 +129,8 @@ async def test_close_with_twenty_active_instruments_and_pending_db_write(postgre
     window = Window()
     window.show()
     try:
-        await until(app,lambda: window.list.count()==20)
-        window.list.selectAll()
+        await until(app,lambda: window.market_table.rowCount()==20)
+        window.market_table.selectAll()
         window.connect_flow()
         expected = {f'{prefix}.{symbol}' for prefix in ('publicTrade','orderbook.50') for symbol in symbols}
         await until(app,lambda: entered.is_set() and window._snapshot.flow_state=='connected'

@@ -245,8 +245,18 @@ class DesktopService:
         from .orderflow_adapters import from_records
         from .orderflow_aggregation import aggregate_by_time
         from .orderflow_view import make_rows
-        trades = tuple(from_records(records))
+        # Bound both memory and Qt table size; refuse truncation that could
+        # silently corrupt cumulative delta or imply complete coverage.
+        max_trades = 250_000
+        max_buckets = 10_000
+        trades = []
+        for record in records:
+            if len(trades) >= max_trades:
+                raise ValueError('historical trade limit exceeded')
+            trades.extend(from_records((record,)))
         buckets = aggregate_by_time(trades, interval_ms)
+        if len(buckets) > max_buckets:
+            raise ValueError('historical interval limit exceeded')
         self.orderflow_rows = make_rows(buckets, quality='UNVERIFIED')
         self.orderflow_status = (
             f'{len(trades)} trades, {len(buckets)} intervals; '

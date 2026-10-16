@@ -45,7 +45,7 @@ async def test_stream_download_and_atomic_commit(tmp_path):
             return Response()
 
     path = tmp_path / "daily.csv.gz"
-    await download_archive(Session(), "https://public.bybit.com/trading/BTCUSDT/a.csv.gz", path)
+    await download_archive(Session(), "https://public.bybit.com/trading/BTCUSDT/BTCUSDT2025-01-01.csv.gz", path)
     assert path.read_bytes() == b"abcdef"
     assert not (tmp_path / "daily.csv.gz.partial").exists()
 
@@ -72,7 +72,7 @@ async def test_download_limit_preserves_existing_file(tmp_path):
     path = tmp_path / "daily.csv.gz"
     path.write_bytes(b"old")
     with pytest.raises(ValueError, match="maximum"):
-        await download_archive(Session(), "https://public.bybit.com/trading/BTCUSDT/a.csv.gz",
+        await download_archive(Session(), "https://public.bybit.com/trading/BTCUSDT/BTCUSDT2025-01-01.csv.gz",
                                path, max_bytes=10)
     assert path.read_bytes() == b"old"
     assert not (tmp_path / "daily.csv.gz.partial").exists()

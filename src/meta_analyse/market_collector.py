@@ -3,9 +3,9 @@ from __future__ import annotations
 import asyncio
 import logging
 from .market_store import MarketStore
+from .market_telemetry import MarketTelemetry
 from .orderbook_stream import OrderBookStream
 from .open_interest import fetch_open_interest
-from .market_telemetry import MarketTelemetry
 
 LOG=logging.getLogger(__name__)
 

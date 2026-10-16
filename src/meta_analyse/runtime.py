@@ -11,7 +11,8 @@ from .core import Trade, new_minute, floor_minute, PaperEngine, RollingFlow
 LOG = logging.getLogger(__name__)
 
 class Runtime:
-    def __init__(self, metascalp, exchange, store=None, tick_size=D("0.00000001")):
+    def __init__(self, metascalp, exchange, store=None, tick_size=D("0.00000001"), *, on_status=None):
+        self.on_status = on_status
         self.api = metascalp
         self.exchange = exchange
         self.store = store
@@ -71,8 +72,20 @@ class Runtime:
                 outputs.append(("paper_fill", symbol, fill))
         return outputs
 
+    def _status(self, text):
+        if self.on_status:
+            self.on_status(text)
+
     async def run(self):
+        if self.running:
+            raise RuntimeError("monitor already running")
         self.running = True
+        try:
+            await self._run()
+        finally:
+            self.running = False
+
+    async def _run(self):
         delay = 1
         while self.running:
             try:
@@ -87,12 +100,13 @@ class Runtime:
                 self.connection_id = eligible[0]["id"]
                 await self.refresh_watchlist()
                 port = int(self.api.base.rsplit(":", 1)[1])
-                async with websockets.connect(f"ws://127.0.0.1:{port}/", max_size=4_194_304) as socket:
+                async with websockets.connect(f"ws://127.0.0.1:{port}/", max_size=4_194_304, close_timeout=2) as socket:
                     for symbol in self.symbols:
                         await socket.send(json.dumps({"Type":"trade_subscribe", "Data":{
                             "connectionId":self.connection_id,"ticker":symbol,"zoomIndex":1}}))
                         await socket.send(json.dumps({"Type":"orderbook_subscribe", "Data":{
                             "connectionId":self.connection_id,"ticker":symbol,"fetchSnapshot":False,"depthLevels":50}}))
+                    self._status("MetaScalp connected; aggregated feed remains UNVERIFIED")
                     delay = 1
                     next_refresh = asyncio.get_running_loop().time() + 300
                     while self.running:
@@ -115,9 +129,11 @@ class Runtime:
                         except asyncio.TimeoutError:
                             continue
             except (ConnectionError, OSError, websockets.WebSocketException, ValueError) as exc:
-                LOG.warning("Market stream reconnect: %s", exc)
-            except Exception:
-                LOG.exception("Market stream failure")
+                self._status(f"Monitor disconnected ({type(exc).__name__}); retrying; data UNVERIFIED")
+                LOG.warning("Market stream reconnect (%s)", type(exc).__name__)
+            except Exception as exc:
+                self._status(f"Monitor failed ({type(exc).__name__}); retrying; data UNVERIFIED")
+                LOG.warning("Market stream failure (%s)", type(exc).__name__)
             if self.running:
                 await asyncio.sleep(delay)
                 delay = min(delay * 2, 60)

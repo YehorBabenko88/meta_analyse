@@ -4,23 +4,41 @@ import asyncio
 import os
 import sys
 import threading
-from PySide6.QtCore import QTimer
+from dataclasses import replace
+from PySide6.QtCore import QTimer, QObject, Signal, Slot, Qt
 from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLabel, QListWidget, QMessageBox, QDoubleSpinBox, QCheckBox, QTabWidget,
-                               QTableWidget, QTableWidgetItem)
-from .ports import MetaScalp
-from .exchange import BybitPublic
-from .runtime import Runtime
+                               QTableWidget, QTableWidgetItem, QAbstractItemView, QProgressBar)
 from .storage import Store
-from .analysis_coordinator import AnalysisCoordinator
-from .liquidity import large_levels
 from decimal import Decimal
 from .trader_theme import TRADER_QSS
-from .flow_bridge import FlowBridge
-from .analysis_session import AnalysisSession
+from .desktop_service import DesktopService, DesktopSnapshot
 from .flow_style import flow_cell_style
 from .flow_diff import changed_rows
+from .freshness import freshness_for_feed
+from .freshness_style import freshness_colors_for_feed
+
+
+class FlowTableItem(QTableWidgetItem):
+    """Numeric market values sort by value; symbols/placeholders sort as text."""
+    def __lt__(self, other):
+        def key(text):
+            try:
+                number = Decimal(text)
+                if number.is_finite():
+                    return (0, number)
+            except ArithmeticError:
+                pass
+            return (1, text)
+        return key(self.text()) < key(other.text())
+
+
+
+class WorkerSignals(QObject):
+    snapshot = Signal(object)
+    error = Signal(str)
+
 
 class Window(QWidget):
     def __init__(self):
@@ -28,25 +46,34 @@ class Window(QWidget):
         self.setWindowTitle("Meta Analyse — read-only / paper")
         self.resize(1000, 690)
         self.loop = asyncio.new_event_loop()
-        self.api = MetaScalp()
-        self.exchange = BybitPublic()
+        self._closing = False
+        self._submission_lock = threading.Lock()
+        self._worker_stopped = threading.Event()
+        self._closed = False
+        self._snapshot = DesktopSnapshot()
+        self.signals = WorkerSignals(self)
+        self.signals.snapshot.connect(self._receive_snapshot, Qt.ConnectionType.QueuedConnection)
+        self.signals.error.connect(self._receive_error, Qt.ConnectionType.QueuedConnection)
         dsn = os.getenv("META_ANALYSE_DSN", "")
         self.store = Store(dsn) if dsn else None
-        self.runtime = Runtime(self.api, self.exchange, self.store)
-        self.worker = threading.Thread(target=self._thread_main, daemon=True)
-        self.worker.start()
+        self.service = DesktopService(self.store, self.signals.snapshot.emit)
+        self.worker = threading.Thread(target=self._thread_main, name="meta-analyse-worker", daemon=False)
         self.tabs = QTabWidget()
         root = QVBoxLayout(self)
         root.addWidget(self.tabs)
         market = QWidget()
         layout = QVBoxLayout(market)
         layout.addWidget(QLabel("Top-20 Bybit USDT perpetual, 24h absolute move; min $1m turnover"))
-        self.list = QListWidget()
-        self.list.setSelectionMode(QListWidget.MultiSelection)
-        layout.addWidget(self.list)
+        self.market_table = QTableWidget(0, 7)
+        self.market_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.market_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.market_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.market_table.setSortingEnabled(True)
+        self.market_table.setHorizontalHeaderLabels(["Symbol", "24h change", "24h turnover $", "OI contracts", "OI change 5m", "OI change 1h", "History readiness"])
+        layout.addWidget(self.market_table)
         actions = QHBoxLayout()
         for name, fn in (("Refresh symbols", self.refresh), ("Open selected MetaScalp combos", self.open_selected),
-                         ("Start monitoring", self.start)):
+                         ("Start monitoring", self.start), ("Find MetaScalp", self.find_metascalp)):
             button = QPushButton(name)
             button.clicked.connect(fn)
             actions.addWidget(button)
@@ -75,17 +102,13 @@ class Window(QWidget):
         self.stats.setHorizontalHeaderLabels(["Symbol", "Trades", "Wins", "Net PnL $", "Open position"])
         controls.addWidget(self.stats)
         self.tabs.addTab(paper, "Paper results")
-        self.analysis = AnalysisCoordinator({})
-        self.flow_bridge = FlowBridge()
-        self.live_session = None
-        self.flow_start_error = None
-        self.flow_starting = False
         flow = QWidget()
         flow_layout = QVBoxLayout(flow)
         flow_layout.addWidget(QLabel("Order flow diagnostics — read-only; data are unverified until live feeds connect"))
         self.flow_status = QLabel("No validated trade/orderbook stream attached")
         flow_layout.addWidget(self.flow_status)
         self.flow_table = QTableWidget(0, 9)
+        self.flow_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.flow_table.setAlternatingRowColors(True)
         self.flow_table.setSortingEnabled(True)
         self.flow_table.setHorizontalHeaderLabels(["Symbol", "Level", "POC", "Delta", "Tape/s", "Quality", "Spread ticks", "Book imbalance", "Nearby wall"])
@@ -104,178 +127,271 @@ class Window(QWidget):
         controls_row.addWidget(self.stop_flow_button)
         flow_layout.addLayout(controls_row)
         self.tabs.addTab(flow, "Order flow")
-        self._previous_flow_rows = ()
+        diagnostics = QWidget()
+        diagnostics_layout = QVBoxLayout(diagnostics)
+        diagnostics_layout.addWidget(QLabel("Persisted feed events and reported gaps; not proof of exchange completeness"))
+        self.diagnostics_state = QLabel("Disconnected — counters hidden")
+        diagnostics_layout.addWidget(self.diagnostics_state)
+        self.diagnostics_table = QTableWidget(0, 5)
+        self.diagnostics_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.diagnostics_table.setSortingEnabled(True)
+        self.diagnostics_table.setHorizontalHeaderLabels(["Feed / symbol", "Persisted events", "Reported gaps", "Last persisted age (s)", "Freshness"])
+        diagnostics_layout.addWidget(self.diagnostics_table)
+        self.tabs.addTab(diagnostics, "Diagnostics")
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.repaint_state)
         self.timer.start(1500)
+        self.worker.start()
         self.refresh()
-
     def _thread_main(self):
         asyncio.set_event_loop(self.loop)
-        self.loop.run_forever()
+        try:
+            self.service.initialize()
+            self.loop.create_task(self.service.publish_loop())
+            self.loop.run_forever()
+        except Exception as exc:
+            self.signals.error.emit(f'Worker initialization failed ({type(exc).__name__})')
+        finally:
+            # Block submissions before draining, including construction failure.
+            with self._submission_lock:
+                self._worker_stopped.set()
+            try:
+                self.loop.run_until_complete(self._shutdown())
+                self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+                self.loop.run_until_complete(self.loop.shutdown_default_executor())
+            finally:
+                self.loop.close()
 
+    @Slot(object)
+    def _receive_snapshot(self, snapshot):
+        if not self._closing:
+            self._snapshot = snapshot
+            self.repaint_state()
+    @Slot(str)
+    def _receive_error(self, message):
+        if not self._closing:
+            self._snapshot = replace(self._snapshot, status=message)
+            self.status.setText(message)
     def schedule(self, task):
-        future = asyncio.run_coroutine_threadsafe(task, self.loop)
+        with self._submission_lock:
+            if self._closing or self._worker_stopped.is_set():
+                task.close()
+                return None
+            future = asyncio.run_coroutine_threadsafe(task, self.loop)
         def done(f):
+            if f.cancelled():
+                return
             try:
                 f.result()
             except Exception as exc:
-                print("Background operation failed:", exc, file=sys.stderr)
+                self.signals.error.emit(f'Background operation failed ({type(exc).__name__})')
         future.add_done_callback(done)
         return future
-
     def refresh(self):
-        self.schedule(self.runtime.refresh_watchlist())
-
+        self.schedule(self.service.refresh())
+    def selected_symbols(self):
+        table = self.market_table
+        return [table.item(i.row(), 0).text() for i in table.selectionModel().selectedRows()
+                if table.item(i.row(), 0) is not None]
     def open_selected(self):
-        selected = [item.text() for item in self.list.selectedItems()]
+        selected = self.selected_symbols()
         if not selected:
             QMessageBox.information(self, "Select tickers", "Select one or several symbols.")
             return
-        self.schedule(self.api.open_combos(selected))
-
+        self.schedule(self.service.open_selected(tuple(selected)))
+    def find_metascalp(self):
+        self.schedule(self.service.locate_metascalp())
     def start(self):
-        if self.store:
-            self.schedule(asyncio.to_thread(self.store.initialize))
-        self.schedule(self.runtime.run())
-        self.status.setText("Monitor requested; see console/log for connectivity errors")
-
+        self.schedule(self.service.start_monitor())
     def connect_flow(self):
-        selected = [item.text() for item in self.list.selectedItems()]
+        selected = tuple(self.selected_symbols())
         if not self.store:
-            QMessageBox.warning(self, "Database required",
-                                "Set META_ANALYSE_DSN before connecting raw market feeds.")
+            QMessageBox.warning(self, "Database required", "Set META_ANALYSE_DSN before connecting raw market feeds.")
             return
         if not selected or len(selected) > 20:
-            QMessageBox.warning(self, "Selection required", "Select 1–20 markets.")
+            QMessageBox.warning(self, "Selection required", "Select 1-20 markets.")
             return
-        if self.live_session is not None:
-            QMessageBox.information(self, "Already running", "Flow session is already running.")
-            return
-        self.flow_start_error = None
-        self.flow_starting = True
         self.connect_flow_button.setEnabled(False)
-        self.flow_status.setText("Connecting; historical continuity remains unverified")
         self.schedule(self._start_flow(selected, Decimal(str(self.level_price.value()))))
-
     async def _start_flow(self, symbols, level):
-        try:
-            from .instruments import instruments
-            metadata = await instruments(self.exchange)
-            tick_sizes = {s: metadata[s].tick_size for s in symbols if s in metadata}
-            if len(tick_sizes) != len(symbols):
-                raise ValueError("Missing tick sizes for selected symbols")
-            session = AnalysisSession(self.store, self.exchange, tick_sizes,
-                                      on_update=self._flow_execution,
-                                      on_gap=self._invalidate_flow,
-                                      on_book_update=self._flow_book)
-            if level > 0:
-                for symbol in symbols:
-                    session.select_level(symbol, level)
-            await session.start()
-            self.live_session = session
-            self.flow_starting = False
-        except Exception as exc:
-            self.flow_bridge.invalidate(symbols)
-            print("Flow startup failed:", exc, file=sys.stderr)
-            self.flow_start_error = str(exc)
-            self.flow_starting = False
-
-    async def _flow_execution(self,symbol,footprint,tape):
-        await self.flow_bridge.update(symbol,footprint,tape)
-        self.flow_bridge.trade_observed(symbol)
-
-    async def _flow_book(self,symbol,summary):
-        self.flow_bridge.book_observed(symbol,summary)
-
-    async def _invalidate_flow(self, symbols, reason):
-        self.flow_bridge.invalidate(symbols)
-
+        self.service.connect_flow(symbols, level)
     def disconnect_flow(self):
-        if self.live_session is None:
-            self.flow_status.setText("No active flow session")
-            self.connect_flow_button.setEnabled(True)
-            return
+        self.connect_flow_button.setEnabled(False)
         self.schedule(self._stop_flow())
-
     async def _stop_flow(self):
-        session = self.live_session
-        if session is None:
-            return
-        try:
-            await session.stop()
-        finally:
-            self.live_session = None
-            self.flow_bridge.invalidate(list(session.analysis.tapes))
-            self.flow_start_error = None
-
+        await self.service.disconnect_flow()
     def toggle_paper(self, enabled):
-        self.runtime.paper.enabled = enabled
-
+        self.schedule(self.service.configure_paper(enabled=bool(enabled)))
     def update_rules(self):
         if not all(hasattr(self, name) for name in ("threshold", "stop", "fee")):
             return
-        from decimal import Decimal as D
-        engine = self.runtime.paper
-        engine.threshold = D(str(self.threshold.value())) / 100
-        engine.stop_pct = D(str(self.stop.value())) / 100
-        engine.fee_rate = D(str(self.fee.value())) / 100
-
+        rules = tuple(Decimal(str(spin.value())) / 100 for spin in (self.threshold, self.stop, self.fee))
+        self.schedule(self.service.configure_paper(rules=rules))
     def repaint_state(self):
-        selected = {item.text() for item in self.list.selectedItems()}
-        current = [self.list.item(i).text() for i in range(self.list.count())]
-        if current != self.runtime.symbols:
-            self.list.clear()
-            self.list.addItems(self.runtime.symbols)
-            for i in range(self.list.count()):
-                self.list.item(i).setSelected(self.list.item(i).text() in selected)
-        if self.flow_start_error:
-            self.flow_status.setText("Connection failed: " + self.flow_start_error[:180])
-            self.connect_flow_button.setEnabled(True)
-        elif self.live_session is not None:
-            self.flow_status.setText("Streams connected — historical continuity NOT verified")
-        elif not self.flow_starting:
-            self.connect_flow_button.setEnabled(True)
-            self.flow_status.setText("Disconnected — data marked UNVERIFIED")
-        rows = self.flow_bridge.snapshot()
-        changed, rebuild = changed_rows(self._previous_flow_rows, rows)
+        self.status.setText(self._snapshot.status)
+        overview = self._snapshot.overview
+        readiness = dict(self._snapshot.readiness)
+        table = self.market_table
+        sorting = table.isSortingEnabled()
+        selected = set(self.selected_symbols())
+        table.setSortingEnabled(False)
+        try:
+            table.setRowCount(len(overview))
+            for i, values in enumerate(overview):
+                for j, value in enumerate(values):
+                    cell = table.item(i, j)
+                    if cell is None:
+                        table.setItem(i, j, FlowTableItem(value))
+                    elif cell.text() != value:
+                        cell.setText(value)
+                # No false 100%: historical ticks/trades and candle coverage are
+                # not yet verified by the live market overview endpoint.
+                bar = table.cellWidget(i, 6)
+                if bar is None:
+                    bar = QProgressBar(table)
+                    bar.setRange(0, 100)
+                    bar.setValue(0)
+                    bar.setFormat('Not verified')
+                    table.setCellWidget(i, 6, bar)
+                progress = readiness.get(values[0])
+                if progress is None or progress.percent is None:
+                    bar.setValue(0)
+                    bar.setFormat('Not verified')
+                    bar.setStyleSheet('')
+                else:
+                    bar.setValue(progress.percent)
+                    bar.setFormat(f'{progress.percent}% — {progress.status}')
+                    color = '#26965c' if progress.percent == 100 and progress.status == 'verified' else '#b58b35'
+                    bar.setStyleSheet(f'QProgressBar::chunk {{ background-color: {color}; }}')
+        finally:
+            table.setSortingEnabled(sorting)
+            if selected:
+                from PySide6.QtCore import QItemSelection, QItemSelectionModel
+                selection = QItemSelection()
+                for i in range(table.rowCount()):
+                    cell = table.item(i, 0)
+                    if cell is not None and cell.text() in selected:
+                        selection.select(table.model().index(i, 0), table.model().index(i, table.columnCount()-1))
+                table.selectionModel().select(selection, QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows)
+        self.flow_status.setText(self._snapshot.flow_status)
+        self.connect_flow_button.setEnabled(self._snapshot.flow_state in ('disconnected', 'failed'))
+        self.stop_flow_button.setEnabled(self._snapshot.flow_state in ('connecting', 'connected', 'failed'))
+        rows = self._snapshot.flow_rows
+        changed, rebuild = changed_rows(getattr(self, "_previous_flow_rows", ()), rows)
         if rebuild or changed:
-            self.flow_table.setSortingEnabled(False)
-            if rebuild:
-                self.flow_table.setRowCount(len(rows))
-            for row in changed:
-                entry = rows[row]
-                values = (entry.symbol, entry.level, entry.poc, entry.delta,
-                          entry.tape_rate, entry.quality, entry.spread, entry.imbalance, entry.wall)
-                for col, value in enumerate(values):
-                    item = QTableWidgetItem(value)
-                    foreground, background = flow_cell_style(col, value, entry.quality)
-                    item.setForeground(QBrush(QColor(foreground)))
-                    item.setBackground(QBrush(QColor(background)))
-                    self.flow_table.setItem(row, col, item)
-            self.flow_table.setSortingEnabled(True)
-            self._previous_flow_rows = rows
-        engine = self.runtime.paper
-        symbols = sorted(set(self.runtime.symbols) | {f.symbol for f in engine.fills})
-        self.stats.setRowCount(len(symbols))
-        for i, symbol in enumerate(symbols):
-            fills = [f for f in engine.fills if f.symbol == symbol]
-            values = [symbol, str(len(fills)), str(sum(f.net > 0 for f in fills)),
-                      str(round(sum((f.net for f in fills), __import__('decimal').Decimal(0)), 4)),
-                      engine.positions[symbol].side if symbol in engine.positions else "-"]
-            for j, value in enumerate(values):
-                self.stats.setItem(i, j, QTableWidgetItem(value))
-
-    def closeEvent(self, event):
-        self.runtime.stop()
-        if self.live_session is not None:
-            future = asyncio.run_coroutine_threadsafe(self.live_session.stop(), self.loop)
+            table = self.flow_table
+            sorting = table.isSortingEnabled()
+            updates = table.updatesEnabled()
+            table.setUpdatesEnabled(False)
+            table.setSortingEnabled(False)
             try:
-                future.result(timeout=5)
-            except Exception as exc:
-                print("Flow shutdown failed:", exc, file=sys.stderr)
-        self.loop.call_soon_threadsafe(self.loop.stop)
-        super().closeEvent(event)
+                if rebuild:
+                    table.setRowCount(len(rows))
+                    positions = {entry.symbol: i for i, entry in enumerate(rows)}
+                else:
+                    # Sorting changes visual positions without changing snapshot order.
+                    positions = {table.item(i, 0).text(): i for i in range(table.rowCount())}
+                for index in changed:
+                    entry = rows[index]
+                    row = positions[entry.symbol]
+                    values = (entry.symbol, entry.level, entry.poc, entry.delta,
+                              entry.tape_rate, entry.quality, entry.spread, entry.imbalance, entry.wall)
+                    for col, value in enumerate(values):
+                        item = table.item(row, col)
+                        if item is None:
+                            item = FlowTableItem(value)
+                            table.setItem(row, col, item)
+                        elif item.text() != value:
+                            item.setText(value)
+                        foreground, background = flow_cell_style(col, value, entry.quality)
+                        if item.foreground().color().name() != foreground.lower():
+                            item.setForeground(QBrush(QColor(foreground)))
+                        if item.background().color().name() != background.lower():
+                            item.setBackground(QBrush(QColor(background)))
+                self._previous_flow_rows = rows
+            finally:
+                table.setSortingEnabled(sorting)
+                table.setUpdatesEnabled(updates)
+        self.diagnostics_state.setText(
+            "Connected — session counters (not exchange completeness)"
+            if self._snapshot.flow_state == "connected"
+            else f"{self._snapshot.flow_state.capitalize()} — counters hidden"
+        )
+        event_counts = dict(self._snapshot.market_events)
+        gap_counts = dict(self._snapshot.market_gaps)
+        ages = dict(self._snapshot.market_ages)
+        keys = sorted(event_counts.keys() | gap_counts.keys() | ages.keys())
+        table = self.diagnostics_table
+        sorting = table.isSortingEnabled()
+        table.setSortingEnabled(False)
+        try:
+            current_keys = {table.item(i, 0).text(): i for i in range(table.rowCount())
+                            if table.item(i, 0) is not None}
+            if set(current_keys) != set(keys) or len(current_keys) != table.rowCount():
+                table.setRowCount(len(keys))
+                for i, key in enumerate(keys):
+                    table.setItem(i, 0, QTableWidgetItem(key))
+                current_keys = {key: i for i, key in enumerate(keys)}
+            for key in keys:
+                i = current_keys[key]
+                for col, value in ((1, str(event_counts.get(key, 0))),
+                                   (2, str(gap_counts.get(key, 0))),
+                                   (3, f"{ages[key]:.1f}" if key in ages else "—"),
+                                   (4, freshness_for_feed(key, ages.get(key)))):
+                    item = table.item(i, col)
+                    if item is None:
+                        item = FlowTableItem(value)
+                        table.setItem(i, col, item)
+                    elif item.text() != value:
+                        item.setText(value)
+                    if col == 4:
+                        foreground, background = freshness_colors_for_feed(key, ages.get(key))
+                        if item.foreground().color().name() != foreground.lower():
+                            item.setForeground(QBrush(QColor(foreground)))
+                        if item.background().color().name() != background.lower():
+                            item.setBackground(QBrush(QColor(background)))
+        finally:
+            table.setSortingEnabled(sorting)
+        self.stats.setRowCount(len(self._snapshot.stats))
+        for row, values in enumerate(self._snapshot.stats):
+            for col, value in enumerate(values):
+                self.stats.setItem(row, col, QTableWidgetItem(value))
+    async def _shutdown(self):
+        # Let owners finish their one cancellation/closing handshake first.
+        # Cancelling every asyncio task here a second time can interrupt an
+        # already-running disconnect and abandon the WebSocket transport.
+        await self.service.close()
+        current = asyncio.current_task()
+        tasks = [task for task in asyncio.all_tasks() if task is not current]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+    def _finish_close(self):
+        if self.worker.is_alive():
+            return
+        self.timer.stop()
+        self._closed = True
+        self.close()
+    def closeEvent(self, event):
+        if self._closed or self._worker_stopped.is_set() and not self.worker.is_alive():
+            self.timer.stop()
+            event.accept()
+            return
+        event.ignore()
+        if self._closing:
+            return
+        self._closing = True
+        self.setEnabled(False)
+        self.status.setText("Closing connections...")
+        self.timer.stop()
+        self.timer.timeout.disconnect()
+        self.timer.timeout.connect(self._finish_close)
+        self.timer.start(20)
+        with self._submission_lock:
+            if not self._worker_stopped.is_set():
+                future = asyncio.run_coroutine_threadsafe(self._shutdown(), self.loop)
+                future.add_done_callback(lambda _f: self.loop.call_soon_threadsafe(self.loop.stop))
+
 
 def main():
     app = QApplication(sys.argv)
@@ -283,6 +399,7 @@ def main():
     window = Window()
     window.show()
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

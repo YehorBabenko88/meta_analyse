@@ -1,12 +1,13 @@
 """MetaScalp localhost REST client. No sockets are bound by this application."""
 from __future__ import annotations
 import httpx
+from .http_client import ManagedAsyncClient
 import asyncio
 
 class MetaScalp:
     def __init__(self):
         self.base: str | None = None
-        self.client = httpx.AsyncClient(timeout=3, trust_env=False)
+        self.client = ManagedAsyncClient(timeout=3, trust_env=False)
 
     async def discover(self) -> str:
         for port in range(17845, 17856):

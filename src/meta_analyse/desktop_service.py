@@ -78,6 +78,18 @@ class DesktopService:
         self.overview = rows
         self.overview_updated = now
 
+    async def locate_metascalp(self):
+        from .metascalp_locator import find_metascalp
+        try:
+            endpoint = await self.api.discover()
+            self.status = f"MetaScalp API available: {endpoint}"
+        except (ConnectionError, OSError):
+            paths = await asyncio.to_thread(find_metascalp)
+            if paths:
+                self.status = f"MetaScalp installed (not connected): {paths[0]}"
+            else:
+                self.status = "MetaScalp not found in common Windows locations; API unavailable"
+
     async def open_selected(self, symbols):
         try:
             await self.api.open_combos(symbols)

@@ -63,6 +63,7 @@ async def download_resumable(session, url: str, destination: str | Path, *,
             raise ValueError("archive exceeds maximum allowed bytes")
         transferred = 0
         transfer_error = None
+        durable = True
         with partial.open("ab" if state is not None else "wb") as stream:
             try:
                 async for chunk in response.content.iter_chunked(chunk_bytes):
@@ -78,6 +79,7 @@ async def download_resumable(session, url: str, destination: str | Path, *,
                     stream.flush()
                     os.fsync(stream.fileno())
                 except OSError:
+                    durable = False
                     if transfer_error is None:
                         raise
                     # The original cancellation/transport failure takes
@@ -86,7 +88,7 @@ async def download_resumable(session, url: str, destination: str | Path, *,
         if transfer_error is not None:
             # Never let checkpoint I/O replace the original cancellation or
             # transport failure; the next run rejects unsaved partial bytes.
-            if 0 < transferred < expected:
+            if durable and 0 < transferred < expected:
                 try:
                     save_partial(destination, url, ResumeState(offset + transferred, etag, total))
                 except OSError:

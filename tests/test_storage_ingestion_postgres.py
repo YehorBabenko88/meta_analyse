@@ -146,3 +146,23 @@ def test_resume_after_failed_batch_and_repaired_archive_conflict(tmp_path):
     assert source_id > 0
     assert checkpoint == 1
     assert count == 1
+
+
+def test_concurrent_identical_archive_is_idempotent(tmp_path):
+    """Two workers racing on the same archive must not duplicate records."""
+    store = Store(DSN)
+    symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+    path, receipt = archive(tmp_path, symbol, "same_trade", "same_archive")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(
+            lambda _: import_verified_archive(
+                store, path, receipt, symbol=symbol, batch_size=1), range(2)))
+    assert sorted(item["resumed_from"] for item in results) == [0, 1]
+    with store.connect() as conn:
+        source_count = conn.execute("""SELECT count(*) FROM meta_analyse.archive_sources
+            WHERE venue='bybit' AND symbol=%s AND sha256=%s""",
+            (symbol, receipt["sha256"])).fetchone()[0]
+        trade_count = conn.execute("""SELECT count(*) FROM meta_analyse.historical_trades
+            WHERE venue='bybit' AND symbol=%s""", (symbol,)).fetchone()[0]
+    assert source_count == 1
+    assert trade_count == 1

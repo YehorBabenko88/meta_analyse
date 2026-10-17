@@ -32,3 +32,36 @@ def test_historical_table_renders_immutable_snapshot(monkeypatch):
     assert table.item(0, 4).text() == "1"
     assert table.item(0, 6).text() == "UNVERIFIED"
     table.close()
+
+
+def test_sorted_history_refresh_replaces_rows_without_stale_values():
+    """Reproduces the sorted-table update path without starting the worker."""
+    app = QApplication.instance() or QApplication([])
+    from meta_analyse.desktop import FlowTableItem
+    table = QTableWidget(0, 7)
+    table.setSortingEnabled(True)
+
+    def render(rows):
+        was_sorting = table.isSortingEnabled()
+        was_updating = table.updatesEnabled()
+        table.setUpdatesEnabled(False)
+        table.setSortingEnabled(False)
+        try:
+            table.setRowCount(0)
+            table.setRowCount(len(rows))
+            for i, row in enumerate(rows):
+                for j, value in enumerate(row):
+                    table.setItem(i, j, FlowTableItem(value))
+        finally:
+            table.setSortingEnabled(was_sorting)
+            table.setUpdatesEnabled(was_updating)
+
+    render([("100", "1", "0", "1", "1", "1", "UNVERIFIED"),
+            ("200", "2", "0", "2", "3", "1", "UNVERIFIED")])
+    table.sortItems(0)
+    render([("300", "3", "0", "3", "3", "1", "UNVERIFIED")])
+    assert table.rowCount() == 1
+    assert table.item(0, 0).text() == "300"
+    assert table.item(0, 3).text() == "3"
+    assert table.isSortingEnabled()
+    table.close()

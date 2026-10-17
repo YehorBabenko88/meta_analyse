@@ -48,6 +48,14 @@ class StreamingTrades:
     def append(self, trade):
         if not isinstance(trade, Trade):
             raise TypeError("expected normalized Trade")
+        if isinstance(trade.timestamp_ms, bool) or not isinstance(trade.timestamp_ms, int):
+            raise ValueError("timestamp_ms must be an integer")
+        if not isinstance(trade.price, Decimal) or not trade.price.is_finite() or trade.price <= 0:
+            raise ValueError("price must be finite and positive")
+        if not isinstance(trade.volume, Decimal) or not trade.volume.is_finite() or trade.volume < 0:
+            raise ValueError("volume must be finite and nonnegative")
+        if trade.side not in ("buy", "sell", "unknown"):
+            raise ValueError("unsupported aggressor side")
         if len(self._trades) == self._trades.maxlen:
             self.dropped += 1
         self._trades.append(trade)

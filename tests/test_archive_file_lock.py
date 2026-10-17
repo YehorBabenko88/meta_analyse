@@ -69,3 +69,27 @@ async def test_cancelled_waiter_does_not_hold_lock(tmp_path):
 async def _wait_for_lock(target):
     async with async_archive_file_lock(target):
         return True
+
+
+@pytest.mark.asyncio
+async def test_waiting_process_acquires_lock_after_release(tmp_path):
+    """A separate process releases the lock while an async waiter is pending."""
+    target = tmp_path / "trades.csv.gz"
+    ctx = multiprocessing.get_context("spawn")
+    ready, release = ctx.Event(), ctx.Event()
+    process = ctx.Process(target=_hold_lock, args=(target, ready, release))
+    process.start()
+    try:
+        assert await asyncio.to_thread(ready.wait, 5)
+        waiter = asyncio.create_task(_wait_for_lock(target))
+        await asyncio.sleep(0.05)
+        assert not waiter.done()
+        release.set()
+        assert await asyncio.wait_for(waiter, timeout=5) is True
+    finally:
+        release.set()
+        await asyncio.to_thread(process.join, 5)
+        if process.is_alive():
+            process.terminate()
+            await asyncio.to_thread(process.join, 5)
+    assert process.exitcode == 0

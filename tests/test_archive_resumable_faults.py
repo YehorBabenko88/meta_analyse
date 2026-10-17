@@ -128,3 +128,41 @@ async def test_sidecar_cleanup_failure_does_not_hide_published_archive(tmp_path,
     result = await download_resumable(session, URL, destination)
     assert result == destination
     assert destination.read_bytes() == b"abcdef"
+
+
+@pytest.mark.asyncio
+async def test_fsync_failure_preserves_cancellation_without_checkpoint(tmp_path, monkeypatch):
+    import os
+
+    destination = tmp_path / "archive.csv.gz"
+    session = Session([
+        Response(200, [b"abc"], {"ETag": '"v1"', "Content-Length": "6"},
+                 asyncio.CancelledError()),
+    ])
+
+    def fail_fsync(fd):
+        raise OSError("disk synchronization failed")
+
+    monkeypatch.setattr(os, "fsync", fail_fsync)
+    with pytest.raises(asyncio.CancelledError):
+        await download_resumable(session, URL, destination)
+    assert read_partial(destination, URL) is None
+    assert not destination.exists()
+
+
+@pytest.mark.asyncio
+async def test_fsync_failure_without_transport_error_propagates(tmp_path, monkeypatch):
+    import os
+
+    destination = tmp_path / "archive.csv.gz"
+    session = Session([
+        Response(200, [b"abcdef"], {"ETag": '"v1"', "Content-Length": "6"}),
+    ])
+
+    def fail_fsync(fd):
+        raise OSError("disk synchronization failed")
+
+    monkeypatch.setattr(os, "fsync", fail_fsync)
+    with pytest.raises(OSError, match="disk synchronization failed"):
+        await download_resumable(session, URL, destination)
+    assert not destination.exists()

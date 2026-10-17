@@ -56,6 +56,10 @@ class StreamingTrades:
             raise ValueError("volume must be finite and nonnegative")
         if trade.side not in ("buy", "sell", "unknown"):
             raise ValueError("unsupported aggressor side")
+        # A late/out-of-order trade breaks the chronological continuity of
+        # this arrival-ordered buffer, even if no capacity eviction occurs.
+        if self._trades and trade.timestamp_ms < self._trades[-1].timestamp_ms:
+            self.gaps += 1
         if len(self._trades) == self._trades.maxlen:
             self.dropped += 1
         self._trades.append(trade)

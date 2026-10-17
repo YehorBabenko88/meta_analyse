@@ -84,3 +84,22 @@ def test_out_of_order_stream_invalidates_continuity_without_dropping():
     assert stream.dropped == 0
     assert stream.gaps == 1
     assert not stream.continuous
+
+
+def test_reconnect_clears_old_epoch_without_restoring_false_continuity():
+    stream = StreamingTrades(capacity=2)
+    stream.append(trade(1))
+    stream.append(trade(2))
+    stream.append(trade(3))
+    assert stream.dropped == 1
+    stream.reconnect()
+    assert stream.snapshot() == ()
+    assert stream.dropped == 1
+    assert stream.gaps == 1
+    assert not stream.continuous
+    stream.append(trade(1))
+    assert stream.snapshot() == (trade(1),)
+    assert not stream.continuous
+    stream.reset()
+    assert stream.continuous
+    assert stream.snapshot() == ()

@@ -127,6 +127,19 @@ class Window(QWidget):
         controls_row.addWidget(self.stop_flow_button)
         flow_layout.addLayout(controls_row)
         self.tabs.addTab(flow, "Order flow")
+        history = QWidget()
+        history_layout = QVBoxLayout(history)
+        self.orderflow_history_status = QLabel("No validated historical trade source attached")
+        history_layout.addWidget(self.orderflow_history_status)
+        self.orderflow_history_table = QTableWidget(0, 7)
+        self.orderflow_history_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.orderflow_history_table.setSortingEnabled(True)
+        self.orderflow_history_table.setHorizontalHeaderLabels(
+            ["Time bucket (ms)", "Buy volume", "Sell volume", "Delta",
+             "Cumulative delta", "Imbalance", "Quality"])
+        history_layout.addWidget(self.orderflow_history_table)
+        self.tabs.addTab(history, "Flow history")
+
         diagnostics = QWidget()
         diagnostics_layout = QVBoxLayout(diagnostics)
         diagnostics_layout.addWidget(QLabel("Persisted feed events and reported gaps; not proof of exchange completeness"))
@@ -312,6 +325,37 @@ class Window(QWidget):
             finally:
                 table.setSortingEnabled(sorting)
                 table.setUpdatesEnabled(updates)
+        self.orderflow_history_status.setText(self._snapshot.orderflow_status)
+        history_rows = self._snapshot.orderflow_rows
+        history_table = self.orderflow_history_table
+        # Immutable tuples are reused between snapshots: identity is a fast
+        # path; equality still handles equivalent independently-built snapshots.
+        previous_history = getattr(self, "_previous_orderflow_history_rows", ())
+        history_changed = history_rows is not previous_history and history_rows != previous_history
+        # Sorting reorders QTableWidget's physical rows. Updating cells by
+        # index afterwards can leave stale or duplicated values; rebuild
+        # sorted history from scratch whenever its source actually changes.
+        if history_changed:
+            was_sorting = history_table.isSortingEnabled()
+            was_updating = history_table.updatesEnabled()
+            history_table.setUpdatesEnabled(False)
+            history_table.setSortingEnabled(False)
+            try:
+                history_table.setRowCount(0)
+                history_table.setRowCount(len(history_rows))
+                for row_index, entry in enumerate(history_rows):
+                    values = (entry.bucket, entry.buy, entry.sell, entry.delta,
+                              entry.cumulative_delta, entry.imbalance, entry.quality)
+                    for column, value in enumerate(values):
+                        item = history_table.item(row_index, column)
+                        if item is None:
+                            history_table.setItem(row_index, column, FlowTableItem(value))
+                        elif item.text() != value:
+                            item.setText(value)
+                self._previous_orderflow_history_rows = history_rows
+            finally:
+                history_table.setSortingEnabled(was_sorting)
+                history_table.setUpdatesEnabled(was_updating)
         self.diagnostics_state.setText(
             "Connected — session counters (not exchange completeness)"
             if self._snapshot.flow_state == "connected"

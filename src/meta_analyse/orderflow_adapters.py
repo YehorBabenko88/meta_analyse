@@ -68,6 +68,15 @@ class StreamingTrades:
         """A reported feed gap must not be mistaken for complete coverage."""
         self.gaps += 1
 
+    def reconnect(self):
+        """Start a new buffer epoch after disconnect, retaining loss evidence.
+
+        A reconnect does not establish exchange-level completeness. Call
+        reset() only for an explicitly new, separately qualified session.
+        """
+        self._trades.clear()
+        self.gaps += 1
+
     def snapshot(self):
         return tuple(self._trades)
 

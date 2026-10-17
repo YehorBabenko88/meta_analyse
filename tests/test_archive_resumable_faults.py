@@ -104,3 +104,25 @@ async def test_initial_response_requires_explicit_content_length(tmp_path):
     with pytest.raises(ValueError, match="explicit Content-Length"):
         await download_resumable(Session([response]), URL, destination)
     assert not destination.exists()
+
+
+@pytest.mark.asyncio
+async def test_sidecar_cleanup_failure_does_not_hide_published_archive(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    destination = tmp_path / "archive.csv.gz"
+    sidecar = partial_paths(destination)[1]
+    original_unlink = Path.unlink
+
+    def fail_sidecar_unlink(self, *args, **kwargs):
+        if self == sidecar:
+            raise PermissionError("sidecar temporarily locked")
+        return original_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_sidecar_unlink)
+    session = Session([
+        Response(200, [b"abcdef"], {"ETag": '"v1"', "Content-Length": "6"}),
+    ])
+    result = await download_resumable(session, URL, destination)
+    assert result == destination
+    assert destination.read_bytes() == b"abcdef"

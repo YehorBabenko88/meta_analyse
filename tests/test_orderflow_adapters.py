@@ -56,3 +56,19 @@ def test_malformed_decimal_records_raise_value_error(field, bad):
     record[field] = bad
     with pytest.raises(ValueError, match="valid decimals"):
         list(from_records([record]))
+
+
+@pytest.mark.parametrize("invalid", [
+    Trade(True, Decimal("10"), Decimal("1"), "buy"),
+    Trade(1, Decimal("NaN"), Decimal("1"), "buy"),
+    Trade(1, Decimal("10"), Decimal("-1"), "buy"),
+    Trade(1, Decimal("10"), Decimal("1"), "invalid"),
+])
+def test_invalid_stream_trade_does_not_evict_valid_history(invalid):
+    stream = StreamingTrades(capacity=1)
+    stream.append(trade(1))
+    with pytest.raises(ValueError):
+        stream.append(invalid)
+    assert stream.snapshot() == (trade(1),)
+    assert stream.dropped == 0
+    assert stream.continuous

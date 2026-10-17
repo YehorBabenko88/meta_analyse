@@ -93,11 +93,14 @@ async def download_resumable(session, url: str, destination: str | Path, *,
                 raise ValueError("incomplete archive response; partial retained")
         if partial.stat().st_size != total:
             raise ValueError("archive size mismatch")
-        # A previous attempt may have left a sidecar for a different partial.
-        # Do not publish a completed archive while stale checkpoint metadata
-        # remains available to a future interrupted attempt.
         os.replace(partial, destination)
-        sidecar.unlink(missing_ok=True)
+        # The completed destination is authoritative. Removing an obsolete
+        # sidecar is best effort: a cleanup failure must not report a failed
+        # download after the archive has already been atomically published.
+        try:
+            sidecar.unlink(missing_ok=True)
+        except OSError:
+            pass
         return destination
     except BaseException:
         # The last saved sidecar remains authoritative. Unsaved appended bytes

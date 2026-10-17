@@ -1,0 +1,53 @@
+"""Isolated PostgreSQL integration: never connect without explicit test DSN."""
+import hashlib
+import os
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+
+import pytest
+
+from meta_analyse.archive_db_import import import_verified_archive
+from meta_analyse.storage import Store
+
+DSN = os.environ.get("META_ANALYSE_TEST_DSN")
+pytestmark = pytest.mark.skipif(not DSN, reason="isolated test PostgreSQL DSN not configured")
+
+
+def archive(tmp_path, symbol, trade_id, name):
+    path = tmp_path / (name + ".csv")
+    path.write_text("timestamp,symbol,side,size,price,trdMatchID\n"
+                    f"1720000000,{symbol},Buy,2,100,{trade_id}\n", encoding="utf-8")
+    receipt = {"valid":True,"complete":False,
+               "url":"https://example.invalid/" + name,
+               "sha256":hashlib.sha256(path.read_bytes()).hexdigest(),
+               "bytes":path.stat().st_size,"rows":1}
+    return path, receipt
+
+
+def test_resume_and_deduplication(tmp_path):
+    store = Store(DSN)
+    symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+    path, receipt = archive(tmp_path, symbol, "trade1", "first")
+    first = import_verified_archive(store,path,receipt,symbol=symbol,batch_size=1)
+    second = import_verified_archive(store,path,receipt,symbol=symbol,batch_size=1)
+    assert first["rows"] == second["rows"] == 1
+    assert second["resumed_from"] == 1
+    with store.connect() as conn:
+        count = conn.execute("""SELECT count(*) FROM meta_analyse.historical_trades
+            WHERE venue='bybit' AND symbol=%s""", (symbol,)).fetchone()[0]
+    assert count == 1
+
+
+def test_concurrent_sources_same_symbol(tmp_path):
+    store = Store(DSN)
+    symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+    a = archive(tmp_path,symbol,"trade1","first")
+    b = archive(tmp_path,symbol,"trade2","second")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda pair: import_verified_archive(
+            store,pair[0],pair[1],symbol=symbol,batch_size=1), (a,b)))
+    assert len(results) == 2
+    with store.connect() as conn:
+        count = conn.execute("""SELECT count(*) FROM meta_analyse.historical_trades
+            WHERE venue='bybit' AND symbol=%s""", (symbol,)).fetchone()[0]
+    assert count == 2

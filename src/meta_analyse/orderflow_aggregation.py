@@ -28,7 +28,12 @@ def aggregate_by_time(trades, interval_ms, *, initial_delta=Decimal(0)):
 
 def aggregate_by_price(trades, tick_size, *, initial_delta=Decimal(0)):
     """Floor to tick price; cumulative delta runs in ascending price order."""
-    tick_size = Decimal(str(tick_size))
+    if isinstance(tick_size, bool):
+        raise ValueError("tick_size must be finite and positive")
+    try:
+        tick_size = Decimal(str(tick_size))
+    except (ArithmeticError, ValueError) as exc:
+        raise ValueError("tick_size must be finite and positive") from exc
     if not tick_size.is_finite() or tick_size <= 0:
         raise ValueError("tick_size must be finite and positive")
     groups = defaultdict(list)

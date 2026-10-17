@@ -13,10 +13,15 @@ def from_records(records):
         timestamp = row["timestamp_ms"]
         if isinstance(timestamp, bool) or not isinstance(timestamp, int):
             raise ValueError("timestamp_ms must be an integer")
+        try:
+            price = Decimal(str(row["price"]))
+            volume = Decimal(str(row["volume"]))
+        except (ArithmeticError, ValueError) as exc:
+            raise ValueError("price and volume must be valid decimals") from exc
         trade = Trade(
             timestamp_ms=timestamp,
-            price=Decimal(str(row["price"])),
-            volume=Decimal(str(row["volume"])),
+            price=price,
+            volume=volume,
             side=side,
         )
         if not trade.price.is_finite() or trade.price <= 0:

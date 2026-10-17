@@ -102,7 +102,3 @@ async def download_resumable(session, url: str, destination: str | Path, *,
         except OSError:
             pass
         return destination
-    except BaseException:
-        # The last saved sidecar remains authoritative. Unsaved appended bytes
-        # cause the next attempt to discard the partial rather than trust it.
-        raise

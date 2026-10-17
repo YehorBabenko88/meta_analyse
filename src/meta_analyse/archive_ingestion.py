@@ -88,11 +88,17 @@ async def acquire_archive(session, url: str, path: str | Path, *,
                 return cached
         transport = download_resumable if resumable else download_archive
         await transport(session, url, path, max_bytes=max_bytes)
-        audit = await asyncio.to_thread(audit_trade_gzip, path)
-        if not audit.valid:
-            raise ValueError(f"archive rejected: {audit.reason}")
-        if day is not None:
-            validate_day_audit(audit, day)
+        try:
+            audit = await asyncio.to_thread(audit_trade_gzip, path)
+            if not audit.valid:
+                raise ValueError(f"archive rejected: {audit.reason}")
+            if day is not None:
+                validate_day_audit(audit, day)
+        except Exception:
+            # Never leave a stale receipt advertising bytes replaced by a
+            # failed validation. The next attempt must download and audit.
+            await asyncio.to_thread(_receipt_path(path).unlink, missing_ok=True)
+            raise
         size, digest = await asyncio.to_thread(lambda: (path.stat().st_size, _digest(path)))
         receipt = ArchiveReceipt(url, digest, size, audit.rows, audit.first_ms,
                                  audit.last_ms, True, False,

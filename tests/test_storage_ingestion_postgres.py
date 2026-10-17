@@ -51,3 +51,33 @@ def test_concurrent_sources_same_symbol(tmp_path):
         count = conn.execute("""SELECT count(*) FROM meta_analyse.historical_trades
             WHERE venue='bybit' AND symbol=%s""", (symbol,)).fetchone()[0]
     assert count == 2
+
+
+def test_conflicting_archive_rolls_back_batch_and_checkpoint(tmp_path):
+    store = Store(DSN)
+    symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+    first_path, first_receipt = archive(tmp_path, symbol, "duplicate", "initial")
+    import_verified_archive(store, first_path, first_receipt, symbol=symbol, batch_size=1)
+    conflicting_path = tmp_path / "conflicting.csv"
+    conflicting_path.write_text(
+        "timestamp,symbol,side,size,price,trdMatchID\n"
+        f"1720000000,{symbol},Buy,2,999,duplicate\n", encoding="utf-8")
+    conflicting_receipt = {
+        "valid": True, "complete": False, "url": "https://example.invalid/conflicting",
+        "sha256": hashlib.sha256(conflicting_path.read_bytes()).hexdigest(),
+        "bytes": conflicting_path.stat().st_size, "rows": 1,
+    }
+    with pytest.raises(ValueError, match="conflicting existing trade ID"):
+        import_verified_archive(
+            store, conflicting_path, conflicting_receipt, symbol=symbol, batch_size=1)
+    with store.connect() as conn:
+        saved = conn.execute("""SELECT price FROM meta_analyse.historical_trades
+            WHERE venue='bybit' AND symbol=%s AND trade_id='duplicate'""",
+            (symbol,)).fetchone()[0]
+        checkpoint = conn.execute("""SELECT c.committed_rows FROM
+            meta_analyse.archive_import_checkpoints c
+            JOIN meta_analyse.archive_sources s ON s.id=c.source_id
+            WHERE s.symbol=%s AND s.sha256=%s""",
+            (symbol, conflicting_receipt["sha256"])).fetchone()[0]
+    assert saved == 100
+    assert checkpoint == 0

@@ -52,3 +52,30 @@ async def test_invalid_archive_never_receives_audit_receipt(tmp_path, monkeypatc
     with pytest.raises(ValueError, match="archive rejected"):
         await acquire_archive(object(), URL, path)
     assert not (tmp_path / "bad.csv.gz.audit.json").exists()
+
+
+@pytest.mark.asyncio
+async def test_failed_replacement_removes_stale_receipt(tmp_path, monkeypatch):
+    from meta_analyse import archive_ingestion
+
+    path = tmp_path / "archive.csv.gz"
+    receipt_path = tmp_path / "archive.csv.gz.audit.json"
+    calls = []
+
+    async def fake_download(session, url, dest, **kwargs):
+        calls.append(url)
+        if len(calls) == 1:
+            make_gzip(dest)
+        else:
+            dest.write_bytes(b"not a gzip archive")
+        return dest
+
+    monkeypatch.setattr(archive_ingestion, "download_archive", fake_download)
+    await acquire_archive(object(), URL, path)
+    assert receipt_path.exists()
+    # Change the existing file so the cached receipt is no longer trusted.
+    path.write_bytes(b"changed after audit")
+    with pytest.raises(ValueError, match="archive rejected"):
+        await acquire_archive(object(), URL, path)
+    assert len(calls) == 2
+    assert not receipt_path.exists()

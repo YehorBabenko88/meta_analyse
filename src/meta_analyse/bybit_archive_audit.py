@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 import csv
 import gzip
+import io
 from pathlib import Path
 
 
@@ -22,13 +23,16 @@ class ArchiveAudit:
     reason: str
 
 
-def audit_trade_gzip(path: str | Path, *, max_rows: int = 50_000_000) -> ArchiveAudit:
-    if max_rows < 1:
-        raise ValueError("max_rows must be positive")
+def audit_trade_gzip(path: str | Path, *, max_rows: int = 50_000_000,
+                     max_uncompressed_bytes: int = 8_000_000_000) -> ArchiveAudit:
+    if max_rows < 1 or max_uncompressed_bytes < 1:
+        raise ValueError("audit budgets must be positive")
     rows = 0
     first = last = None
     try:
-        with gzip.open(path, "rt", encoding="utf-8-sig", newline="") as stream:
+        with gzip.open(path, "rb") as compressed:
+            stream = io.TextIOWrapper(_LimitedReader(compressed, max_uncompressed_bytes),
+                                      encoding="utf-8-sig", newline="")
             reader = csv.DictReader(stream)
             fields = set(reader.fieldnames or ())
             if not {"timestamp", "price", "size"}.issubset(fields):
@@ -54,9 +58,32 @@ def audit_trade_gzip(path: str | Path, *, max_rows: int = 50_000_000) -> Archive
                 if first is None:
                     first = timestamp_ms
                 last = timestamp_ms
-    except (OSError, EOFError, UnicodeError, csv.Error) as exc:
+    except (OSError, EOFError, UnicodeError, csv.Error, ValueError) as exc:
         return ArchiveAudit(rows, first, last, False, False, f"corrupt archive: {exc}")
     if not rows:
         return ArchiveAudit(0, None, None, False, False, "empty archive")
     return ArchiveAudit(rows, first, last, True, False,
                         "parsed successfully; completeness not independently verified")
+
+
+class _LimitedReader(io.RawIOBase):
+    """Cap decompressed bytes, including the CSV header and long lines."""
+
+    def __init__(self, source, limit: int):
+        self.source = source
+        self.remaining = limit
+
+    def readable(self):
+        return True
+
+    def readinto(self, buffer):
+        if self.remaining == 0:
+            if self.source.read(1):
+                raise ValueError("decompressed archive byte budget exceeded")
+            return 0
+        chunk = self.source.read(min(len(buffer), self.remaining + 1))
+        if len(chunk) > self.remaining:
+            raise ValueError("decompressed archive byte budget exceeded")
+        buffer[:len(chunk)] = chunk
+        self.remaining -= len(chunk)
+        return len(chunk)

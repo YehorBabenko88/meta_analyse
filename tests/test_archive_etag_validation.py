@@ -29,6 +29,6 @@ def test_strong_etag_accepts_rfc_visible_boundaries(etag):
     assert strong_etag(etag)
 
 
-@pytest.mark.parametrize("etag", ['"x "', '"x\\t"', '"x\\n"', '"x\\x7f"'])
+@pytest.mark.parametrize("etag", ['"x "', '"x\t"', '"x\n"', '"x\x7f"'])
 def test_strong_etag_rejects_control_and_space(etag):
     assert not strong_etag(etag)

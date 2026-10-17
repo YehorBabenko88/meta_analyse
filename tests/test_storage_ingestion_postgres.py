@@ -112,3 +112,37 @@ def test_partial_batch_failure_keeps_previous_committed_checkpoint(tmp_path):
             (symbol,)).fetchone()[0]
     assert checkpoint == 1
     assert unique == 1
+
+
+def test_resume_after_failed_batch_and_repaired_archive_conflict(tmp_path):
+    """After a failed second batch, rerun preserves the first checkpoint."""
+    store = Store(DSN)
+    symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+    seed, seed_receipt = archive(tmp_path, symbol, "collision", "resume_seed")
+    import_verified_archive(store, seed, seed_receipt, symbol=symbol, batch_size=1)
+    path = tmp_path / "resume_partial.csv"
+    path.write_text(
+        "timestamp,symbol,side,size,price,trdMatchID\n"
+        f"1720000001,{symbol},Buy,2,100,unique\n"
+        f"1720000002,{symbol},Buy,2,999,collision\n",
+        encoding="utf-8")
+    receipt = {
+        "valid": True, "complete": False, "url": "https://example.invalid/resume_partial",
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "bytes": path.stat().st_size, "rows": 2,
+    }
+    for attempt in range(2):
+        with pytest.raises(ValueError, match="conflicting existing trade ID"):
+            import_verified_archive(store, path, receipt, symbol=symbol, batch_size=1)
+    with store.connect() as conn:
+        source_id, checkpoint = conn.execute("""SELECT s.id,c.committed_rows
+            FROM meta_analyse.archive_sources s
+            JOIN meta_analyse.archive_import_checkpoints c ON c.source_id=s.id
+            WHERE s.symbol=%s AND s.sha256=%s""",
+            (symbol, receipt["sha256"])).fetchone()
+        count = conn.execute("""SELECT count(*) FROM meta_analyse.historical_trades
+            WHERE venue='bybit' AND symbol=%s AND trade_id='unique'""",
+            (symbol,)).fetchone()[0]
+    assert source_id > 0
+    assert checkpoint == 1
+    assert count == 1

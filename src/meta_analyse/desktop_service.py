@@ -250,10 +250,10 @@ class DesktopService:
         max_trades = 250_000
         max_buckets = 10_000
         trades = []
-        for record in records:
+        for trade in from_records(records):
             if len(trades) >= max_trades:
                 raise ValueError('historical trade limit exceeded')
-            trades.extend(from_records((record,)))
+            trades.append(trade)
         buckets = aggregate_by_time(trades, interval_ms)
         if len(buckets) > max_buckets:
             raise ValueError('historical interval limit exceeded')

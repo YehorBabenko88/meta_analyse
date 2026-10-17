@@ -27,6 +27,8 @@ class FlowMetrics:
 
 def calculate(trades: Iterable[Trade], *, initial_delta: Decimal = Decimal(0)) -> FlowMetrics:
     """Imbalance=(buy-sell)/(buy+sell); None when no classified volume exists."""
+    if not isinstance(initial_delta, Decimal) or not initial_delta.is_finite():
+        raise ValueError("initial_delta must be a finite Decimal")
     buy = sell = unknown = Decimal(0)
     count = 0
     for trade in trades:

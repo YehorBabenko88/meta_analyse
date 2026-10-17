@@ -46,3 +46,28 @@ def test_bad_tick(tick):
 def test_invalid_tick_size_is_rejected_consistently(tick_size):
     with pytest.raises(ValueError, match="tick_size"):
         aggregate_by_price([], tick_size)
+
+
+def test_aggregation_preserves_unknown_volume_and_zero_classified_imbalance():
+    trades = [
+        Trade(100, Decimal("100.01"), Decimal("2"), "unknown"),
+        Trade(101, Decimal("100.02"), Decimal("0"), "buy"),
+    ]
+    time_rows = aggregate_by_time(trades, 1000)
+    price_rows = aggregate_by_price(trades, Decimal("0.1"))
+    for rows in (time_rows, price_rows):
+        assert len(rows) == 1
+        metrics = rows[0][1]
+        assert metrics.buy_volume == Decimal("0")
+        assert metrics.sell_volume == Decimal("0")
+        assert metrics.unknown_volume == Decimal("2")
+        assert metrics.imbalance is None
+        assert metrics.trade_count == 2
+
+
+def test_aggregation_generator_matches_materialized_input():
+    trades = sample() * 10
+    for aggregate, arg in ((aggregate_by_time, 1000), (aggregate_by_price, Decimal("0.1"))):
+        assert aggregate(iter(trades), arg, initial_delta=Decimal("1.25")) == aggregate(
+            trades, arg, initial_delta=Decimal("1.25")
+        )

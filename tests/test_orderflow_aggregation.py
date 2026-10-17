@@ -40,3 +40,9 @@ def test_bad_interval(interval):
 def test_bad_tick(tick):
     with pytest.raises(ValueError):
         aggregate_by_price(sample(), tick)
+
+
+@pytest.mark.parametrize("tick_size", [True, False, "invalid", "", "NaN", "Infinity", 0, -1])
+def test_invalid_tick_size_is_rejected_consistently(tick_size):
+    with pytest.raises(ValueError, match="tick_size"):
+        aggregate_by_price([], tick_size)

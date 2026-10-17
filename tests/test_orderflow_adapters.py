@@ -72,3 +72,15 @@ def test_invalid_stream_trade_does_not_evict_valid_history(invalid):
     assert stream.snapshot() == (trade(1),)
     assert stream.dropped == 0
     assert stream.continuous
+
+
+def test_out_of_order_stream_invalidates_continuity_without_dropping():
+    stream = StreamingTrades(capacity=3)
+    stream.append(trade(10))
+    stream.append(trade(10))  # same millisecond is permitted
+    assert stream.continuous
+    stream.append(trade(9))
+    assert stream.snapshot() == (trade(10), trade(10), trade(9))
+    assert stream.dropped == 0
+    assert stream.gaps == 1
+    assert not stream.continuous

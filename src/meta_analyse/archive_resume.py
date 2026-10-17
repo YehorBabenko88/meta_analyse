@@ -20,8 +20,7 @@ class ResumeState:
 
 
 def strong_etag(value: str | None) -> bool:
-    return bool(value and value.startswith('"') and value.endswith('"')
-                and len(value) > 2 and "\r" not in value and "\n" not in value)
+    return bool(value and re.fullmatch(r'"[\\x21\\x23-\\x7e\\x80-\\xff]+"', value))
 
 
 def resume_headers(state: ResumeState) -> dict[str, str]:

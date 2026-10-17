@@ -47,3 +47,12 @@ def test_stream_rejects_unnormalized_input():
     stream = StreamingTrades()
     with pytest.raises(TypeError):
         stream.append("not a trade")
+
+
+@pytest.mark.parametrize("field", ["price", "volume"])
+@pytest.mark.parametrize("bad", ["broken", "", "1.2.3"])
+def test_malformed_decimal_records_raise_value_error(field, bad):
+    record = {"timestamp_ms": 1, "price": "100", "volume": "1", "side": "buy"}
+    record[field] = bad
+    with pytest.raises(ValueError, match="valid decimals"):
+        list(from_records([record]))

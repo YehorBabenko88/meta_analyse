@@ -74,8 +74,15 @@ async def download_resumable(session, url: str, destination: str | Path, *,
                 # Preserve cancellation semantics after durable checkpointing.
                 transfer_error = exc
             finally:
-                stream.flush()
-                os.fsync(stream.fileno())
+                try:
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                except OSError:
+                    if transfer_error is None:
+                        raise
+                    # The original cancellation/transport failure takes
+                    # precedence. Without a durable checkpoint, the next
+                    # invocation discards the untrusted partial bytes.
         if transfer_error is not None:
             # Never let checkpoint I/O replace the original cancellation or
             # transport failure; the next run rejects unsaved partial bytes.

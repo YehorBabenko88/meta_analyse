@@ -55,3 +55,32 @@ def test_history_limits_fail_without_partial_publication():
     with pytest.raises(ValueError, match="limit"):
         service.load_orderflow_records(excessive())
     assert service.snapshot().orderflow_rows == before
+
+
+def test_generator_failure_does_not_publish_partial_history():
+    service = service_with_stub_runtime()
+    service.load_orderflow_records([
+        {"timestamp_ms": 1, "price": "10", "volume": "1", "side": "buy"}
+    ])
+    before = service.snapshot()
+
+    def interrupted():
+        yield {"timestamp_ms": 2, "price": "11", "volume": "5", "side": "sell"}
+        raise OSError("historical stream interrupted")
+
+    with pytest.raises(OSError, match="interrupted"):
+        service.load_orderflow_records(interrupted())
+    after = service.snapshot()
+    assert after.orderflow_rows == before.orderflow_rows
+    assert after.orderflow_status == before.orderflow_status
+
+
+def test_empty_history_replaces_previous_snapshot_explicitly():
+    service = service_with_stub_runtime()
+    service.load_orderflow_records([
+        {"timestamp_ms": 1, "price": "10", "volume": "1", "side": "buy"}
+    ])
+    service.load_orderflow_records(iter(()))
+    snapshot = service.snapshot()
+    assert snapshot.orderflow_rows == ()
+    assert "0 trades, 0 intervals" in snapshot.orderflow_status

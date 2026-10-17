@@ -6,7 +6,7 @@ from meta_analyse.archive_resume import ResumeState, resume_headers, strong_etag
 
 @pytest.mark.parametrize("etag", [
     'W/"weak"', '"contains space"', '"embedded"quote"',
-    '"tab\tinside"', '"backslash\\inside"', '"newline\ninside"',
+    '"tab\tinside"', '"newline\ninside"',
     '"carriage\rinside"', '""', "unquoted",
 ])
 def test_reject_unsafe_or_weak_etag(etag):
@@ -17,4 +17,6 @@ def test_reject_unsafe_or_weak_etag(etag):
 
 def test_accept_strong_etag():
     assert strong_etag('"abc-123"')
+    # RFC 9110 permits a backslash within an opaque ETag value.
+    assert strong_etag('"backslash\\\\inside"')
     assert resume_headers(ResumeState(3, '"abc-123"', 10))["If-Range"] == '"abc-123"'

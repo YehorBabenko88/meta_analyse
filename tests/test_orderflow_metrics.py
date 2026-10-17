@@ -39,3 +39,9 @@ def test_cumulative_seed():
 def test_invalid_trade_rejected(side, volume, price):
     with pytest.raises(ValueError):
         calculate([trade(side, volume, price)])
+
+
+@pytest.mark.parametrize("seed", [Decimal("NaN"), Decimal("Infinity"), Decimal("-Infinity"), 0, "0"])
+def test_nonfinite_or_non_decimal_cumulative_seed_rejected(seed):
+    with pytest.raises(ValueError, match="initial_delta"):
+        calculate([], initial_delta=seed)

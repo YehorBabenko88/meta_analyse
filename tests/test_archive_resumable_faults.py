@@ -115,7 +115,9 @@ async def test_sidecar_cleanup_failure_does_not_hide_published_archive(tmp_path,
     original_unlink = Path.unlink
 
     def fail_sidecar_unlink(self, *args, **kwargs):
-        if self == sidecar:
+        # Initial discard_partial() runs before the transfer. Only inject
+        # the failure after os.replace() has published the destination.
+        if self == sidecar and destination.exists():
             raise PermissionError("sidecar temporarily locked")
         return original_unlink(self, *args, **kwargs)
 

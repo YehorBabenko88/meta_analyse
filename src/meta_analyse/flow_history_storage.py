@@ -89,3 +89,9 @@ def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[dict, ...]:
             "side": trade.side.lower(),
         })
     return tuple(records)
+
+
+def to_orderflow_trades(snapshot: FlowHistorySnapshot) -> tuple:
+    """Produce PR #7 Order Flow Trade values without losing Decimal precision."""
+    from .orderflow_adapters import from_records
+    return tuple(from_records(to_orderflow_records(snapshot)))

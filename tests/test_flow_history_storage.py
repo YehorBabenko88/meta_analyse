@@ -112,3 +112,6 @@ def test_worker_snapshot_exposes_history_before_runtime_initialization():
     result = service.snapshot()
     assert result.flow_history is history
     assert result.flow_history.status == "UNVERIFIED"
+    assert result.flow_history_request_id == 0
+    service._history_generation = 2
+    assert service.snapshot().flow_history_request_id == 2

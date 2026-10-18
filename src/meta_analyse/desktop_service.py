@@ -26,6 +26,7 @@ class DesktopSnapshot:
     overview: tuple = ()
     readiness: tuple = ()
     flow_history: object = None
+    flow_history_request_id: int = 0
 
 def _client_operation(method):
     """Own requests until cancellation/response teardown finishes before aclose."""
@@ -272,7 +273,7 @@ class DesktopService:
 
     def snapshot(self):
         if self.runtime is None:
-            return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status, flow_history=self.flow_history)
+            return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status, flow_history=self.flow_history, flow_history_request_id=self._history_generation)
         engine = self.runtime.paper
         symbols = tuple(self.runtime.symbols)
         stats = []
@@ -300,7 +301,7 @@ class DesktopService:
         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
                                self.flow_state, self.flow_status, self.status,
                                telemetry.events if telemetry else (), telemetry.gaps if telemetry else (),
-                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols), self.flow_history)
+                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols), self.flow_history, self._history_generation)
 
     async def check_health(self):
         if self.flow_state != 'connected' or self.session is None:

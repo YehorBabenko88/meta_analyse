@@ -115,3 +115,19 @@ def test_worker_snapshot_exposes_history_before_runtime_initialization():
     assert result.flow_history_request_id == 0
     service._history_generation = 2
     assert service.snapshot().flow_history_request_id == 2
+
+
+def test_orderflow_bridge_preserves_decimals_and_exact_milliseconds():
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    timestamp = start + timedelta(microseconds=123456)
+    price = Decimal("0.000000000000000123456789")
+    quantity = Decimal("123456789.000000000000001")
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
+        (HistoricalTrade("id-1", timestamp, price, quantity, "Buy"),))
+    records = to_orderflow_records(snapshot)
+    expected_ms = int((start - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds()) * 1000 + 123
+    assert records == ({"timestamp_ms": expected_ms, "price": price,
+                        "volume": quantity, "side": "buy"},)
+    assert snapshot.status == "UNVERIFIED"
+    assert snapshot.trades[0].quantity is quantity

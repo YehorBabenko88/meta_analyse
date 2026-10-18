@@ -101,3 +101,14 @@ def test_half_open_time_window_is_parameterized_and_utc_normalized():
     assert result.end == result.start + timedelta(minutes=1)
     assert "trade_ts >= %s AND trade_ts < %s" in store.connection.sql
     assert store.connection.params[1:4] == ("ETHUSDT", result.start, result.end)
+
+
+def test_worker_snapshot_exposes_history_before_runtime_initialization():
+    from meta_analyse.desktop_service import DesktopService
+    service = DesktopService(None, lambda _: None)
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    history = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1), ())
+    service.flow_history = history
+    result = service.snapshot()
+    assert result.flow_history is history
+    assert result.flow_history.status == "UNVERIFIED"

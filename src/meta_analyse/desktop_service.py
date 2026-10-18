@@ -10,6 +10,7 @@ from .exchange import BybitPublic
 from .ports import MetaScalp
 from .runtime import Runtime
 from .flow_bridge import FlowBridge
+from .flow_history_storage import read_flow_history
 
 @dataclass(frozen=True)
 class DesktopSnapshot:
@@ -24,6 +25,7 @@ class DesktopSnapshot:
     market_ages: tuple = ()
     overview: tuple = ()
     readiness: tuple = ()
+    flow_history: object = None
 
 def _client_operation(method):
     """Own requests until cancellation/response teardown finishes before aclose."""
@@ -61,6 +63,8 @@ class DesktopService:
         self.overview_task = None
         self.overview_lock = None
         self.readiness = {}
+        self.flow_history = None
+        self._history_generation = 0
 
     def initialize(self):
         self.api = MetaScalp()
@@ -230,6 +234,28 @@ class DesktopService:
             self.flow_state = 'disconnected'
             self.flow_status = 'Disconnected — data marked UNVERIFIED'
 
+    async def load_flow_history(self, *, symbol, start, end, limit=5000):
+        """Worker-only DB access; stale async requests cannot replace newer snapshots."""
+        if self.closing:
+            return
+        self._history_generation += 1
+        generation = self._history_generation
+        self.flow_history = None
+        if self.store is None:
+            self.status = 'Flow History unavailable: PostgreSQL not configured'
+            return
+        try:
+            result = await asyncio.to_thread(
+                read_flow_history, self.store, symbol=symbol, start=start, end=end, limit=limit)
+            if not self.closing and generation == self._history_generation:
+                self.flow_history = result
+                self.status = 'Flow History loaded — UNVERIFIED'
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if generation == self._history_generation:
+                self.error('Flow History', exc)
+
     async def configure_paper(self, enabled=None, rules=None):
         if enabled is not None:
             self.runtime.paper.enabled = enabled
@@ -273,7 +299,7 @@ class DesktopService:
         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
                                self.flow_state, self.flow_status, self.status,
                                telemetry.events if telemetry else (), telemetry.gaps if telemetry else (),
-                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols))
+                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols), self.flow_history)
 
     async def check_health(self):
         if self.flow_state != 'connected' or self.session is None:

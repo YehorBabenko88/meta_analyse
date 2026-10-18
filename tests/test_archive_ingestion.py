@@ -11,9 +11,9 @@ URL = "https://public.bybit.com/trading/BTCUSDT/BTCUSDT2025-01-01.csv.gz"
 
 def make_gzip(path):
     with gzip.open(path, "wt", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=["timestamp", "price", "size"])
+        writer = csv.DictWriter(stream, fieldnames=["trdMatchID", "timestamp", "price", "size", "side"])
         writer.writeheader()
-        writer.writerow({"timestamp": "1735689600", "price": "100", "size": "2"})
+        writer.writerow({"trdMatchID": "id1", "timestamp": "1735689600", "price": "100", "size": "2", "side": "Buy"})
 
 
 @pytest.mark.asyncio

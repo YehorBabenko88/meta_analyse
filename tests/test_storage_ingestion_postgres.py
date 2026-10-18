@@ -205,3 +205,53 @@ def test_orderflow_reader_returns_exact_aliases(tmp_path):
     assert rows[0]["volume"] == Decimal("2")
     assert rows[0]["price"] == Decimal("100")
     assert rows[0]["side"] == "Buy"
+
+
+def test_unlock_failure_does_not_mask_original_import_error(tmp_path):
+    """R6: an advisory-unlock failure must not replace a trade conflict."""
+    store = Store(DSN)
+    symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+    seed, seed_receipt = archive(tmp_path, symbol, "collision", "unlock_seed")
+    import_verified_archive(store, seed, seed_receipt, symbol=symbol, batch_size=1)
+    path = tmp_path / "unlock_conflict.csv"
+    path.write_text(
+        "timestamp,symbol,side,size,price,trdMatchID\n"
+        f"1720000000,{symbol},Buy,2,999,collision\n", encoding="utf-8")
+    receipt = {"valid": True, "complete": False,
+               "url": "https://example.invalid/unlock_conflict",
+               "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+               "bytes": path.stat().st_size, "rows": 1}
+
+    class UnlockFailureConnection:
+        def __init__(self, underlying):
+            self.underlying = underlying
+
+        def __enter__(self):
+            self.underlying.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.underlying.__exit__(*args)
+
+        def __getattr__(self, name):
+            return getattr(self.underlying, name)
+
+        def execute(self, sql, params=None):
+            if "pg_advisory_unlock" in sql:
+                raise RuntimeError("simulated advisory unlock failure")
+            return self.underlying.execute(sql, params)
+
+    class UnlockFailureStore:
+        def connect(self):
+            return UnlockFailureConnection(store.connect())
+
+    with pytest.raises(ValueError, match="conflicting existing trade ID"):
+        import_verified_archive(
+            UnlockFailureStore(), path, receipt, symbol=symbol, batch_size=1)
+    with store.connect() as conn:
+        checkpoint, status = conn.execute("""SELECT c.committed_rows,c.status
+            FROM meta_analyse.archive_import_checkpoints c
+            JOIN meta_analyse.archive_sources s ON s.id=c.source_id
+            WHERE s.symbol=%s AND s.sha256=%s""",
+            (symbol, receipt["sha256"])).fetchone()
+    assert (checkpoint, status) == (0, "failed")

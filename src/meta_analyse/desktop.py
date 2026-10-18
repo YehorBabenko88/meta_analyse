@@ -257,6 +257,7 @@ class Window(QWidget):
             return
         self.history_status.setText("Loading — UNVERIFIED")
         self._previous_history = None
+        self._history_pending = True
         self.history_table.setRowCount(0)
         self.schedule(self.service.load_flow_history(symbol=symbol, start=start, end=end))
 
@@ -314,11 +315,13 @@ class Window(QWidget):
                         selection.select(table.model().index(i, 0), table.model().index(i, table.columnCount()-1))
                 table.selectionModel().select(selection, QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows)
         history = self._snapshot.flow_history
+        if getattr(self, '_history_pending', False) and history is not None:
+            self._history_pending = False
         if history is None and self._snapshot.status.startswith("Flow History failed"):
             self.history_status.setText(self._snapshot.status + " — UNVERIFIED")
         elif history is None and self._snapshot.status.startswith("Flow History unavailable"):
             self.history_status.setText(self._snapshot.status + " — UNVERIFIED")
-        if history is not None and history is not getattr(self, "_previous_history", None):
+        if history is not None and not getattr(self, "_history_pending", False) and history is not getattr(self, "_previous_history", None):
             self._previous_history = history
             self.history_status.setText(
                 f"{history.symbol}: {len(history.trades)} trades — UNVERIFIED"

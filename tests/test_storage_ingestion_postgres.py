@@ -175,9 +175,9 @@ def test_failed_import_status_preserves_committed_checkpoint(tmp_path):
     seed, seed_receipt = archive(tmp_path, symbol, "collision", "seed_status")
     import_verified_archive(store, seed, seed_receipt, symbol=symbol, batch_size=1)
     path = tmp_path / "status_partial.csv"
-    path.write_text("timestamp,symbol,side,size,price,trdMatchID\\n"
-                    f"1720000001,{symbol},Buy,2,100,unique\\n"
-                    f"1720000002,{symbol},Buy,2,999,collision\\n")
+    path.write_text("timestamp,symbol,side,size,price,trdMatchID\n"
+                    f"1720000001,{symbol},Buy,2,100,unique\n"
+                    f"1720000002,{symbol},Buy,2,999,collision\n")
     receipt = {"valid": True, "complete": False, "url": "https://example.invalid/status",
                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                "bytes": path.stat().st_size, "rows": 2}

@@ -3,7 +3,7 @@ from decimal import Decimal
 from dataclasses import FrozenInstanceError
 import pytest
 
-from meta_analyse.flow_history_storage import read_flow_history, FlowHistorySnapshot
+from meta_analyse.flow_history_storage import read_flow_history, FlowHistorySnapshot, HistoricalTrade
 
 
 class FakeConnection:

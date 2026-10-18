@@ -241,6 +241,7 @@ class DesktopService:
         self._history_generation += 1
         generation = self._history_generation
         self.flow_history = None
+        self.status = 'Flow History loading — UNVERIFIED'
         if self.store is None:
             self.status = 'Flow History unavailable: PostgreSQL not configured'
             return
@@ -342,6 +343,7 @@ class DesktopService:
     async def _close(self):
         # Stop request producers before the pool; otherwise a request can finish
         # connecting after aclose has already visited the active connections.
+        self._history_generation += 1
         requests = tuple(self._client_tasks)
         for task in requests:
             task.cancel()

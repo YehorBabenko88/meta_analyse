@@ -4,12 +4,13 @@ import asyncio
 import os
 import sys
 import threading
+from datetime import datetime, timedelta, timezone
 from dataclasses import replace
 from PySide6.QtCore import QTimer, QObject, Signal, Slot, Qt
 from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLabel, QListWidget, QMessageBox, QDoubleSpinBox, QCheckBox, QTabWidget,
-                               QTableWidget, QTableWidgetItem, QAbstractItemView, QProgressBar)
+                               QTableWidget, QTableWidgetItem, QAbstractItemView, QProgressBar, QLineEdit)
 from .storage import Store
 from decimal import Decimal
 from .trader_theme import TRADER_QSS
@@ -127,6 +128,30 @@ class Window(QWidget):
         controls_row.addWidget(self.stop_flow_button)
         flow_layout.addLayout(controls_row)
         self.tabs.addTab(flow, "Order flow")
+        history = QWidget()
+        history_layout = QVBoxLayout(history)
+        history_layout.addWidget(QLabel("PostgreSQL historical trades — UNVERIFIED; UTC interval [start, end)"))
+        history_controls = QHBoxLayout()
+        self.history_symbol = QLineEdit()
+        self.history_symbol.setPlaceholderText("Explicit symbol, e.g. BTCUSDT")
+        history_controls.addWidget(self.history_symbol)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        self.history_start = QLineEdit((now - timedelta(hours=1)).isoformat())
+        self.history_end = QLineEdit(now.isoformat())
+        history_controls.addWidget(self.history_start)
+        history_controls.addWidget(self.history_end)
+        self.history_load_button = QPushButton("Load history")
+        self.history_load_button.clicked.connect(self.load_flow_history)
+        history_controls.addWidget(self.history_load_button)
+        history_layout.addLayout(history_controls)
+        self.history_status = QLabel("UNVERIFIED — no history requested")
+        history_layout.addWidget(self.history_status)
+        self.history_table = QTableWidget(0, 5)
+        self.history_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.history_table.setHorizontalHeaderLabels(["UTC timestamp", "Trade ID", "Side", "Price", "Quantity"])
+        self.history_table.setSortingEnabled(True)
+        history_layout.addWidget(self.history_table)
+        self.tabs.addTab(history, "Flow History")
         diagnostics = QWidget()
         diagnostics_layout = QVBoxLayout(diagnostics)
         diagnostics_layout.addWidget(QLabel("Persisted feed events and reported gaps; not proof of exchange completeness"))
@@ -220,6 +245,19 @@ class Window(QWidget):
         self.schedule(self._stop_flow())
     async def _stop_flow(self):
         await self.service.disconnect_flow()
+    def load_flow_history(self):
+        symbol = self.history_symbol.text().strip()
+        try:
+            start = datetime.fromisoformat(self.history_start.text().strip())
+            end = datetime.fromisoformat(self.history_end.text().strip())
+            if not symbol or start.tzinfo is None or end.tzinfo is None or start >= end:
+                raise ValueError("invalid symbol or interval")
+        except ValueError:
+            QMessageBox.warning(self, "Flow History", "Specify symbol and timezone-aware ISO start/end.")
+            return
+        self.history_status.setText("Loading — UNVERIFIED")
+        self.schedule(self.service.load_flow_history(symbol=symbol, start=start, end=end))
+
     def toggle_paper(self, enabled):
         self.schedule(self.service.configure_paper(enabled=bool(enabled)))
     def update_rules(self):
@@ -273,6 +311,28 @@ class Window(QWidget):
                     if cell is not None and cell.text() in selected:
                         selection.select(table.model().index(i, 0), table.model().index(i, table.columnCount()-1))
                 table.selectionModel().select(selection, QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows)
+        history = self._snapshot.flow_history
+        if history is not None and history is not getattr(self, "_previous_history", None):
+            self._previous_history = history
+            self.history_status.setText(
+                f"{history.symbol}: {len(history.trades)} trades — UNVERIFIED"
+                + (" — TRUNCATED (narrow time range)" if history.truncated else ""))
+            table = self.history_table
+            sorting = table.isSortingEnabled()
+            table.setSortingEnabled(False)
+            try:
+                table.setRowCount(len(history.trades))
+                for row, trade in enumerate(history.trades):
+                    values = (trade.timestamp.isoformat(), trade.trade_id,
+                              trade.side, str(trade.price), str(trade.quantity))
+                    for col, value in enumerate(values):
+                        item = table.item(row, col)
+                        if item is None:
+                            table.setItem(row, col, FlowTableItem(value))
+                        elif item.text() != value:
+                            item.setText(value)
+            finally:
+                table.setSortingEnabled(sorting)
         self.flow_status.setText(self._snapshot.flow_status)
         self.connect_flow_button.setEnabled(self._snapshot.flow_state in ('disconnected', 'failed'))
         self.stop_flow_button.setEnabled(self._snapshot.flow_state in ('connecting', 'connected', 'failed'))

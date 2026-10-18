@@ -141,3 +141,49 @@ async def test_cancelled_thread_read_keeps_lock_until_competing_writer(tmp_path,
             await asyncio.wait_for(writer, timeout=5)
     assert events == ["reader-finished", "writer-start"]
     assert target.read_bytes() == b"new"
+
+
+@pytest.mark.asyncio
+async def test_repeated_cancellation_does_not_release_lock_early(tmp_path, monkeypatch):
+    """Even a second cancel while joining the worker cannot race a writer."""
+    import threading
+    from meta_analyse import archive_ingestion
+
+    target = tmp_path / "trades.csv.gz"
+    target.write_bytes(b"old")
+    entered = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+
+    def slow_receipt(*_args):
+        entered.set()
+        assert release.wait(5)
+        finished.set()
+        return None
+
+    monkeypatch.setattr(archive_ingestion, "_load_receipt", slow_receipt)
+    task = asyncio.create_task(archive_ingestion.acquire_archive(
+        None, "https://public.bybit.com/trading/BTCUSDT/BTCUSDT2025-01-01.csv.gz", target
+    ))
+    writer = None
+    try:
+        assert await asyncio.to_thread(entered.wait, 5)
+        task.cancel()
+        await asyncio.sleep(0)
+        task.cancel()
+
+        async def write_after_reader():
+            async with async_archive_file_lock(target, timeout=3):
+                assert finished.is_set()
+                target.write_bytes(b"new")
+
+        writer = asyncio.create_task(write_after_reader())
+        await asyncio.sleep(0.1)
+        assert not writer.done()
+    finally:
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        if writer is not None:
+            await asyncio.wait_for(writer, timeout=5)
+    assert target.read_bytes() == b"new"

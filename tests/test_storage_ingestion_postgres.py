@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from meta_analyse.archive_db_import import import_verified_archive
+from meta_analyse.orderflow_archive_reader import read_orderflow_trades
 from meta_analyse.storage import Store
 
 DSN = os.environ.get("META_ANALYSE_TEST_DSN")
@@ -166,3 +167,41 @@ def test_concurrent_identical_archive_is_idempotent(tmp_path):
             WHERE venue='bybit' AND symbol=%s""", (symbol,)).fetchone()[0]
     assert source_count == 1
     assert trade_count == 1
+
+
+def test_failed_import_status_preserves_committed_checkpoint(tmp_path):
+    store = Store(DSN)
+    symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+    seed, seed_receipt = archive(tmp_path, symbol, "collision", "seed_status")
+    import_verified_archive(store, seed, seed_receipt, symbol=symbol, batch_size=1)
+    path = tmp_path / "status_partial.csv"
+    path.write_text("timestamp,symbol,side,size,price,trdMatchID\\n"
+                    f"1720000001,{symbol},Buy,2,100,unique\\n"
+                    f"1720000002,{symbol},Buy,2,999,collision\\n")
+    receipt = {"valid": True, "complete": False, "url": "https://example.invalid/status",
+               "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+               "bytes": path.stat().st_size, "rows": 2}
+    with pytest.raises(ValueError, match="conflicting existing trade ID"):
+        import_verified_archive(store, path, receipt, symbol=symbol, batch_size=1)
+    with store.connect() as conn:
+        checkpoint, status = conn.execute("""SELECT c.committed_rows,c.status
+            FROM meta_analyse.archive_import_checkpoints c
+            JOIN meta_analyse.archive_sources s ON s.id=c.source_id
+            WHERE s.symbol=%s AND s.sha256=%s""",
+            (symbol, receipt["sha256"])).fetchone()
+    assert (checkpoint, status) == (1, "failed")
+
+
+def test_orderflow_reader_returns_exact_aliases(tmp_path):
+    from decimal import Decimal
+    store = Store(DSN)
+    symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+    path, receipt = archive(tmp_path, symbol, "trade_reader", "reader")
+    import_verified_archive(store, path, receipt, symbol=symbol)
+    rows = read_orderflow_trades(store, venue="bybit", symbol=symbol,
+                                 start_ms=1720000000000, end_ms=1720000001000)
+    assert len(rows) == 1
+    assert rows[0]["timestamp_ms"] == 1720000000000
+    assert rows[0]["volume"] == Decimal("2")
+    assert rows[0]["price"] == Decimal("100")
+    assert rows[0]["side"] == "Buy"

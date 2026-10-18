@@ -272,7 +272,7 @@ class DesktopService:
 
     def snapshot(self):
         if self.runtime is None:
-            return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status)
+            return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status, flow_history=self.flow_history)
         engine = self.runtime.paper
         symbols = tuple(self.runtime.symbols)
         stats = []

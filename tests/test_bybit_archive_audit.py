@@ -6,9 +6,9 @@ from meta_analyse.bybit_archive_audit import audit_trade_gzip
 
 def write_archive(path, rows):
     with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=["timestamp", "price", "size"])
+        writer = csv.DictWriter(stream, fieldnames=["trdMatchID", "timestamp", "price", "size", "side"])
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows({"trdMatchID": f"id{index}", "side": "Buy", **row} for index, row in enumerate(rows, 1))
 
 
 def test_valid_archive_is_not_assumed_complete(tmp_path):

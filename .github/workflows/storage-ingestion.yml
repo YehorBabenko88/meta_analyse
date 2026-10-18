@@ -4,6 +4,10 @@ on:
     paths:
       - 'src/meta_analyse/archive_db_import.py'
       - 'src/meta_analyse/storage_migrations.py'
+      - 'src/meta_analyse/flow_history_storage.py'
+      - 'src/meta_analyse/desktop_service.py'
+      - 'src/meta_analyse/desktop.py'
+      - 'tests/test_flow_history_storage.py'
       - 'tests/test_storage_ingestion_*.py'
       - '.github/workflows/storage-ingestion.yml'
   push:
@@ -12,6 +16,10 @@ on:
     paths:
       - 'src/meta_analyse/archive_db_import.py'
       - 'src/meta_analyse/storage_migrations.py'
+      - 'src/meta_analyse/flow_history_storage.py'
+      - 'src/meta_analyse/desktop_service.py'
+      - 'src/meta_analyse/desktop.py'
+      - 'tests/test_flow_history_storage.py'
       - 'tests/test_storage_ingestion_*.py'
       - '.github/workflows/storage-ingestion.yml'
 permissions:
@@ -46,4 +54,4 @@ jobs:
       - name: Validate source syntax
         run: python -m compileall -q src tests
       - name: Run storage unit and PostgreSQL integration tests
-        run: python -m pytest -q tests/test_storage_ingestion_unit.py tests/test_storage_ingestion_postgres.py
+        run: python -m pytest -q tests/test_storage_ingestion_unit.py tests/test_storage_ingestion_postgres.py tests/test_flow_history_storage.py

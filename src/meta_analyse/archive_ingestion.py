@@ -84,12 +84,16 @@ async def _to_thread_join_on_cancel(func, /, *args, **kwargs):
     try:
         return await asyncio.shield(worker)
     except asyncio.CancelledError:
-        try:
-            await asyncio.shield(worker)
-        except Exception:
-            # Cancellation remains the externally visible result, but the
-            # worker has finished before the destination lock is released.
-            pass
+        # A second cancellation during cleanup must not release the lock
+        # while the worker is still reading or publishing archive bytes.
+        while not worker.done():
+            try:
+                await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                continue
+            except Exception:
+                # The original cancellation remains authoritative.
+                break
         raise
 
 

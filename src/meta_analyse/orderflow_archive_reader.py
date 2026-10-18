@@ -1,7 +1,7 @@
 """Read-only PostgreSQL adapter for historical trades consumed by Order Flow."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
 
@@ -18,8 +18,9 @@ def read_orderflow_trades(store, *, venue: str, symbol: str,
         raise ValueError("invalid timestamp interval")
     if type(limit) is not int or not 1 <= limit <= 100000:
         raise ValueError("invalid result limit")
-    start = datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc)
-    end = datetime.fromtimestamp(end_ms / 1000, tz=timezone.utc)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    start = epoch + timedelta(milliseconds=start_ms)
+    end = epoch + timedelta(milliseconds=end_ms)
     with store.connect() as conn:
         with conn.transaction():
             conn.execute("SET TRANSACTION READ ONLY")
@@ -31,7 +32,7 @@ def read_orderflow_trades(store, *, venue: str, symbol: str,
     return [
         {
             "trade_id": trade_id,
-            "timestamp_ms": int((trade_ts - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds() * 1000),
+            "timestamp_ms": ((trade_ts - epoch).days * 86400000 + (trade_ts - epoch).seconds * 1000 + (trade_ts - epoch).microseconds // 1000),
             "price": Decimal(price),
             "volume": Decimal(quantity),
             "side": side,

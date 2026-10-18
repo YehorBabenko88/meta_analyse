@@ -73,6 +73,26 @@ def _write_receipt(path: Path, receipt: ArchiveReceipt) -> None:
         temporary.unlink(missing_ok=True)
 
 
+async def _to_thread_join_on_cancel(func, /, *args, **kwargs):
+    """Do not release the archive lock while a cancelled thread still runs.
+
+    Shielding prevents cancellation from cancelling the task wrapper; after a
+    cancellation request, wait for the actual worker to finish before the
+    caller's async lock context is allowed to exit.
+    """
+    worker = asyncio.create_task(asyncio.to_thread(func, *args, **kwargs))
+    try:
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        try:
+            await asyncio.shield(worker)
+        except Exception:
+            # Cancellation remains the externally visible result, but the
+            # worker has finished before the destination lock is released.
+            pass
+        raise
+
+
 async def acquire_archive(session, url: str, path: str | Path, *,
                           max_bytes: int = 2_000_000_000,
                           day: date | None = None,
@@ -83,13 +103,13 @@ async def acquire_archive(session, url: str, path: str | Path, *,
     path = Path(path)
     async with async_archive_file_lock(path):
         if path.is_file():
-            cached = await asyncio.to_thread(_load_receipt, path, url, day)
+            cached = await _to_thread_join_on_cancel(_load_receipt, path, url, day)
             if cached is not None:
                 return cached
         transport = download_resumable if resumable else download_archive
         await transport(session, url, path, max_bytes=max_bytes)
         try:
-            audit = await asyncio.to_thread(audit_trade_gzip, path)
+            audit = await _to_thread_join_on_cancel(audit_trade_gzip, path)
             if not audit.valid:
                 raise ValueError(f"archive rejected: {audit.reason}")
             if day is not None:
@@ -97,13 +117,13 @@ async def acquire_archive(session, url: str, path: str | Path, *,
         except Exception:
             # Never leave a stale receipt advertising bytes replaced by a
             # failed validation. The next attempt must download and audit.
-            await asyncio.to_thread(_receipt_path(path).unlink, missing_ok=True)
+            await _to_thread_join_on_cancel(_receipt_path(path).unlink, missing_ok=True)
             raise
-        size, digest = await asyncio.to_thread(lambda: (path.stat().st_size, _digest(path)))
+        size, digest = await _to_thread_join_on_cancel(lambda: (path.stat().st_size, _digest(path)))
         receipt = ArchiveReceipt(url, digest, size, audit.rows, audit.first_ms,
                                  audit.last_ms, True, False,
                                  day.isoformat() if day else None)
-        await asyncio.to_thread(_write_receipt, path, receipt)
+        await _to_thread_join_on_cancel(_write_receipt, path, receipt)
         return receipt
 
 

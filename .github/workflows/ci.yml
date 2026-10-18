@@ -21,7 +21,9 @@ jobs:
       - run: python -m pip install -c requirements.lock -e ".[test]"
       - run: python -m pip check
       - name: Mandatory local HTTP archive fault regression (Windows)
-        run: python -m pytest -q tests/test_archive_http_server.py tests/test_archive_resumable_faults.py
+        run: |
+          python -c "import aiohttp"
+          python -m pytest -q tests/test_archive_http_server.py tests/test_archive_resumable_faults.py
       - name: Windows Qt and disposable PostgreSQL integration
         shell: pwsh
         run: ./scripts/test-windows.ps1
@@ -74,7 +76,9 @@ jobs:
       - name: Repeat lifecycle resource regressions in fresh processes
         run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir repeat-lifecycle
       - name: Mandatory local HTTP archive fault regression (Linux)
-        run: python -m pytest -q tests/test_archive_http_server.py tests/test_archive_resumable_faults.py
+        run: |
+          python -c "import aiohttp"
+          python -m pytest -q tests/test_archive_http_server.py tests/test_archive_resumable_faults.py
       - name: Linux regressions (preserve pytest failure through tee)
         shell: bash
         run: python -m pytest -q --junitxml=tests.xml | tee tests.log

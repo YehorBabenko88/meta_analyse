@@ -76,3 +76,28 @@ def test_truncation_never_claims_completeness():
     assert snapshot.truncated is True
     assert snapshot.status == "UNVERIFIED"
     assert len(snapshot.trades) == 2
+
+
+def test_rejects_naive_datetime_and_invalid_limits():
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    for bad_start in (start.replace(tzinfo=None),):
+        with pytest.raises(ValueError, match="timezone-aware"):
+            read_flow_history(FakeStore([]), symbol="BTCUSDT",
+                              start=bad_start, end=start + timedelta(seconds=1))
+    for bad_limit in (0, -1, True, 100001):
+        with pytest.raises(ValueError, match="limit"):
+            read_flow_history(FakeStore([]), symbol="BTCUSDT",
+                              start=start, end=start + timedelta(seconds=1),
+                              limit=bad_limit)
+
+
+def test_half_open_time_window_is_parameterized_and_utc_normalized():
+    from datetime import timezone as tz
+    start = datetime(2026, 10, 17, 3, tzinfo=tz(timedelta(hours=3)))
+    end = start + timedelta(minutes=1)
+    store = FakeStore([])
+    result = read_flow_history(store, symbol="ETHUSDT", start=start, end=end)
+    assert result.start == datetime(2026, 10, 17, tzinfo=timezone.utc)
+    assert result.end == result.start + timedelta(minutes=1)
+    assert "trade_ts >= %s AND trade_ts < %s" in store.connection.sql
+    assert store.connection.params[1:4] == ("ETHUSDT", result.start, result.end)

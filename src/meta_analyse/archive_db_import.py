@@ -185,11 +185,14 @@ def import_verified_archive(store, path, receipt, *, venue="bybit", symbol, batc
                                 SET status='imported',updated_at=now() WHERE source_id=%s""", (source_id,))
                     return {"source_id":source_id,"rows":count,"resumed_from":checkpoint}
                 except BaseException:
-                    # Each committed batch advances its checkpoint atomically.
-                    # Only update status; never overwrite committed_rows.
-                    with conn.transaction():
-                        conn.execute("""UPDATE meta_analyse.archive_import_checkpoints
-                            SET status='failed',updated_at=now() WHERE source_id=%s""", (source_id,))
+                    # Preserve the original import/DB failure even if marking
+                    # the checkpoint failed encounters another DB error.
+                    try:
+                        with conn.transaction():
+                            conn.execute("""UPDATE meta_analyse.archive_import_checkpoints
+                                SET status='failed',updated_at=now() WHERE source_id=%s""", (source_id,))
+                    except Exception:
+                        pass
                     raise
             finally:
                 original_error = sys.exc_info()[0] is not None

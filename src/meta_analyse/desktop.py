@@ -256,6 +256,8 @@ class Window(QWidget):
             QMessageBox.warning(self, "Flow History", "Specify symbol and timezone-aware ISO start/end.")
             return
         self.history_status.setText("Loading — UNVERIFIED")
+        self._previous_history = None
+        self.history_table.setRowCount(0)
         self.schedule(self.service.load_flow_history(symbol=symbol, start=start, end=end))
 
     def toggle_paper(self, enabled):
@@ -312,6 +314,10 @@ class Window(QWidget):
                         selection.select(table.model().index(i, 0), table.model().index(i, table.columnCount()-1))
                 table.selectionModel().select(selection, QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows)
         history = self._snapshot.flow_history
+        if history is None and self._snapshot.status.startswith("Flow History failed"):
+            self.history_status.setText(self._snapshot.status + " — UNVERIFIED")
+        elif history is None and self._snapshot.status.startswith("Flow History unavailable"):
+            self.history_status.setText(self._snapshot.status + " — UNVERIFIED")
         if history is not None and history is not getattr(self, "_previous_history", None):
             self._previous_history = history
             self.history_status.setText(

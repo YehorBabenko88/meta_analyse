@@ -66,3 +66,26 @@ def read_flow_history(store, *, symbol: str, start: datetime, end: datetime,
         for trade_id, timestamp, price, quantity, side in rows[:limit]
     )
     return FlowHistorySnapshot(symbol, start, end, trades, truncated=truncated)
+
+
+def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[dict, ...]:
+    """Bridge PostgreSQL history to the Order Flow adapter's record contract.
+
+    Milliseconds are derived by integer timedelta arithmetic, never floating
+    point. The source snapshot remains UNVERIFIED and is not modified.
+    """
+    if not isinstance(snapshot, FlowHistorySnapshot):
+        raise TypeError("FlowHistorySnapshot required")
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    records = []
+    for trade in snapshot.trades:
+        delta = _utc(trade.timestamp) - epoch
+        timestamp_ms = ((delta.days * 86400 + delta.seconds) * 1000
+                        + delta.microseconds // 1000)
+        records.append({
+            "timestamp_ms": timestamp_ms,
+            "price": trade.price,
+            "volume": trade.quantity,
+            "side": trade.side.lower(),
+        })
+    return tuple(records)

@@ -236,6 +236,16 @@ def test_unlock_failure_does_not_mask_original_import_error(tmp_path):
         def __getattr__(self, name):
             return getattr(self.underlying, name)
 
+        @property
+        def autocommit(self):
+            return self.underlying.autocommit
+
+        @autocommit.setter
+        def autocommit(self, value):
+            # Match the real psycopg connection: imports must commit each
+            # checkpoint transaction even through this fault-injection wrapper.
+            self.underlying.autocommit = value
+
         def execute(self, sql, params=None):
             if "pg_advisory_unlock" in sql:
                 raise RuntimeError("simulated advisory unlock failure")

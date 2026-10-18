@@ -34,20 +34,29 @@ def audit_trade_gzip(path: str | Path, *, max_rows: int = 50_000_000,
             stream = io.TextIOWrapper(_LimitedReader(compressed, max_uncompressed_bytes),
                                       encoding="utf-8-sig", newline="")
             reader = csv.DictReader(stream)
-            fields = set(reader.fieldnames or ())
-            if not {"timestamp", "price", "size"}.issubset(fields):
+            header = reader.fieldnames or []
+            fields = set(header)
+            if not {"trdMatchID", "timestamp", "price", "size", "side"}.issubset(fields):
                 return ArchiveAudit(0, None, None, False, False, "required columns missing")
+            if len(header) != len(fields):
+                return ArchiveAudit(0, None, None, False, False, "duplicate CSV columns")
             for record in reader:
                 rows += 1
                 if rows > max_rows:
                     return ArchiveAudit(rows, first, last, False, False, "row budget exceeded")
                 try:
+                    if None in record or any(value is None for value in record.values()):
+                        raise ValueError("malformed CSV field count")
+                    if not record["trdMatchID"].strip():
+                        raise ValueError("missing trade ID")
+                    if record["side"] not in ("Buy", "Sell"):
+                        raise ValueError("invalid trade side")
                     raw_ts = Decimal(record["timestamp"])
                     price = Decimal(record["price"])
                     size = Decimal(record["size"])
                     if not raw_ts.is_finite() or not price.is_finite() or not size.is_finite():
                         raise ValueError("nonfinite numeric value")
-                    if raw_ts < 0 or price <= 0 or size <= 0:
+                    if not (0 <= raw_ts < Decimal("253402300800")) or price <= 0 or size <= 0:
                         raise ValueError("invalid trade values")
                     # Bybit archive timestamps are in seconds, often fractional.
                     timestamp_ms = int(raw_ts * 1000)

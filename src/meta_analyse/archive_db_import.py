@@ -5,6 +5,7 @@ import csv
 import gzip
 import hashlib
 import json
+import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_DOWN
@@ -135,52 +136,66 @@ def import_verified_archive(store, path, receipt, *, venue="bybit", symbol, batc
                         raise ValueError("conflicting receipt rows")
                     conn.execute("""INSERT INTO meta_analyse.archive_import_checkpoints(source_id)
                         VALUES (%s) ON CONFLICT DO NOTHING""", (source_id,))
-                checkpoint = conn.execute("""SELECT committed_rows FROM meta_analyse.archive_import_checkpoints
-                    WHERE source_id=%s""", (source_id,)).fetchone()[0]
-                if checkpoint > count:
-                    raise ValueError("checkpoint exceeds archive")
-                def flush(batch, end):
-                    with conn.transaction():
-                        with conn.cursor() as cur:
-                            cur.execute("""CREATE TEMP TABLE IF NOT EXISTS archive_stage (
-                                trade_id TEXT, trade_ts TIMESTAMPTZ, price NUMERIC,
-                                quantity NUMERIC, side TEXT) ON COMMIT DELETE ROWS""")
-                            with cur.copy("COPY archive_stage (trade_id,trade_ts,price,quantity,side) FROM STDIN") as copy:
-                                for trade in batch:
-                                    copy.write_row(trade)
-                            if cur.execute("""SELECT 1 FROM archive_stage s
-                                JOIN meta_analyse.historical_trades t ON
-                                t.venue=%s AND t.symbol=%s AND t.trade_id=s.trade_id
-                                WHERE (t.trade_ts,t.price,t.quantity,t.side) IS DISTINCT FROM
-                                (s.trade_ts,s.price,s.quantity,s.side) LIMIT 1""", (venue,symbol)).fetchone():
-                                raise ValueError("conflicting existing trade ID")
-                            if cur.execute("""SELECT 1 FROM archive_stage GROUP BY trade_id
-                                HAVING count(DISTINCT (trade_ts,price,quantity,side)) > 1 LIMIT 1""").fetchone():
-                                raise ValueError("conflicting trade ID within batch")
-                            cur.execute("""INSERT INTO meta_analyse.historical_trades
-                                (venue,symbol,trade_id,trade_ts,price,quantity,side,source_id)
-                                SELECT DISTINCT ON (trade_id) %s,%s,trade_id,trade_ts,price,quantity,side,%s
-                                FROM archive_stage ORDER BY trade_id
-                                ON CONFLICT (venue,symbol,trade_id) DO NOTHING""", (venue,symbol,source_id))
-                            cur.execute("""UPDATE meta_analyse.archive_import_checkpoints
-                                SET committed_rows=%s,status=%s,updated_at=now()
-                                WHERE source_id=%s""", (end,"imported" if end == count else "running",source_id))
-                batch = []
-                position = 0
-                for row in iter_rows(snapshot):
-                    position += 1
-                    if position <= checkpoint:
-                        continue
-                    batch.append(parse_trade(row))
-                    if len(batch) >= batch_size:
+                try:
+                    checkpoint = conn.execute("""SELECT committed_rows FROM meta_analyse.archive_import_checkpoints
+                        WHERE source_id=%s""", (source_id,)).fetchone()[0]
+                    if checkpoint > count:
+                        raise ValueError("checkpoint exceeds archive")
+                    def flush(batch, end):
+                        with conn.transaction():
+                            with conn.cursor() as cur:
+                                cur.execute("""CREATE TEMP TABLE IF NOT EXISTS archive_stage (
+                                    trade_id TEXT, trade_ts TIMESTAMPTZ, price NUMERIC,
+                                    quantity NUMERIC, side TEXT) ON COMMIT DELETE ROWS""")
+                                with cur.copy("COPY archive_stage (trade_id,trade_ts,price,quantity,side) FROM STDIN") as copy:
+                                    for trade in batch:
+                                        copy.write_row(trade)
+                                if cur.execute("""SELECT 1 FROM archive_stage s
+                                    JOIN meta_analyse.historical_trades t ON
+                                    t.venue=%s AND t.symbol=%s AND t.trade_id=s.trade_id
+                                    WHERE (t.trade_ts,t.price,t.quantity,t.side) IS DISTINCT FROM
+                                    (s.trade_ts,s.price,s.quantity,s.side) LIMIT 1""", (venue,symbol)).fetchone():
+                                    raise ValueError("conflicting existing trade ID")
+                                if cur.execute("""SELECT 1 FROM archive_stage GROUP BY trade_id
+                                    HAVING count(DISTINCT (trade_ts,price,quantity,side)) > 1 LIMIT 1""").fetchone():
+                                    raise ValueError("conflicting trade ID within batch")
+                                cur.execute("""INSERT INTO meta_analyse.historical_trades
+                                    (venue,symbol,trade_id,trade_ts,price,quantity,side,source_id)
+                                    SELECT DISTINCT ON (trade_id) %s,%s,trade_id,trade_ts,price,quantity,side,%s
+                                    FROM archive_stage ORDER BY trade_id
+                                    ON CONFLICT (venue,symbol,trade_id) DO NOTHING""", (venue,symbol,source_id))
+                                cur.execute("""UPDATE meta_analyse.archive_import_checkpoints
+                                    SET committed_rows=%s,status=%s,updated_at=now()
+                                    WHERE source_id=%s""", (end,"imported" if end == count else "running",source_id))
+                    batch = []
+                    position = 0
+                    for row in iter_rows(snapshot):
+                        position += 1
+                        if position <= checkpoint:
+                            continue
+                        batch.append(parse_trade(row))
+                        if len(batch) >= batch_size:
+                            flush(batch, position)
+                            batch.clear()
+                    if batch:
                         flush(batch, position)
-                        batch.clear()
-                if batch:
-                    flush(batch, position)
-                elif checkpoint == count:
+                    elif checkpoint == count:
+                        with conn.transaction():
+                            conn.execute("""UPDATE meta_analyse.archive_import_checkpoints
+                                SET status='imported',updated_at=now() WHERE source_id=%s""", (source_id,))
+                    return {"source_id":source_id,"rows":count,"resumed_from":checkpoint}
+                except BaseException:
+                    # Each committed batch advances its checkpoint atomically.
+                    # Only update status; never overwrite committed_rows.
                     with conn.transaction():
                         conn.execute("""UPDATE meta_analyse.archive_import_checkpoints
-                            SET status='imported',updated_at=now() WHERE source_id=%s""", (source_id,))
-                return {"source_id":source_id,"rows":count,"resumed_from":checkpoint}
+                            SET status='failed',updated_at=now() WHERE source_id=%s""", (source_id,))
+                    raise
             finally:
-                conn.execute("SELECT pg_advisory_unlock(%s)", (key,))
+                original_error = sys.exc_info()[0] is not None
+                try:
+                    conn.execute("SELECT pg_advisory_unlock(%s)", (key,))
+                except BaseException:
+                    if not original_error:
+                        raise
+                    # Preserve the import/DB exception over unlock cleanup.

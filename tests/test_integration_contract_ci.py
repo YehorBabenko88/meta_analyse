@@ -45,3 +45,13 @@ def test_integration_contract_ci_rejects_malformed_report(tmp_path):
     report.write_text("<broken", encoding="utf-8")
     result = subprocess.run([sys.executable, str(SCRIPT), str(report), "--minimum", "1"], capture_output=True)
     assert result.returncode != 0
+
+def test_integration_contract_ci_does_not_allow_substring_skip_bypass(tmp_path):
+    result = _check(tmp_path, [("unsafe_windows_only_extra", "skipped")],
+                    "--allow-skip", "windows_only")
+    assert result.returncode != 0
+
+def test_integration_contract_ci_allows_parametrized_case_by_exact_base_name(tmp_path):
+    result = _check(tmp_path, [("windows_only[False]", "skipped")],
+                    "--allow-skip", "windows_only")
+    assert result.returncode == 0

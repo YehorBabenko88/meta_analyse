@@ -1,6 +1,7 @@
 """Offline regression tests for historical trade ingestion."""
 from datetime import datetime, timezone
 from decimal import Decimal
+import csv
 import gzip
 import hashlib
 
@@ -117,7 +118,7 @@ def test_import_rejects_malformed_csv_quoting_before_db(tmp_path):
     receipt = {"valid": True, "complete": False,
                "url": "https://example.invalid/malformed",
                "sha256": file_sha256(path), "bytes": path.stat().st_size, "rows": 1}
-    with pytest.raises((ValueError, __import__("csv").Error)):
+    with pytest.raises(csv.Error):
         import_verified_archive(None, path, receipt, symbol="BTCUSDT")
 
 
@@ -144,3 +145,19 @@ def test_timestamp_max_supported_microsecond():
     row = {"trdMatchID": "max", "timestamp": "253402300799.999999999999999999",
            "price": "1", "size": "1", "side": "Sell"}
     assert parse_trade(row)[1] == datetime(9999, 12, 31, 23, 59, 59, 999999, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize("content", [
+    "timestamp,trdMatchID,price,size,side\n1,id,1,1,Buy,extra\n",
+    "timestamp,trdMatchID,price,size,side\n1,id,1,1,Buy\n2,id2,1,1\n",
+    "timestamp,trdMatchID,price,size,side,side\n1,id,1,1,Buy,Buy\n",
+])
+def test_import_rejects_csv_shape_violations_before_db(tmp_path, content):
+    path = tmp_path / "invalid.csv"
+    path.write_text(content)
+    receipt = {"valid": True, "complete": False,
+               "url": "https://example.invalid/invalid",
+               "sha256": file_sha256(path), "bytes": path.stat().st_size,
+               "rows": content.count("\n") - 1}
+    with pytest.raises(ValueError):
+        import_verified_archive(None, path, receipt, symbol="BTCUSDT")

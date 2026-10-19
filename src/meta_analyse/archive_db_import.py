@@ -25,7 +25,7 @@ def file_sha256(path):
 def iter_rows(path):
     opener = gzip.open if str(path).endswith(".gz") else open
     with opener(path, "rt", encoding="utf-8-sig", newline="") as stream:
-        reader = csv.DictReader(stream)
+        reader = csv.DictReader(stream, strict=True)
         required = {"trdMatchID", "timestamp", "price", "size", "side"}
         if not reader.fieldnames or not required.issubset(reader.fieldnames):
             raise ValueError("missing required trade columns")

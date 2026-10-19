@@ -80,6 +80,10 @@ def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[Mapping[str, ob
         raise TypeError("FlowHistorySnapshot required")
     if snapshot.status != "UNVERIFIED":
         raise ValueError("unsupported historical verification status")
+    if not isinstance(snapshot.trades, tuple):
+        raise TypeError("immutable tuple of historical trades required")
+    if type(snapshot.truncated) is not bool:
+        raise TypeError("boolean truncation flag required")
     if not isinstance(snapshot.symbol, str) or not snapshot.symbol.strip():
         raise ValueError("explicit snapshot symbol required")
     start, end = _utc(snapshot.start), _utc(snapshot.end)

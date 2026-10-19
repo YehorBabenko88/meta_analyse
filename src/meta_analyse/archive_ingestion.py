@@ -108,6 +108,8 @@ async def acquire_archive(session, url: str, path: str | Path, *,
                           day: date | None = None,
                           resumable: bool = False) -> ArchiveReceipt:
     validate_archive_url(url)
+    if type(max_bytes) is not int or max_bytes <= 0:
+        raise ValueError("max_bytes must be a positive integer")
     if day is not None:
         utc_day_boundary(day)  # validate before any filesystem or network effects
     path = Path(path)

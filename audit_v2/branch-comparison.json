@@ -1,0 +1,218 @@
+{
+  "6": {
+    "head": "ad672fed702ecdb29f228886acd14b60a367d3bd",
+    "merge_base": "1722170a9b0e63826a9424b387591cf33d3f13ad",
+    "files": [
+      {
+        "path": ".github/workflows/ci.yml",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/archive_file_lock.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/archive_ingestion.py",
+        "state": "DIFFERENT"
+      },
+      {
+        "path": "src/meta_analyse/archive_resumable_download.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/archive_resume.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/bybit_archive_audit.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/bybit_archive_download.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_archive_csv_profile.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_archive_decompression_budget.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_archive_etag_validation.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_archive_file_lock.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_archive_full_length.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_archive_http_server.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_archive_ingestion.py",
+        "state": "DIFFERENT"
+      },
+      {
+        "path": "tests/test_archive_ingestion_day.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_archive_ingestion_resume.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_archive_partial_integrity.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_archive_resumable_faults.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_archive_resume_strict_headers.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_bybit_archive_audit.py",
+        "state": "IDENTICAL"
+      }
+    ]
+  },
+  "7": {
+    "head": "bd26d8a30b6dc39144585d8f5ec0340afedc8618",
+    "merge_base": "1722170a9b0e63826a9424b387591cf33d3f13ad",
+    "files": [
+      {
+        "path": "scripts/benchmark_orderflow_memory.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "scripts/benchmark_orderflow_qt.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/desktop.py",
+        "state": "DIFFERENT"
+      },
+      {
+        "path": "src/meta_analyse/desktop_service.py",
+        "state": "DIFFERENT"
+      },
+      {
+        "path": "src/meta_analyse/orderflow_adapters.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/orderflow_aggregation.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/orderflow_metrics.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/orderflow_view.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_orderflow_adapters.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_orderflow_aggregation.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_orderflow_desktop_service.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_orderflow_large_history.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_orderflow_metrics.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_orderflow_qt.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_orderflow_view_scale.py",
+        "state": "IDENTICAL"
+      }
+    ]
+  },
+  "8": {
+    "head": "340bad1d016a0f6e30bfe575ab90ae3e4db7a3fa",
+    "merge_base": "1722170a9b0e63826a9424b387591cf33d3f13ad",
+    "files": [
+      {
+        "path": ".github/workflows/storage-ingestion.yml",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/archive_db_import.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/desktop.py",
+        "state": "DIFFERENT"
+      },
+      {
+        "path": "src/meta_analyse/desktop_service.py",
+        "state": "DIFFERENT"
+      },
+      {
+        "path": "src/meta_analyse/flow_history_storage.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/orderflow_archive_reader.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "src/meta_analyse/storage_migrations.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_flow_history_storage.py",
+        "state": "DIFFERENT"
+      },
+      {
+        "path": "tests/test_storage_ingestion_postgres.py",
+        "state": "IDENTICAL"
+      },
+      {
+        "path": "tests/test_storage_ingestion_unit.py",
+        "state": "IDENTICAL"
+      }
+    ]
+  },
+  "9": {
+    "head": "083fe42a515da49d2c47e2e631b2e11478d2bdbe",
+    "merge_base": "1722170a9b0e63826a9424b387591cf33d3f13ad",
+    "files": [
+      {
+        "path": ".github/workflows/ci.yml",
+        "state": "DIFFERENT"
+      },
+      {
+        "path": "scripts/check_integration_junit.py",
+        "state": "MISSING"
+      },
+      {
+        "path": "tests/test_integration_contract_ci.py",
+        "state": "MISSING"
+      }
+    ]
+  }
+}

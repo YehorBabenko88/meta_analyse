@@ -1,0 +1,51 @@
+name: Independent integration audit V2
+on:
+  push:
+    branches: ['audit/parallel-integration-v2-20261019']
+    paths: ['audit_v2/**', '.github/workflows/parallel-audit-v2.yml']
+permissions:
+  contents: read
+jobs:
+  independent-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONASYNCIODEBUG: '1'
+      META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+      META_ANALYSE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify audited product sources are unchanged from PR10
+        run: git diff --exit-code aa489666191137b631aab989f4834743820f4831 -- src tests scripts pyproject.toml requirements.lock .github/workflows/ci.yml .github/workflows/storage-ingestion.yml
+      - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
+      - run: python -m pip install -c requirements.lock -e '.[test,archive]'
+      - run: python -m pip check
+      - name: Full unmodified baseline with both PostgreSQL DSNs
+        shell: bash
+        run: python -m pytest tests -q -W error::RuntimeWarning --junitxml=audit-full-linux.xml | tee audit-full-linux.log
+      - name: Prove required cases ran without skips
+        run: python audit_v2/verify_junit.py audit-full-linux.xml --output audit-junit-proof.json
+      - name: Independent negative invariants and actual user path (failures are findings)
+        shell: bash
+        run: python -m pytest audit_v2 -q -W error::RuntimeWarning --junitxml=audit-negative-linux.xml | tee audit-negative-linux.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: independent-audit-v2-linux
+          path: |
+            audit-full-linux.*
+            audit-negative-linux.*
+            audit-junit-proof.json

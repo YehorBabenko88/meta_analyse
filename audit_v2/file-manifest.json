@@ -1,0 +1,1082 @@
+[
+  {
+    "path": ".github/workflows/ci.yml",
+    "bytes": 3858,
+    "sha256": "e5baa593fda26e19f037869adec60d0365d182a99439f317fd9005337da6a7fa",
+    "python_syntax_checked": false
+  },
+  {
+    "path": ".github/workflows/storage-ingestion.yml",
+    "bytes": 2045,
+    "sha256": "79a7fbf074c1d88a100beb58a0494aa9de71764cb6b2a6e9720aded6d9f36f53",
+    "python_syntax_checked": false
+  },
+  {
+    "path": ".gitignore",
+    "bytes": 90,
+    "sha256": "c4e2c80b7ffd46462513881b809985bee1ca97f9afcddcd2609a8f78e0ad8ece",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "README.md",
+    "bytes": 5205,
+    "sha256": "be55258a9692048c5fa54658862ab3debf764f61fde8824c451e64c12897a9e9",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "docs/AUDIT.md",
+    "bytes": 1835,
+    "sha256": "8561433c2fd5f037290ef244d91a309f854c8548c3679a25830030faeba25bb5",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "docs/CODEX_HANDOFF.md",
+    "bytes": 2885,
+    "sha256": "fb3ded2dc672db426745d14e0d16e22b8ff751dcea0f10b445072c8c45f79f32",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "docs/CODEX_INDEPENDENT_AUDIT_20261016.md",
+    "bytes": 4318,
+    "sha256": "3f46556d8bc98f401808c9878be6c5c79d5ec8eb0ee1561ca7f951261cd6c68e",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "docs/CODEX_ORDER_FLOW_FOLLOWUP.md",
+    "bytes": 9783,
+    "sha256": "064b5d24472fad8967b2298fefe28710f990083a89fc75da47d6457b09af0eee",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "docs/CODEX_WINDOWS_AUDIT.md",
+    "bytes": 11610,
+    "sha256": "f215805dfb1eb2db6d941f4664710c27cfe3453f3f33cf8a690977cd41faa315",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "docs/PRE_LIVE_AUDIT_2026-10-15.md",
+    "bytes": 7014,
+    "sha256": "48a8e41e643bcbc7feb64a94bbe50e17ab7f7f3813a3d743d086000acda84f04",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-15-order-flow-followup.md",
+    "bytes": 2888,
+    "sha256": "944afeb1ef6fd1cfdbabde0cc93e54ef95db5a58f5b1ff9b00051b9b413d85da",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-15-windows-lifecycle-audit.md",
+    "bytes": 2928,
+    "sha256": "bad4e3ff359efddec647d9f19aee790f6116000735486a767cf69e174fa18ef0",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "install.ps1",
+    "bytes": 3127,
+    "sha256": "1f9d7090aa6ae6b2af0b4c31ad575cbe0d67890226f14732de33461ecaab7bc4",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "pyproject.toml",
+    "bytes": 909,
+    "sha256": "969498b39f56463f66a9fe009e2d52436cfc296c825c573bb20d3a5168c28503",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "requirements.lock",
+    "bytes": 1492,
+    "sha256": "a20cc26dda8978f5fee646231d48efaab8431ba8d81358fa5e31a01c64ace22f",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "scripts/benchmark_flow_ui.py",
+    "bytes": 7832,
+    "sha256": "bc7564be2ad015d0385371328109184f320847617302ae38b313384baf398431",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "scripts/benchmark_orderflow_memory.py",
+    "bytes": 1760,
+    "sha256": "bcd9e391751eb18c1eb8894507da8a53a3f439b090cd136a4d862f69fa8054e3",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "scripts/benchmark_orderflow_qt.py",
+    "bytes": 2340,
+    "sha256": "a77c46522d19f475a5a070d17092ec607320c1fd158cfcacf61a8ef9fcda8e55",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "scripts/repeat_lifecycle_tests.py",
+    "bytes": 1779,
+    "sha256": "0790ee073b1b404c519f33562a5f03e7b71f64e56666191b16ae0af95ea2f55f",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "scripts/test-windows.ps1",
+    "bytes": 2802,
+    "sha256": "e2ca6eac2a462270d3ddbcfa635deab1296cdefdfe18d87ba4b5f1d2a47275ff",
+    "python_syntax_checked": false
+  },
+  {
+    "path": "src/meta_analyse/__init__.py",
+    "bytes": 100,
+    "sha256": "d18578c832215a10e2e680e04997fefe8a26765ca2a76bd4f45de859a45da82d",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/analysis_coordinator.py",
+    "bytes": 1642,
+    "sha256": "6df84ee6f1b73e9a1263516f01378627dc01b9ae559c82761482863ff7ef088c",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/analysis_session.py",
+    "bytes": 5929,
+    "sha256": "99916243ee2b6961b94d50245195e95b3b76cce1484d946bc3cec4b86d80d466",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/archive_day_boundary.py",
+    "bytes": 1475,
+    "sha256": "f6df4426cf12287df1c36e56fbb61d623dba6d0afa09203c798789f80c0598b4",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/archive_db_import.py",
+    "bytes": 11224,
+    "sha256": "b4aa3f0f6271017c74e97d3afe9d54eedcafba4808ff9a34620adfc70c88cfdb",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/archive_file_lock.py",
+    "bytes": 3082,
+    "sha256": "849325d39c5f31f0565b62d77080297ee335097218ef31640196161615780f9d",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/archive_ingestion.py",
+    "bytes": 7210,
+    "sha256": "c61dae96d376f50a388e0975b5300451aa227ea0e0ca8a230da6e5601181dfb0",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/archive_partial_state.py",
+    "bytes": 2762,
+    "sha256": "c9211d3dbe2c5bf881a356d9d29ebb35404d983ecae30f9ab16f618af07d21cc",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/archive_resumable_download.py",
+    "bytes": 5336,
+    "sha256": "439846bc00499fe52d412ff43344f65470030e4a7aac21fe77b13d60aca15df9",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/archive_resume.py",
+    "bytes": 2377,
+    "sha256": "3db8e855f6e20e5c71552d404b16cd0bda6b2eb580dc2febd3e31e7a36331f85",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/backfill.py",
+    "bytes": 1299,
+    "sha256": "6beb4b40c5ac8ac84ea39913271c48b73ff6abb564b4cd44d04bc9eb94087ba8",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/book_summary.py",
+    "bytes": 1304,
+    "sha256": "8268a119bd2cbf4e03a8df9c435ba000ea0e8fcc9d3d8da862b4db6078fcaeb9",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/bybit_archive_audit.py",
+    "bytes": 4503,
+    "sha256": "fbfa8b499d7419265df34465280938264a5b9777ebb8b8d72f982856eb2d19cd",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/bybit_archive_download.py",
+    "bytes": 4225,
+    "sha256": "1c34c75c1be0a5fa76f2d9bfca14cc432ed92b0b043868c4de65c8ced610764f",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/bybit_archive_plan.py",
+    "bytes": 1674,
+    "sha256": "22ce0c471a35550332193864087735682f48c2f231a84fd5ed19d1c50a195cc7",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/collector.py",
+    "bytes": 2689,
+    "sha256": "74e75c590183013853ce64cd7afcfeb17ffa7495526f0b203e8e21b9de4b4b8b",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/core.py",
+    "bytes": 8357,
+    "sha256": "9239fdee5d8118d62e1c4013dad87d4882d442eca4ab1f0b06e1673ab5ab2a90",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/crossing_quality.py",
+    "bytes": 751,
+    "sha256": "a9ea8bdd6454f24ccdae9251cbd4a5eab5e802a85e4fe88fd6897ab0ba8ff831",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/crossing_service.py",
+    "bytes": 1455,
+    "sha256": "14615ace429b1ca8d3342a5ffe8da36e115da49c7329e51025d9b6de78ea27e9",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/desktop.py",
+    "bytes": 27908,
+    "sha256": "6563b53e8be23b4dd25354a4d92655880544ed7f63521ee54c34140a0d241aeb",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/desktop_service.py",
+    "bytes": 19881,
+    "sha256": "fc31b9724cb31f81ec26676fb861d1a9b956910534a1ad6395a1030a4080ca55",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/durable_sync.py",
+    "bytes": 2210,
+    "sha256": "1817d33ea758be03925c72b402863e3b0a36f44cfbac737e860a803939f4550c",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/exchange.py",
+    "bytes": 4522,
+    "sha256": "8d44b3332da7c6e63365381db49075b7af8d17bb73ab2a433e0aac66eeb12f78",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/feed_watchdog.py",
+    "bytes": 1487,
+    "sha256": "95bc25663f0defdfe9df2fd824e20d824520ec62d2a5979ddb1c809800db9562",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/flow_bridge.py",
+    "bytes": 3061,
+    "sha256": "f20c9b4eb42041d3bcd62ec85de2f053ba64dcdd30e1d30799f3c3347844a16c",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/flow_diff.py",
+    "bytes": 522,
+    "sha256": "03ddea6bcef37c11ac2132d16a9333d0ac7d30631d86a8f8b57283dd1f355a02",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/flow_history_storage.py",
+    "bytes": 5165,
+    "sha256": "34779e3b2fe686e106b0d8a2324bbaab6b996d6db17d4c92e2b91574cb654970",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/flow_style.py",
+    "bytes": 984,
+    "sha256": "a55f58029c32e581dc2c2880b508117f497e5896237ea621e75def210c1b0c60",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/footprint.py",
+    "bytes": 2170,
+    "sha256": "1fc648f472cefe12e46459a3332b25acc4e2a6b7d1ad48ef09c4bf39ff2a785c",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/footprint_engine.py",
+    "bytes": 1472,
+    "sha256": "7393c22958b2d363a2cc076c47ecfeaab7a902ed26ff9d6e271c1cf1a9e1d383",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/freshness.py",
+    "bytes": 1218,
+    "sha256": "f831e5e4a48f66b6e025cc1bb75ae23f994891b1220664739c5c6726c0c0ef6c",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/freshness_style.py",
+    "bytes": 544,
+    "sha256": "53c6b7401a658a767d93815163ab9f54b37ca822812ee79192ed1b1650cb6d16",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/health.py",
+    "bytes": 1117,
+    "sha256": "c09c1fae25af1d19b19deb0a08b7caa280bff431739d3b38c329177136f596a2",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/history.py",
+    "bytes": 3189,
+    "sha256": "478173b184d6ec03a69d3223352a94745f0fd3c47be7f7f27220cd208a0ad922",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/history_checkpoint.py",
+    "bytes": 2410,
+    "sha256": "39dcf3d484e340961da5080713aa7df7d92f189411cc5832046c9d5fb7202edc",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/history_parallel.py",
+    "bytes": 1889,
+    "sha256": "c1743dd6ae09311b0e07ea96f4b204e901ab8fce8ff67c70051c6291dc1403c1",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/history_progress.py",
+    "bytes": 3373,
+    "sha256": "05488e5fee76ac09d2d9acd6c7ac7d4cac46861a8a571630126eee3ba59e4b3b",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/history_retention.py",
+    "bytes": 2100,
+    "sha256": "6f6fc765fa1f02633005d2b910319c1d7a47a1b56b8ec1e3440be8bfba62d126",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/http_client.py",
+    "bytes": 2271,
+    "sha256": "11f2f173316cf56446bc537c7d4e8fd8bcabe5ecb4f316f9009f0a6197f6d826",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/instruments.py",
+    "bytes": 1485,
+    "sha256": "a2d0831d907693e05e3729e1243ce74a96e8ec2d7e972333b05b6106d61fed24",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/integrity.py",
+    "bytes": 2609,
+    "sha256": "b411296339da89735e0683abee0b22042d55ee69dbc2e627b5fd67c6accaf7a6",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/level_publish.py",
+    "bytes": 1174,
+    "sha256": "1d272e2903be8218437e282ced54246d525f2a9526c8547547263aa693c4941a",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/level_quality.py",
+    "bytes": 1188,
+    "sha256": "bf9f79e979d4c96a6726ff49d701861505d92315dd904399c0095991995d4b52",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/level_sync.py",
+    "bytes": 4003,
+    "sha256": "8acf63bcda861b7f85c1b40024afa7f2c2b66b3654571669022784a5ddbb3cd5",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/liquidity.py",
+    "bytes": 1407,
+    "sha256": "432b04bae88e91540665461cacde3b1a93bc70e16531df0e59f023227267832d",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/market_clock.py",
+    "bytes": 1989,
+    "sha256": "6c5500a2b91ad325e0bd516e78292ac348de562a46137e802cd1d30404193a63",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/market_collector.py",
+    "bytes": 2931,
+    "sha256": "596aeb9ff4030427b1de2e36fd30c5fb6c663846c0cbaa2737dfcaa5b8de3d99",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/market_health.py",
+    "bytes": 1575,
+    "sha256": "bb44d903c0b53c796ca5415f28d4204bda02bcd65c651d53df9a571395a7ffc4",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/market_store.py",
+    "bytes": 2557,
+    "sha256": "ea86d61db11511e1eb604682fae40ff0c571d54d5acd1610f686458b1d725b28",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/market_telemetry.py",
+    "bytes": 1844,
+    "sha256": "3c344f42d9220a74706f5cff26178a0a990e236a0ee107d455caa4d28f58c515",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/metascalp_locator.py",
+    "bytes": 2863,
+    "sha256": "2d19714b898b31c33f2c43c3704875030029da6e4c2cc5144b4a98fef8a6be70",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/open_interest.py",
+    "bytes": 1143,
+    "sha256": "31a66cd9e9e09356c31276e88569f5730c4c67eff00614e0d8f45c2496328f44",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/orderbook.py",
+    "bytes": 2353,
+    "sha256": "2715daba7d93939423ac64242c471de83a6f4f36ff8b8096e5d0f2511dd5ddc2",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/orderbook_stream.py",
+    "bytes": 3179,
+    "sha256": "b12ec3a4c7b45c73f0d95a8592c4f4ce95d9751686a014f287d701ca1036de6a",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/orderflow_adapters.py",
+    "bytes": 3596,
+    "sha256": "c0005bc51eddaf3fc1f7db17b99c18021611ab7232171083e07962598dfae83a",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/orderflow_aggregation.py",
+    "bytes": 2087,
+    "sha256": "3ea8a7a79171ad2bbfb1deb9463d86a18fd2cf47c8605e5fe2e49737336d1d8e",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/orderflow_archive_reader.py",
+    "bytes": 1942,
+    "sha256": "16c33bf2c82bef696400f424650ea79bd731d487770c6e2483dbcfb3ef70f526",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/orderflow_metrics.py",
+    "bytes": 1790,
+    "sha256": "6b3c8860bc8eb71670bf0b59ee85276a5d04b6a2d7e98d5440ae70fafdb1cfee",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/orderflow_view.py",
+    "bytes": 791,
+    "sha256": "c5dc04393479e03d91da0ff6791fe1235542162e8c46d16b00f0f3ff54147bf6",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/pipeline.py",
+    "bytes": 3542,
+    "sha256": "a23704b508915c6aedde62e60c20e934b4fbb6de63063b5eacfaa40730fcf729",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/ports.py",
+    "bytes": 2969,
+    "sha256": "6bfb0c15e2ff3c444627b02d695918175a0aee6254666f56f3a3825f3699185f",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/raw_store.py",
+    "bytes": 2175,
+    "sha256": "3912b1e35869d250a124ada2665c62aafcf2ed8e113d1fdcb46b6b2c6b19d91a",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/raw_trades.py",
+    "bytes": 3974,
+    "sha256": "46fb4fc6d2d22b17a17af919040f2c6531ce34b49f67521116d87aa59364cbb5",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/recovery.py",
+    "bytes": 1198,
+    "sha256": "0a8ec8f1cd4e6754d5b194e7fd1c505eab1f83891b8917f434a40e9caa694507",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/retention_report.py",
+    "bytes": 1057,
+    "sha256": "e40da66efbd4da5c63a2b8e734e8f826e9b195b4d363ae7314538020ce6fcb8e",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/runtime.py",
+    "bytes": 6961,
+    "sha256": "98203c5e5f4a75b1b910d5d3f3a95792e836c9f6b4ccbd8a5c57ecdd03aa54d2",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/storage.py",
+    "bytes": 4077,
+    "sha256": "deddf680b1ef79892387623edc1ba3a24b1d3cba476b73b4ce5d51b66b1a45aa",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/storage_migrations.py",
+    "bytes": 2427,
+    "sha256": "e78f2a21bf96b823bffbe081fe3953512c798275f500046731d8b6634264ea83",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/sync_journal.py",
+    "bytes": 1971,
+    "sha256": "bdb2ee1af0b22deb4d73532f2bd8d5e89015218fb757d131eb50ba3ad8196c70",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/tape_velocity.py",
+    "bytes": 2256,
+    "sha256": "60740a545755cd4273ba0a63ad4861fe0d6996dc58441543fe0bddbcb6c30cb2",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/terminal_pipeline.py",
+    "bytes": 871,
+    "sha256": "23f80d9757b5359640416222a8b40867c6ea6c1aee1dbbfd520626963eb8347e",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/trade_archive.py",
+    "bytes": 1998,
+    "sha256": "63b6c911f5a08dd01be8b1ef6823579cd6f016df2adc67ca765a463042853342",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/trade_archive_audit.py",
+    "bytes": 2386,
+    "sha256": "f298da11bbffa646aa8a65d5d94043e0b5f3b883df870d0ffa37959be51ca352",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/trader_theme.py",
+    "bytes": 1656,
+    "sha256": "c1f867832a9cbb8cc54e7705d4ac4054f767cd2997a018002f98edfaea8fa561",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "src/meta_analyse/wall_tracker.py",
+    "bytes": 1830,
+    "sha256": "7eedc95ac4fa946313228c5f87b7e34aff81dbdb7cfa4917f44b9cfa4728b046",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/conftest.py",
+    "bytes": 2786,
+    "sha256": "3cfd2b78ccf50e12999337bec6c4594b51d585110d206d13478ae54000d99c40",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_analysis_coordinator.py",
+    "bytes": 1781,
+    "sha256": "036887c2cc472ecb52a97a3fc677bb12872fa57da2f14f7b76ecf385dea06f11",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_analysis_session.py",
+    "bytes": 1278,
+    "sha256": "896f800f1d2a362559fecaf1bd14275b9b7390373c8ca18e5e5595b4945fa805",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_csv_profile.py",
+    "bytes": 1898,
+    "sha256": "76a9b4d2b9d9cac8b5d2ddb80573b367ab77896d8f3fa364e9cfda97eab2def8",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_day_boundary.py",
+    "bytes": 1250,
+    "sha256": "59b5ebaba5ebba2b59df4f87ef03edcb5af3088c48e342144d81ba7a2f7e6f89",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_decompression_budget.py",
+    "bytes": 1209,
+    "sha256": "0f49bc3f365a77dcc3067410c74e9feb61cbe6284ae67d5fbb48b401f02aef10",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_etag_validation.py",
+    "bytes": 1164,
+    "sha256": "71e39ac96067c4700d5dd4ca5bce15aa0f58865b6568f35e9d16ea20faae67d9",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_file_lock.py",
+    "bytes": 6549,
+    "sha256": "c58b618384b9c501b7815b0f7042db404759d2a5ace8760ce1221ebd7f23ff8f",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_full_length.py",
+    "bytes": 1609,
+    "sha256": "831cdc6657283c4e9e77cb99883d99b2c54f64b7280d85d1eaea0ef8b39a93f8",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_http_server.py",
+    "bytes": 3208,
+    "sha256": "2b52723988f64b74b0333fb7856e7b778ff5b8666109126790f1fb5ab7617a2a",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_ingestion.py",
+    "bytes": 10469,
+    "sha256": "6b0e2cc5b95075ba122a29e9e4dd3bd4ce780e225272c4043c7bc580823ef7b0",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_ingestion_concurrency.py",
+    "bytes": 928,
+    "sha256": "22e5d78a999d6b26a584b9800ad0f52dda2ae27f7addadc56dd852ae693349a2",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_ingestion_day.py",
+    "bytes": 2024,
+    "sha256": "0f596c3f565c7d2d3906403e07ad62a960711d2d126cc82b2e5c7f50f4ca79d4",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_ingestion_resume.py",
+    "bytes": 1416,
+    "sha256": "113ddefab1730752e36045728e9a9b5ca032c3a3cba8a15b53f6667277897f0a",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_partial_integrity.py",
+    "bytes": 1263,
+    "sha256": "0d937edeced2a8b86a2e10c470717f2e341314592461d4db0b5baed56748afec",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_partial_state.py",
+    "bytes": 1781,
+    "sha256": "90fdec4ad565c4437f054162514a0efb3d753c65023678c87f45732ee95e090c",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_resumable_download.py",
+    "bytes": 2627,
+    "sha256": "f9db853abeea5e11727418ccbf7a24ec901dbd3781ed1d60c1df357821cd6a07",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_resumable_faults.py",
+    "bytes": 6144,
+    "sha256": "f83a41f1d41357cdfc3e76289d37315e82235afe5b189d4c280062a4fc7f2d94",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_resume.py",
+    "bytes": 1385,
+    "sha256": "5321d10c70c59ed1aaee528dedb37839de46ebbde20278f9e997ed1cf7e9711c",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_resume_strict_headers.py",
+    "bytes": 1308,
+    "sha256": "f4e32b74a17dc95e8919245c58fadad2e6ebaf7c2877595cf0004becdafa29da",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_archive_url_hardening.py",
+    "bytes": 1041,
+    "sha256": "46fdbe76ad960d881d28b118e0000fc98968e8b55d6076a6c49a13f9be1e0e52",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_backfill.py",
+    "bytes": 991,
+    "sha256": "ab300de911e9aa719c0e980c6d47d6bb126fa801acf3d3231c686f3ecad90460",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_book_ui_integration.py",
+    "bytes": 1988,
+    "sha256": "28f44020ea12caa2b03f230027b51d7c6a7aa52ed6a135c451a9ba126396b84a",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_bybit_archive_audit.py",
+    "bytes": 1587,
+    "sha256": "a55dcb140286d7540b1a99c38e07e70eee1ec25a0fd8b2335b4f382c93e7d2fb",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_bybit_archive_download.py",
+    "bytes": 2447,
+    "sha256": "888a1c80db1f0582f056826be360ac835086350cb0c106b255ac31c678e5c44e",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_bybit_archive_plan.py",
+    "bytes": 1193,
+    "sha256": "e161730d16fb7cfd76378f372e912a7f402e8d0f1c8fc60a41263f4b3a6452c8",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_combined_readiness.py",
+    "bytes": 1193,
+    "sha256": "2cb73830b13a5cad4c35d2ce95f554d5b06b3e7d60c2aa3d4cd1ae6c8106d87f",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_core.py",
+    "bytes": 2589,
+    "sha256": "66f2f76194044c65f63ffd09a92de3891c8ca26e31da6c04c7d9a6f8a0b4f263",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_crossing_service.py",
+    "bytes": 1398,
+    "sha256": "3bda4d59a018f06c3f95a359f17f252f78eff712a23caea9f2d159c21a20b90a",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_desktop_flow_contract.py",
+    "bytes": 376,
+    "sha256": "7ef2cc17794a4d91bed81bf63be3fd4f50cdb72ee57c6dbf507308882e5532f2",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_desktop_lifecycle.py",
+    "bytes": 5339,
+    "sha256": "51c27d7b734385775f5f11cebfe995bc7d2dd7fec559faedd24c10eaf22f3292",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_desktop_service.py",
+    "bytes": 33695,
+    "sha256": "7d04272a24a20a97b96b37d813bdd0bcf39ec57338fe736e94b472217bf40c58",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_desktop_telemetry.py",
+    "bytes": 4236,
+    "sha256": "e3eb4cf3e32fa53ecae64e39cbffcd725d80aee1e7fe9770ca653ebc817040d5",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_durable_sync.py",
+    "bytes": 1641,
+    "sha256": "c50799e58658b9c6234996f9677a0f07b890e4b4d4913f71f13ce247d24b630c",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_exchange.py",
+    "bytes": 635,
+    "sha256": "87c4763f863e7394f57abda8c9947bcfd3cd8e029244e8535fc5214a764e95eb",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_feed_freshness.py",
+    "bytes": 851,
+    "sha256": "e964876a208adb4e627ea79aa637e7d1ed23fa7fd5aceee78a297f7b50ac55ba",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_feed_watchdog.py",
+    "bytes": 778,
+    "sha256": "f86445e3f1437cc7153a67bec7faa9e6b847c685a4fd95bf30a1919e0258a053",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_flow_diff.py",
+    "bytes": 659,
+    "sha256": "d56ffc9ba0e433b715b13d2b6b914f8e2ba88cf6d384e6eedbe3a8c5e5f21547",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_flow_history_storage.py",
+    "bytes": 24199,
+    "sha256": "5347f62b88d7cb75e33f564203a0ac50be3f2ddbfaadbcc65145a3d6800ed143",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_flow_lifecycle_stress.py",
+    "bytes": 8577,
+    "sha256": "48bcbba863a7986074667fac2d0b517b634b568cdc5aeb70f842c82ff75caf47",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_flow_quality.py",
+    "bytes": 764,
+    "sha256": "9ddc39973a822aeb6ae23b2fe05a0411562eeed8120dfff570478a8c6eddaae7",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_flow_style.py",
+    "bytes": 623,
+    "sha256": "41f823164071244bc014b75b2837f0f153f25eebd1abc5a5775818e1fb99f4e2",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_flow_table_updates.py",
+    "bytes": 3781,
+    "sha256": "954fdcf6ca46f52170e1c326adb499c7f027ff0d310c0a3ba545035569ef115a",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_freshness.py",
+    "bytes": 804,
+    "sha256": "5da465bc6037d4e769495f3d9ccbf8b737042e5822dde16466a0ca2fc6fbd94a",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_freshness_style.py",
+    "bytes": 759,
+    "sha256": "e6b411e3d3af6f7b71b185d7f570fbdf67d5cb12a992376b5a15eb722e61a7e6",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_health.py",
+    "bytes": 962,
+    "sha256": "8393c4c64ec615e3157cbad56184e2199b7fb98215fc402dc2b9133a3aad9b98",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_history_checkpoint.py",
+    "bytes": 1798,
+    "sha256": "7bab4a6f0abc77a4e088bf4676df025c5b8a7ff66415bc893898d9a7a70bb504",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_history_parallel.py",
+    "bytes": 1547,
+    "sha256": "5dc55622968766cf57c1fb7007bd39e42e62e726261a2b807c8076e87c334ef6",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_history_progress.py",
+    "bytes": 1408,
+    "sha256": "2eaeb9220ee5a2b02a6d6e4d314a843e462a6f9f7e4cdc6d20b1cc1a00f7f602",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_history_retention.py",
+    "bytes": 1348,
+    "sha256": "cfe0986c2fb7412d593f1c62e5a29875cf882b7b9a6c0b5de209798f4c3b1baa",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_http_client.py",
+    "bytes": 3352,
+    "sha256": "7281e540209a131cf002a11cf06a5c70e278c6eee54b84ac0b25703514982f40",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_installer.py",
+    "bytes": 1194,
+    "sha256": "d2eb2f9835cab8332a4967fdc78c7ff2dfae543ce5658e377785b810fc752a65",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_integrity.py",
+    "bytes": 1385,
+    "sha256": "dc42cf64a8c568a1fcdbaab76319765ce21319550023cf2f42a7bfd3e1e590f3",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_integrity_engine.py",
+    "bytes": 1064,
+    "sha256": "d6acbd302be773cff176eea0d2f996ba3f6c046d48413710538a75eec20f5905",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_level_publish.py",
+    "bytes": 989,
+    "sha256": "741f675fe98afede3b38ead8aa342c2b7029c33ea2f7b16c6ab7808e39aa2c48",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_level_quality.py",
+    "bytes": 852,
+    "sha256": "eaf2da18a05b821cbc0bd2d234ed3b099f444cda3074f93ecc3d388e5fe17545",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_level_sync.py",
+    "bytes": 1844,
+    "sha256": "7fbc334bcd19a5b6a33cce082e3ef6cb0ee92b638408847649342ed7d6c41c25",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_market_collector.py",
+    "bytes": 1287,
+    "sha256": "07f8d665ddcb2eb7dc06ca4386af763ead172f4f4c1e13277cf0d0e80b63c3b9",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_market_collector_oi_telemetry.py",
+    "bytes": 1563,
+    "sha256": "7b0cc4e0d51ff1e7ccdf73955fc2da92e10bf1764a86080d6e1bff038cf9f454",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_market_collector_telemetry.py",
+    "bytes": 1640,
+    "sha256": "1462788d4cf7fffa4a6f97b22f05beb68338a2aaf349e4d118ee6889dcbfc4e4",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_market_health.py",
+    "bytes": 870,
+    "sha256": "76381e1ed6457cce8383fc5f0bba851fd9679076bed8400f89956330ebf73fd9",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_market_microstructure.py",
+    "bytes": 1612,
+    "sha256": "1a36dfec68cc467f8a938961a6de64d8edd5e830ff94858f0ab69fd2fa79664f",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_market_telemetry.py",
+    "bytes": 1544,
+    "sha256": "02f4d181d29002b9fcb5246396ab73626b76e11e6888df328e0959ce90e7ea42",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_orderflow_adapters.py",
+    "bytes": 3531,
+    "sha256": "9497993d68ff085d8328c2da5c3083b4c5f9d26f927cbc0aa8c0aa3e1821ac4a",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_orderflow_aggregation.py",
+    "bytes": 2682,
+    "sha256": "6093b3840ef73f0da9e3e30eb8f668c6aee98f14e0c2d0eccefaf1e4eb48c83e",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_orderflow_desktop_service.py",
+    "bytes": 3337,
+    "sha256": "90772af04483b65fc9689d4f500e3de01862f9c9ddc0914e810933be5b7d5efb",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_orderflow_large_history.py",
+    "bytes": 731,
+    "sha256": "c774c84309f538a3622c517d877e84cb9de9c09eca132c2f0c7d6305907f87f4",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_orderflow_metrics.py",
+    "bytes": 1514,
+    "sha256": "6e9e6c597b426d750d6817fff8e1450f149a30b9584b5e8396f506d8da96ddaa",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_orderflow_qt.py",
+    "bytes": 2673,
+    "sha256": "11335021de48b782e20417db9a0579f5531579b23006404b48f1456763c21f13",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_orderflow_view_scale.py",
+    "bytes": 741,
+    "sha256": "dfe9ffc39f9a6c61bfc828c390efbbb81df7d7416f5899b192b8048ab60a799e",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_pagination.py",
+    "bytes": 805,
+    "sha256": "b391c304e9673473a5f51a8d35638c02bbbb547a2cae9efbb0a66dbf1b144a8e",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_pipeline.py",
+    "bytes": 1823,
+    "sha256": "0630047e0d315fba9f07f315a0f294c52f39864032e47a29821ac7c8f6546bc2",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_pipeline_callbacks.py",
+    "bytes": 1033,
+    "sha256": "3ca9392dbe4b456abac7fcb341aaa120c81c48e03aa97f10934039fc8e2ab2d6",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_qt_diagnostics.py",
+    "bytes": 8541,
+    "sha256": "657007b7ad1a00afa140209101d3408d6dbee50779ea2e6c0654bfeacd73568b",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_recovery.py",
+    "bytes": 1062,
+    "sha256": "b6807ff06902659f958062ab1545e4d33b79e46fb34225defc13c88324496ec7",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_retention_report.py",
+    "bytes": 764,
+    "sha256": "d08daba5f5d265568a97cd999b9bb3ebcfab24e7d8e5894e0ce91c1e2f86a9b2",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_session_lifecycle.py",
+    "bytes": 8223,
+    "sha256": "c4e29ce4883afeeb575eb9b658cc6d22b4e1df9e5c0bbe499c718bb78fe93775",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_storage_ingestion_postgres.py",
+    "bytes": 12791,
+    "sha256": "ba2601f78f8e141001085139a6e330dd48cb40c5be31439ff0f71ba8e9ea2359",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_storage_ingestion_unit.py",
+    "bytes": 2281,
+    "sha256": "1d0d2b0f71df329378f8030c652e4ab81de9da481220e33632a428477fe91df9",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_stream_quality.py",
+    "bytes": 701,
+    "sha256": "a9a1beb182687fcc918c632f2d6e2d34565a23745b9bde1a4d3d2e5f9e071ed5",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_trade_archive.py",
+    "bytes": 928,
+    "sha256": "23c9d17df019f144fffbb5c2e9fb66df879398da97b9a80c5361df7face947d4",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_trade_archive_audit.py",
+    "bytes": 939,
+    "sha256": "c009f3f7a7892947ddb2ea66ab985d6c0c9fc8c5c2291fd4076235079be581df",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_trader_ui.py",
+    "bytes": 719,
+    "sha256": "aa0cfaa90bec3ded65a7403ebf4645d819378e2f75d3feb9328e76b053d6d45a",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_user_level_api.py",
+    "bytes": 726,
+    "sha256": "eae805dd64dcd24c384152e3046edfdd7e3734bd1e24bd15dfa86cfd6e0a7dc9",
+    "python_syntax_checked": true
+  },
+  {
+    "path": "tests/test_windows_smoke.py",
+    "bytes": 7647,
+    "sha256": "2bf6f96860f9742fa73dd15ad810251fd9e36a681ec83b92865c737eeddee093",
+    "python_syntax_checked": true
+  }
+]

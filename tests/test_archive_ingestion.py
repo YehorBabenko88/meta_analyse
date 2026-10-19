@@ -11,10 +11,14 @@ URL = "https://public.bybit.com/trading/BTCUSDT/BTCUSDT2025-01-01.csv.gz"
 
 
 def make_gzip(path):
-    with gzip.open(path, "wt", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=["trdMatchID", "timestamp", "price", "size", "side"])
-        writer.writeheader()
-        writer.writerow({"trdMatchID": "id1", "timestamp": "1735689600", "price": "100", "size": "2", "side": "Buy"})
+    import io
+
+    with path.open("wb") as raw:
+        with gzip.GzipFile(fileobj=raw, mode="wb", filename="", mtime=0) as compressed:
+            with io.TextIOWrapper(compressed, encoding="utf-8", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=["trdMatchID", "timestamp", "price", "size", "side"])
+                writer.writeheader()
+                writer.writerow({"trdMatchID": "id1", "timestamp": "1735689600", "price": "100", "size": "2", "side": "Buy"})
 
 
 @pytest.mark.asyncio
@@ -166,3 +170,69 @@ async def test_invalid_cached_receipt_time_bounds_force_reaudit(tmp_path, monkey
     result = await acquire_archive(object(), URL, path)
     assert result.valid and result.first_ms <= result.last_ms
     assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_cached_receipt_cannot_bypass_smaller_byte_budget(tmp_path, monkeypatch):
+    from meta_analyse import archive_ingestion
+    path = tmp_path / "archive.csv.gz"
+    make_gzip(path)
+    calls = []
+
+    async def fake_download(session, url, dest, **kwargs):
+        calls.append(kwargs["max_bytes"])
+        if path.is_file() and path.stat().st_size > kwargs["max_bytes"]:
+            raise ValueError("archive exceeds byte budget")
+        make_gzip(dest)
+        return dest
+
+    monkeypatch.setattr(archive_ingestion, "download_archive", fake_download)
+    await acquire_archive(object(), URL, path)
+    assert path.stat().st_size > 1
+    with pytest.raises(ValueError, match="byte budget"):
+        await acquire_archive(object(), URL, path, max_bytes=1)
+    assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("field", "bad_value"), [
+    ("valid", 1),
+    ("valid", "true"),
+    ("complete", 0),
+    ("complete", None),
+])
+async def test_nonboolean_cached_receipt_flags_force_reaudit(tmp_path, monkeypatch, field, bad_value):
+    from meta_analyse import archive_ingestion
+    path = tmp_path / "archive.csv.gz"
+    make_gzip(path)
+    calls = []
+
+    async def fake_download(session, url, dest, **kwargs):
+        calls.append(url)
+        make_gzip(dest)
+        return dest
+
+    monkeypatch.setattr(archive_ingestion, "download_archive", fake_download)
+    await acquire_archive(object(), URL, path)
+    receipt_path = tmp_path / "archive.csv.gz.audit.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt[field] = bad_value
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    result = await acquire_archive(object(), URL, path)
+    assert result.valid is True and result.complete is False
+    assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_budget", [0, -1, True, False, 1.5, "100"])
+async def test_invalid_max_bytes_rejected_before_download(tmp_path, monkeypatch, bad_budget):
+    from meta_analyse import archive_ingestion
+    path = tmp_path / "archive.csv.gz"
+
+    async def unexpected_download(*args, **kwargs):
+        pytest.fail("invalid budget must not reach network")
+
+    monkeypatch.setattr(archive_ingestion, "download_archive", unexpected_download)
+    with pytest.raises(ValueError, match="max_bytes must be a positive integer"):
+        await acquire_archive(object(), URL, path, max_bytes=bad_budget)
+    assert not path.exists()

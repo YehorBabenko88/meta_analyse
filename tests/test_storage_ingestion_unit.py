@@ -53,3 +53,26 @@ def test_gzip_row_budget_before_db(tmp_path):
                "bytes":path.stat().st_size,"rows":1}
     with pytest.raises(ValueError,match="audited row count"):
         import_verified_archive(None,path,receipt,symbol="BTCUSDT")
+
+
+def test_timestamp_exact_microseconds_ignores_decimal_context():
+    from decimal import localcontext
+    row = {"trdMatchID": "precision", "timestamp": "1735689600.123456999999999999999999",
+           "price": "1", "size": "1", "side": "Buy"}
+    with localcontext() as context:
+        context.prec = 8
+        _, result, _, _, _ = parse_trade(row)
+    assert result == datetime(2025, 1, 1, 0, 0, 0, 123456, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("1735689599.999999999999999999", datetime(2024, 12, 31, 23, 59, 59, 999999, tzinfo=timezone.utc)),
+    ("1735689600.000000999999999999", datetime(2025, 1, 1, tzinfo=timezone.utc)),
+])
+def test_timestamp_utc_day_boundary_without_rounding(value, expected):
+    from decimal import localcontext
+    row = {"trdMatchID": "boundary", "timestamp": value,
+           "price": "1", "size": "1", "side": "Sell"}
+    with localcontext() as context:
+        context.prec = 8
+        assert parse_trade(row)[1] == expected

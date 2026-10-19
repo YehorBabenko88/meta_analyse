@@ -59,6 +59,8 @@ def _load_receipt(path: Path, url: str, day: date | None = None, max_bytes: int 
                 and type(receipt.first_ms) is int and 0 <= receipt.first_ms < 253402300800000
                 and type(receipt.last_ms) is int and receipt.last_ms >= receipt.first_ms
                 and receipt.last_ms < 253402300800000
+                and (day is None or (utc_day_boundary(day).start_ms <= receipt.first_ms
+                                     and receipt.last_ms < utc_day_boundary(day).end_ms))
                 and path.stat().st_size == receipt.bytes
                 and _digest(path) == receipt.sha256):
             return receipt

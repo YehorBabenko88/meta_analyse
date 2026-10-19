@@ -249,6 +249,8 @@ class DesktopService:
         try:
             result = await asyncio.to_thread(
                 read_flow_history, self.store, symbol=symbol, start=start, end=end, limit=limit)
+            if self.closing or generation != self._history_generation:
+                return
             if not isinstance(result, FlowHistorySnapshot):
                 raise TypeError('Flow History reader returned invalid snapshot')
             if (result.symbol != symbol or result.start != _utc(start)

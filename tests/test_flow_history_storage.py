@@ -372,3 +372,21 @@ def test_orderflow_bridge_records_are_immutable_mappings():
     with pytest.raises(TypeError):
         records[0]["price"] = Decimal("0")
     assert snapshot.trades[0].price == Decimal("1.234567890123456789")
+
+
+def test_orderflow_bridge_rejects_mutable_trade_collection():
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1), [])
+    with pytest.raises(TypeError, match="immutable tuple"):
+        to_orderflow_records(snapshot)
+
+
+@pytest.mark.parametrize("truncated", [0, 1, "false", None])
+def test_orderflow_bridge_requires_boolean_truncation_flag(truncated):
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
+                                   (), truncated=truncated)
+    with pytest.raises(TypeError, match="boolean truncation"):
+        to_orderflow_records(snapshot)

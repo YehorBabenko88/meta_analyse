@@ -14,6 +14,20 @@ def main():
     root = ET.parse(a.xml).getroot()
     cases = list(root.iter("testcase"))
     names = [f"{c.get('classname', '')}.{c.get('name', '')}" for c in cases]
+    identities = [(c.get("classname", ""), c.get("name", "")) for c in cases]
+    duplicates = len(identities) - len(set(identities))
+    declared = root.get("tests")
+    if declared is None:
+        suites = list(root.iter("testsuite"))
+        if len(suites) == 1:
+            declared = suites[0].get("tests")
+    if declared is not None:
+        try:
+            count_mismatch = int(declared) != len(cases)
+        except ValueError:
+            count_mismatch = True
+    else:
+        count_mismatch = True
     failures = [c for c in cases if any(c.find(t) is not None for t in ("failure", "error"))]
     skipped = [c for c in cases if c.find("skipped") is not None]
     missing = [pattern for pattern in a.require if not any(pattern in name for name in names)]
@@ -26,7 +40,11 @@ def main():
     unexpected = [c for c in skipped if not any(token == c.get("name", "").split("[", 1)[0] for token in a.allow_skip)]
     for name in exact_missing:
         print(f"MISSING EXACT TEST: {name}", file=sys.stderr)
-    if len(cases) < a.minimum or unexpected or failures or missing or exact_missing:
+    if duplicates:
+        print(f"DUPLICATE TESTCASES: {duplicates}", file=sys.stderr)
+    if count_mismatch:
+        print(f"INVALID TEST COUNT: declared={declared} actual={len(cases)}", file=sys.stderr)
+    if len(cases) < a.minimum or unexpected or failures or missing or exact_missing or duplicates or count_mismatch:
         sys.exit(1)
 
 if __name__ == "__main__":

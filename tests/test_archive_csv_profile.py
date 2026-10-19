@@ -63,3 +63,11 @@ def test_audit_rejects_invalid_resource_budget_before_opening_file(tmp_path, fie
     path = tmp_path / "missing.csv.gz"
     with pytest.raises(ValueError, match="audit budgets must be positive integers"):
         audit_trade_gzip(path, **{field: bad_budget})
+
+
+def test_archive_rejects_unterminated_quoted_csv_field(tmp_path):
+    path = tmp_path / "malformed.csv.gz"
+    path.write_bytes(gzip.compress((HEADER + 'id1,1735689600,100,1,"Buy\n').encode("utf-8")))
+    audit = audit_trade_gzip(path)
+    assert audit.valid is False
+    assert audit.complete is False

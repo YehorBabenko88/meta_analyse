@@ -256,6 +256,7 @@ class Window(QWidget):
             QMessageBox.warning(self, "Flow History", "Specify symbol and timezone-aware ISO start/end.")
             return
         self.history_status.setText("Loading — UNVERIFIED")
+        self.history_load_button.setEnabled(False)
         self._previous_history = None
         self._history_min_request_id = self._snapshot.flow_history_request_id + 1
         self.history_table.setRowCount(0)
@@ -315,14 +316,19 @@ class Window(QWidget):
                         selection.select(table.model().index(i, 0), table.model().index(i, table.columnCount()-1))
                 table.selectionModel().select(selection, QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows)
         history = self._snapshot.flow_history
-        if history is None and self._snapshot.status.startswith("Flow History failed"):
+        if (history is None and self._snapshot.flow_history_request_id >= getattr(self, "_history_min_request_id", 0)
+                and self._snapshot.status.startswith("Flow History failed")):
+            self.history_load_button.setEnabled(True)
             self.history_status.setText(self._snapshot.status + " — UNVERIFIED")
-        elif history is None and self._snapshot.status.startswith("Flow History unavailable"):
+        elif (history is None and self._snapshot.flow_history_request_id >= getattr(self, "_history_min_request_id", 0)
+                and self._snapshot.status.startswith("Flow History unavailable")):
+            self.history_load_button.setEnabled(True)
             self.history_status.setText(self._snapshot.status + " — UNVERIFIED")
         if (history is not None
                 and self._snapshot.flow_history_request_id >= getattr(self, "_history_min_request_id", 0)
                 and history is not getattr(self, "_previous_history", None)):
             self._previous_history = history
+            self.history_load_button.setEnabled(True)
             self.history_status.setText(
                 f"{history.symbol}: {len(history.trades)} trades — UNVERIFIED"
                 + (" — TRUNCATED (narrow time range)" if history.truncated else ""))

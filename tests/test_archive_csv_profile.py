@@ -55,3 +55,11 @@ def test_timestamp_milliseconds_never_round_across_boundary(tmp_path, raw_timest
     assert audit.valid, audit.reason
     assert audit.first_ms == expected_ms
     assert audit.last_ms == expected_ms
+
+
+@pytest.mark.parametrize("bad_budget", [0, -1, True, False, 1.5, "10"])
+@pytest.mark.parametrize("field", ["max_rows", "max_uncompressed_bytes"])
+def test_audit_rejects_invalid_resource_budget_before_opening_file(tmp_path, field, bad_budget):
+    path = tmp_path / "missing.csv.gz"
+    with pytest.raises(ValueError, match="audit budgets must be positive integers"):
+        audit_trade_gzip(path, **{field: bad_budget})

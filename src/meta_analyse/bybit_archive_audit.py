@@ -35,7 +35,7 @@ def audit_trade_gzip(path: str | Path, *, max_rows: int = 50_000_000,
         with gzip.open(path, "rb") as compressed:
             stream = io.TextIOWrapper(_LimitedReader(compressed, max_uncompressed_bytes),
                                       encoding="utf-8-sig", newline="")
-            reader = csv.DictReader(stream)
+            reader = csv.DictReader(stream, strict=True)
             header = reader.fieldnames or []
             fields = set(header)
             if not {"trdMatchID", "timestamp", "price", "size", "side"}.issubset(fields):

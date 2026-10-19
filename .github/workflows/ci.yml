@@ -92,3 +92,27 @@ jobs:
             tests.xml
             tests.log
             ui-performance.json
+
+  archive-contract:
+    name: Archive HTTP fault contract (PR 6)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: parallel/archive-reliability
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install archive contract dependencies
+        run: python -m pip install -c requirements.lock -e ".[test,archive]"
+      - name: Run mandatory HTTP fault contracts
+        run: python -m pytest -q tests/test_archive_http_server.py tests/test_archive_resumable_faults.py tests/test_archive_resume_strict_headers.py --junitxml=archive-contract.xml
+      - uses: actions/checkout@v4
+        with:
+          path: integration-gate
+          ref: ${{ github.sha }}
+      - name: Verify contract coverage and no skips
+        run: python integration-gate/scripts/check_integration_junit.py archive-contract.xml --minimum 3 --require test_archive_http_server --require test_archive_resumable_faults --require test_archive_resume_strict_headers

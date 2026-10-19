@@ -448,3 +448,25 @@ def test_stale_malformed_reader_result_does_not_replace_newer_history(monkeypatc
         assert snapshot.flow_history_request_id == 2
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("malformed", ["mutable_trades", "truncated_flag"])
+def test_worker_rejects_nonimmutable_reader_snapshot(monkeypatch, malformed):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=1)
+        async def fake_to_thread(func, store, *, symbol, start, end, limit):
+            return FlowHistorySnapshot(symbol, start, end,
+                [] if malformed == "mutable_trades" else (),
+                truncated=1 if malformed == "truncated_flag" else False)
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        await service.load_flow_history(symbol="BTCUSDT", start=start, end=end)
+        assert service.snapshot().flow_history is None
+        assert service.snapshot().flow_history_request_id == 1
+
+    asyncio.run(scenario())

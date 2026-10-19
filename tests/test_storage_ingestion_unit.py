@@ -109,3 +109,13 @@ def test_import_preflight_rejects_missing_field_or_zero_size(tmp_path, content):
                "sha256": file_sha256(path), "bytes": path.stat().st_size, "rows": 1}
     with pytest.raises(ValueError):
         import_verified_archive(None, path, receipt, symbol="BTCUSDT")
+
+
+def test_import_rejects_malformed_csv_quoting_before_db(tmp_path):
+    path = tmp_path / "malformed.csv"
+    path.write_text('timestamp,trdMatchID,price,size,side\n"1735689600,id,1,1,Buy\n')
+    receipt = {"valid": True, "complete": False,
+               "url": "https://example.invalid/malformed",
+               "sha256": file_sha256(path), "bytes": path.stat().st_size, "rows": 1}
+    with pytest.raises((ValueError, __import__("csv").Error)):
+        import_verified_archive(None, path, receipt, symbol="BTCUSDT")

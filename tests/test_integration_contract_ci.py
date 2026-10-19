@@ -55,3 +55,11 @@ def test_integration_contract_ci_allows_parametrized_case_by_exact_base_name(tmp
     result = _check(tmp_path, [("windows_only[False]", "skipped")],
                     "--allow-skip", "windows_only")
     assert result.returncode == 0
+
+def test_integration_contract_ci_requires_exact_name(tmp_path):
+    assert _check(tmp_path, [("test_required_suffix", "passed")],
+                  "--require-exact", "test_required").returncode != 0
+
+def test_integration_contract_ci_accepts_exact_required_name(tmp_path):
+    assert _check(tmp_path, [("test_required", "passed")],
+                  "--require-exact", "test_required").returncode == 0

@@ -135,7 +135,7 @@ def test_orderflow_bridge_preserves_decimals_and_exact_milliseconds():
 
 @pytest.mark.parametrize("side,price,quantity", [
     ("Unknown", Decimal("1"), Decimal("1")),
-    ("buy", Decimal("1"), Decimal("1")),
+    ("hold", Decimal("1"), Decimal("1")),
     ("Buy", Decimal("NaN"), Decimal("1")),
     ("Sell", Decimal("0"), Decimal("1")),
     ("Buy", Decimal("1"), Decimal("-1")),
@@ -305,3 +305,11 @@ def test_orderflow_bridge_epoch_millisecond_boundaries(offset_us, expected_ms):
         epoch + timedelta(seconds=1),
         (HistoricalTrade("id", timestamp, Decimal("1"), Decimal("2"), "Sell"),))
     assert to_orderflow_records(snapshot)[0]["timestamp_ms"] == expected_ms
+
+
+def test_orderflow_bridge_accepts_lowercase_aggressor_side():
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
+        (HistoricalTrade("id", start, Decimal("1"), Decimal("2"), "buy"),))
+    assert to_orderflow_records(snapshot)[0]["side"] == "buy"

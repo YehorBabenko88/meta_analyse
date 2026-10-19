@@ -252,3 +252,37 @@ def test_cancelled_current_history_request_reports_status(monkeypatch):
         assert snapshot.flow_history_request_id == 1
 
     asyncio.run(scenario())
+
+
+def test_cancelled_stale_history_request_preserves_newer_success(monkeypatch):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=1)
+        first_started = asyncio.Event()
+
+        async def fake_to_thread(func, store, *, symbol, start, end, limit):
+            if symbol == "BTCUSDT":
+                first_started.set()
+                await asyncio.Event().wait()
+            return FlowHistorySnapshot(symbol, start, end, ())
+
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        old = asyncio.create_task(service.load_flow_history(
+            symbol="BTCUSDT", start=start, end=end))
+        await first_started.wait()
+        await service.load_flow_history(symbol="ETHUSDT", start=start, end=end)
+        assert service.snapshot().status == "Flow History loaded — UNVERIFIED"
+        old.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await old
+        snapshot = service.snapshot()
+        assert snapshot.flow_history.symbol == "ETHUSDT"
+        assert snapshot.status == "Flow History loaded — UNVERIFIED"
+        assert snapshot.flow_history_request_id == 2
+
+    asyncio.run(scenario())

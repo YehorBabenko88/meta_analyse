@@ -44,7 +44,7 @@ Main, агентские ветки и LS5 не изменялись; merge и �
 | R1 — PostgreSQL → Order Flow → Desktop | **FIXED** | Реальный двухстрочный gzip передан через локальный HTTP, acquire/audit/receipt, настоящий PostgreSQL, worker-owned load и нажатие Qt Load history. История и Order Flow появились, Decimal сохранён, качество UNVERIFIED. Ошибка terminal-status ниже — отдельная регрессия. |
 | R2 — отмена/interprocess lock и ресурсные ограничения архивов | **FIXED** | Ожидание lock асинхронное; acquired-флаг исключает unlock чужого lock. Отмена не оставляет lock. Thread workers ожидаются до освобождения lock. Архивные бюджеты и HTTP fault/resume проверки сохранены. Дополнительное усиление cache-day consistency описано ниже. |
 | R3 — согласованность CSV-валидации и точность временных границ | **PARTIAL** | Проверки обязательных/дублирующих колонок, конечных чисел, стороны и порядка есть. Но size=0 аудитор отвергает, importer принимает; Decimal-масштабирование timestamp округляет до усечения. Четыре собственных отрицательных теста падают. |
-| R4 — большая история без потери сделок, включая путь пользователя | **PARTIAL** | 100k-trade aggregation сохраняет объёмы; сервис отвергает переполнение вместо молчаливого усечения. Но реальный UI всегда использует limit=5000 и не предлагает лимит/пагинацию. При 100k строк Order Flow недоступен; прямой API с limit=100000 работает. |
+| R4 — большая история без потери сделок, включая путь пользователя | **PARTIAL** | 100k-trade aggregation сохраняет объёмы; сервис отвергает переполнение вместо молчаливого усечения. Но реальный UI всегда использует limit=5000 и не предлагает лимит/пагинацию. В отдельном FakeStore-воспроизведении 100k строк UI/default-путь отказывает, а прямой API с limit=100000 агрегирует все строки. |
 | R5 — immutable snapshots, Qt и stale async results | **FIXED** | Frozen history/trade/row, tuple и readonly mappings; generation guard; source scope/status проверяются; оба UI-tab сохранены. 10k-row/immutable UI и целевые тесты проходят, обычный реальный сквозной путь проходит. |
 | R6 — failed checkpoint, rollback/resume и исходная ошибка БД | **FIXED** | Все 9 PostgreSQL-тестов реально выполнены. Собственный тест вызывает настоящий CheckViolation, затем ошибки failed-checkpoint и advisory-unlock: наружу выходит исходный CheckViolation. После failed batch checkpoint=1/status=failed; после устранения конфликта повтор импортирует с позиции 1, заканчивает checkpoint=2/status=imported без дублей. |
 | R7 — fail-closed обязательные интеграционные CI-gates | **OPEN** | Из PR9 отсутствуют verifier и его тест; workflow PR10 совпадает с PR6, не PR9. Основной зелёный CI пропускает 9 PostgreSQL cases. Отдельный storage workflow их выполняет, но не заменяет потерянную проверку полноты/JUnit общего прогона. |
@@ -130,8 +130,8 @@ PR9 gates не дают CI обнаружить это как ошибку ин�
 
 - Аудитор требует size>0, importer/SQL допускают size=0. Согласовать или явно
   разделить контракты; сейчас тест согласованности падает.
-- UI не даёт управлять history limit=5000. Прямой API способен читать до 100k;
-  чистый 100k aggregation проходит, но это не доказательство такого Desktop пути.
+- UI не даёт управлять history limit=5000. Прямой API допускает до 100k (проверено с FakeStore);
+  чистый 100k aggregation проходит, но это не доказательство реального PostgreSQL/Desktop пути на 100k.
 - `_load_receipt` проверяет day-tag, SHA/размер и числовые границы, но не проверяет
   соответствие first/last указанному дню. Искажённый локальный JSON с day=2025-01-01,
   first=last=1735603200000 (2024-12-31) принимается. Нормальная запись receipt

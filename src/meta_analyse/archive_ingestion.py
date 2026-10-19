@@ -55,6 +55,7 @@ def _load_receipt(path: Path, url: str, day: date | None = None, max_bytes: int 
                 and type(receipt.rows) is int and receipt.rows > 0
                 and type(receipt.bytes) is int and receipt.bytes > 0 and receipt.bytes <= max_bytes
                 and isinstance(receipt.sha256, str) and len(receipt.sha256) == 64
+                and all(character in "0123456789abcdef" for character in receipt.sha256)
                 and type(receipt.first_ms) is int and receipt.first_ms >= 0
                 and type(receipt.last_ms) is int and receipt.last_ms >= receipt.first_ms
                 and receipt.last_ms < 253402300800000
@@ -144,6 +145,8 @@ async def acquire_many(archives: list[tuple[str, str | Path]], *,
                        resumable: bool = False):
     if type(max_bytes) is not int or max_bytes <= 0:
         raise ValueError("max_bytes must be a positive integer")
+    if type(concurrency) is not int or concurrency <= 0:
+        raise ValueError("concurrency must be a positive integer")
     # Two workers must never write the same .partial or audit receipt path.
     # Resolve paths before opening network sessions; reject collisions early.
     destinations = [str(Path(path).resolve()) for _, path in archives]

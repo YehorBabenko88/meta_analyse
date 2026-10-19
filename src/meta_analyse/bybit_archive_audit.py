@@ -29,6 +29,7 @@ def audit_trade_gzip(path: str | Path, *, max_rows: int = 50_000_000,
         raise ValueError("audit budgets must be positive")
     rows = 0
     first = last = None
+    previous_timestamp = None
     try:
         with gzip.open(path, "rb") as compressed:
             stream = io.TextIOWrapper(_LimitedReader(compressed, max_uncompressed_bytes),
@@ -60,13 +61,14 @@ def audit_trade_gzip(path: str | Path, *, max_rows: int = 50_000_000,
                         raise ValueError("invalid trade values")
                     # Bybit archive timestamps are in seconds, often fractional.
                     timestamp_ms = int(raw_ts * 1000)
-                    if last is not None and timestamp_ms < last:
+                    if previous_timestamp is not None and raw_ts < previous_timestamp:
                         raise ValueError("out-of-order trades")
                 except (ValueError, TypeError, InvalidOperation, KeyError) as exc:
                     return ArchiveAudit(rows, first, last, False, False, f"invalid row: {exc}")
                 if first is None:
                     first = timestamp_ms
                 last = timestamp_ms
+                previous_timestamp = raw_ts
     except (OSError, EOFError, UnicodeError, csv.Error, ValueError) as exc:
         return ArchiveAudit(rows, first, last, False, False, f"corrupt archive: {exc}")
     if not rows:

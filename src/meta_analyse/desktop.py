@@ -324,7 +324,8 @@ class Window(QWidget):
             self.history_load_button.setEnabled(True)
             self.history_status.setText(self._snapshot.status + " — UNVERIFIED")
         elif (history is None and self._snapshot.flow_history_request_id >= getattr(self, "_history_min_request_id", 0)
-                and self._snapshot.status.startswith("Flow History unavailable")):
+                and (self._snapshot.status.startswith("Flow History unavailable")
+                     or self._snapshot.status.startswith("Flow History cancelled"))):
             self.history_load_button.setEnabled(True)
             self.history_status.setText(self._snapshot.status + " — UNVERIFIED")
         if (history is not None

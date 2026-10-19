@@ -315,6 +315,163 @@ def test_orderflow_bridge_accepts_lowercase_aggressor_side():
     assert to_orderflow_records(snapshot)[0]["side"] == "buy"
 
 
+@pytest.mark.parametrize("price,quantity", [
+    (1.5, Decimal("2")),
+    (Decimal("1"), 2.5),
+    ("1.0", Decimal("2")),
+    (Decimal("1"), "2.0"),
+])
+def test_orderflow_bridge_rejects_non_decimal_trade_fields(price, quantity):
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
+        (HistoricalTrade("id", start, price, quantity, "Buy"),))
+    with pytest.raises(TypeError, match="Decimal"):
+        to_orderflow_records(snapshot)
+
+
+@pytest.mark.parametrize("offset_seconds", [-1, 60])
+def test_orderflow_bridge_rejects_trades_outside_half_open_range(offset_seconds):
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    end = start + timedelta(seconds=60)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, end,
+        (HistoricalTrade("id", start + timedelta(seconds=offset_seconds),
+                         Decimal("1"), Decimal("2"), "Buy"),))
+    with pytest.raises(ValueError, match="outside requested interval"):
+        to_orderflow_records(snapshot)
+
+
+def test_orderflow_bridge_requires_explicit_snapshot_symbol():
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("", start, start + timedelta(seconds=1), ())
+    with pytest.raises(ValueError, match="symbol"):
+        to_orderflow_records(snapshot)
+
+
+@pytest.mark.parametrize("status", ["VERIFIED", "COMPLETE", ""])
+def test_orderflow_bridge_rejects_unsubstantiated_verification_status(status):
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
+        (), status=status)
+    with pytest.raises(ValueError, match="verification status"):
+        to_orderflow_records(snapshot)
+
+
+def test_orderflow_bridge_records_are_immutable_mappings():
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
+        (HistoricalTrade("id", start, Decimal("1.234567890123456789"),
+                         Decimal("0.000000000000000001"), "Sell"),))
+    records = to_orderflow_records(snapshot)
+    assert records[0]["price"] == Decimal("1.234567890123456789")
+    assert records[0]["volume"] == Decimal("0.000000000000000001")
+    with pytest.raises(TypeError):
+        records[0]["price"] = Decimal("0")
+    assert snapshot.trades[0].price == Decimal("1.234567890123456789")
+
+
+def test_orderflow_bridge_rejects_mutable_trade_collection():
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1), [])
+    with pytest.raises(TypeError, match="immutable tuple"):
+        to_orderflow_records(snapshot)
+
+
+@pytest.mark.parametrize("truncated", [0, 1, "false", None])
+def test_orderflow_bridge_requires_boolean_truncation_flag(truncated):
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
+                                   (), truncated=truncated)
+    with pytest.raises(TypeError, match="boolean truncation"):
+        to_orderflow_records(snapshot)
+
+
+@pytest.mark.parametrize("wrong_scope", ["symbol", "start", "end", "status"])
+def test_worker_rejects_reader_snapshot_with_wrong_scope(monkeypatch, wrong_scope):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=1)
+        async def fake_to_thread(func, store, *, symbol, start, end, limit):
+            return FlowHistorySnapshot(
+                "ETHUSDT" if wrong_scope == "symbol" else symbol,
+                start + timedelta(seconds=1) if wrong_scope == "start" else start,
+                end + timedelta(seconds=1) if wrong_scope == "end" else end,
+                (), status="VERIFIED" if wrong_scope == "status" else "UNVERIFIED")
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        await service.load_flow_history(symbol="BTCUSDT", start=start, end=end)
+        assert service.snapshot().flow_history is None
+        assert service.snapshot().flow_history_request_id == 1
+
+    asyncio.run(scenario())
+
+
+def test_stale_malformed_reader_result_does_not_replace_newer_history(monkeypatch):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=1)
+        first_started = asyncio.Event()
+        release_first = asyncio.Event()
+
+        async def fake_to_thread(func, store, *, symbol, start, end, limit):
+            if symbol == "BTCUSDT":
+                first_started.set()
+                await release_first.wait()
+                return object()
+            return FlowHistorySnapshot(symbol, start, end, ())
+
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        old = asyncio.create_task(service.load_flow_history(
+            symbol="BTCUSDT", start=start, end=end))
+        await first_started.wait()
+        await service.load_flow_history(symbol="ETHUSDT", start=start, end=end)
+        release_first.set()
+        await old
+        snapshot = service.snapshot()
+        assert snapshot.flow_history.symbol == "ETHUSDT"
+        assert snapshot.status == "Flow History loaded — UNVERIFIED"
+        assert snapshot.flow_history_request_id == 2
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("malformed", ["mutable_trades", "truncated_flag"])
+def test_worker_rejects_nonimmutable_reader_snapshot(monkeypatch, malformed):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=1)
+        async def fake_to_thread(func, store, *, symbol, start, end, limit):
+            return FlowHistorySnapshot(symbol, start, end,
+                [] if malformed == "mutable_trades" else (),
+                truncated=1 if malformed == "truncated_flag" else False)
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        await service.load_flow_history(symbol="BTCUSDT", start=start, end=end)
+        assert service.snapshot().flow_history is None
+        assert service.snapshot().flow_history_request_id == 1
+
+    asyncio.run(scenario())
+
+
 def test_postgres_history_populates_orderflow_without_completeness_claim(monkeypatch):
     import asyncio
     import meta_analyse.desktop_service as module

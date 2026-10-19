@@ -25,8 +25,9 @@ class ArchiveAudit:
 
 def audit_trade_gzip(path: str | Path, *, max_rows: int = 50_000_000,
                      max_uncompressed_bytes: int = 8_000_000_000) -> ArchiveAudit:
-    if max_rows < 1 or max_uncompressed_bytes < 1:
-        raise ValueError("audit budgets must be positive")
+    if (type(max_rows) is not int or max_rows <= 0
+            or type(max_uncompressed_bytes) is not int or max_uncompressed_bytes <= 0):
+        raise ValueError("audit budgets must be positive integers")
     rows = 0
     first = last = None
     previous_timestamp = None

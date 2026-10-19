@@ -414,3 +414,37 @@ def test_worker_rejects_reader_snapshot_with_wrong_scope(monkeypatch, wrong_scop
         assert service.snapshot().flow_history_request_id == 1
 
     asyncio.run(scenario())
+
+
+def test_stale_malformed_reader_result_does_not_replace_newer_history(monkeypatch):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=1)
+        first_started = asyncio.Event()
+        release_first = asyncio.Event()
+
+        async def fake_to_thread(func, store, *, symbol, start, end, limit):
+            if symbol == "BTCUSDT":
+                first_started.set()
+                await release_first.wait()
+                return object()
+            return FlowHistorySnapshot(symbol, start, end, ())
+
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        old = asyncio.create_task(service.load_flow_history(
+            symbol="BTCUSDT", start=start, end=end))
+        await first_started.wait()
+        await service.load_flow_history(symbol="ETHUSDT", start=start, end=end)
+        release_first.set()
+        await old
+        snapshot = service.snapshot()
+        assert snapshot.flow_history.symbol == "ETHUSDT"
+        assert snapshot.status == "Flow History loaded — UNVERIFIED"
+        assert snapshot.flow_history_request_id == 2
+
+    asyncio.run(scenario())

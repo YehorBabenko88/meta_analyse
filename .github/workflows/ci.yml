@@ -62,6 +62,7 @@ jobs:
       QT_QPA_PLATFORM: offscreen
       PYTHONASYNCIODEBUG: '1'
       META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+      META_ANALYSE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

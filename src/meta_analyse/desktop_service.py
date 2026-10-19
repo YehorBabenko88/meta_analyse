@@ -253,6 +253,8 @@ class DesktopService:
                 self.flow_history = result
                 self.status = 'Flow History loaded — UNVERIFIED'
         except asyncio.CancelledError:
+            if not self.closing and generation == self._history_generation:
+                self.status = 'Flow History cancelled — UNVERIFIED'
             raise
         except Exception as exc:
             if generation == self._history_generation:

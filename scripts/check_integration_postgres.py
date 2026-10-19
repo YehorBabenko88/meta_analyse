@@ -20,10 +20,10 @@ REQUIRED = (
 )
 
 def main():
-    if len(sys.argv) != 2:
-        raise SystemExit("Usage: check_integration_postgres.py FULL_JUNIT_XML")
+    if len(sys.argv) < 2:
+        raise SystemExit("Usage: check_integration_postgres.py FULL_JUNIT_XML [--allow-skip TEST_NAME ...]")
     checker = Path(__file__).with_name("check_integration_junit.py")
-    command = [sys.executable, str(checker), sys.argv[1], "--minimum", "9"]
+    command = [sys.executable, str(checker), sys.argv[1], "--minimum", "9", *sys.argv[2:]]
     for name in REQUIRED:
         command.extend(["--require-exact", name])
     raise SystemExit(subprocess.call(command))

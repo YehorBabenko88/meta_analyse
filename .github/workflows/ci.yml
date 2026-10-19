@@ -18,7 +18,7 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: requirements.lock
-      - run: python -m pip install -c requirements.lock -e ".[test]"
+      - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
       - name: Mandatory local HTTP archive fault regression (Windows)
         run: |
@@ -72,7 +72,7 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.lock
       - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
-      - run: python -m pip install -c requirements.lock -e ".[test]"
+      - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
       - run: python -m compileall -q src
       - name: Repeat lifecycle resource regressions in fresh processes

@@ -79,8 +79,8 @@ def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[dict, ...]:
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
     records = []
     for trade in snapshot.trades:
-        if trade.side not in ('Buy', 'Sell'):
-            raise ValueError('unsupported historical aggressor side')
+        if not isinstance(trade.side, str) or trade.side.lower() not in ("buy", "sell"):
+            raise ValueError("unsupported historical aggressor side")
         if not trade.price.is_finite() or trade.price <= 0:
             raise ValueError('invalid historical trade price')
         if not trade.quantity.is_finite() or trade.quantity < 0:

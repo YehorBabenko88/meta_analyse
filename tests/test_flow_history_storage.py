@@ -224,3 +224,31 @@ def test_failed_latest_history_request_does_not_restore_stale_result(monkeypatch
         assert service.snapshot().flow_history_request_id == 2
 
     asyncio.run(scenario())
+
+
+def test_cancelled_current_history_request_reports_status(monkeypatch):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        started = asyncio.Event()
+        async def fake_to_thread(func, store, *, symbol, start, end, limit):
+            started.set()
+            await asyncio.Event().wait()
+
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        task = asyncio.create_task(service.load_flow_history(
+            symbol="BTCUSDT", start=start, end=start + timedelta(minutes=1)))
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        snapshot = service.snapshot()
+        assert snapshot.flow_history is None
+        assert snapshot.status == "Flow History cancelled — UNVERIFIED"
+        assert snapshot.flow_history_request_id == 1
+
+    asyncio.run(scenario())

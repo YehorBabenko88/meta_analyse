@@ -20,10 +20,10 @@ jobs:
           cache-dependency-path: requirements.lock
       - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
-      - name: Mandatory archive fault and contract suite
-        run: python -m pytest -q tests/test_archive_http_server.py tests/test_archive_resumable_faults.py tests/test_archive_resume_strict_headers.py --junitxml=integration-gate.xml
-      - name: Verify mandatory archive tests ran without skips
-        run: python scripts/check_integration_junit.py integration-gate.xml --minimum 3 --require test_archive_http_server --require test_archive_resumable_faults --require test_archive_resume_strict_headers
+      - name: Mandatory baseline integration suite
+        run: python -m pytest -q tests --junitxml=integration-gate.xml
+      - name: Verify baseline suite ran without skips
+        run: python scripts/check_integration_junit.py integration-gate.xml --minimum 100
       - name: Windows Qt and disposable PostgreSQL integration
         shell: pwsh
         run: ./scripts/test-windows.ps1
@@ -72,10 +72,10 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
       - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
-      - name: Mandatory archive fault and contract suite
-        run: python -m pytest -q tests/test_archive_http_server.py tests/test_archive_resumable_faults.py tests/test_archive_resume_strict_headers.py --junitxml=integration-gate.xml
-      - name: Verify mandatory archive tests ran without skips
-        run: python scripts/check_integration_junit.py integration-gate.xml --minimum 3 --require test_archive_http_server --require test_archive_resumable_faults --require test_archive_resume_strict_headers
+      - name: Mandatory baseline integration suite
+        run: python -m pytest -q tests --junitxml=integration-gate.xml
+      - name: Verify baseline suite ran without skips
+        run: python scripts/check_integration_junit.py integration-gate.xml --minimum 100
       - run: python -m compileall -q src
       - name: Repeat lifecycle resource regressions in fresh processes
         run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir repeat-lifecycle

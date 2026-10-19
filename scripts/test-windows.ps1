@@ -30,6 +30,7 @@ $listener.Stop()
 & (Join-Path $PgBin 'initdb.exe') -D $data -U meta_audit --auth=trust --no-locale --encoding=UTF8
 if ($LASTEXITCODE -ne 0) { throw 'initdb failed' }
 $oldDsn = $env:META_ANALYSE_TEST_ADMIN_DSN
+$oldTestDsn = $env:META_ANALYSE_TEST_DSN
 $oldQt = $env:QT_QPA_PLATFORM
 $started = $false
 try {
@@ -37,6 +38,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL startup failed' }
     $started = $true
     $env:META_ANALYSE_TEST_ADMIN_DSN = "host=127.0.0.1 port=$port user=meta_audit dbname=postgres"
+    $env:META_ANALYSE_TEST_DSN = $env:META_ANALYSE_TEST_ADMIN_DSN
     $env:QT_QPA_PLATFORM = 'offscreen'
     & $Python -m compileall -q src
     if ($LASTEXITCODE -ne 0) { throw 'Compilation failed' }
@@ -44,8 +46,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Repeated lifecycle tests failed; see repeat-lifecycle logs' }
     & $Python -m pytest -q --junitxml (Join-Path $WorkRoot 'tests.xml') --basetemp (Join-Path $WorkRoot 'pytest-temp') 2>&1 | Tee-Object -FilePath (Join-Path $WorkRoot 'tests.log')
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed; see tests.log and tests.xml' }
+    & $Python scripts/check_integration_postgres.py (Join-Path $WorkRoot 'tests.xml')
+    if ($LASTEXITCODE -ne 0) { throw 'Required PostgreSQL integration cases missing, skipped or failed' }
 } finally {
     if ($started) { & (Join-Path $PgBin 'pg_ctl.exe') -D $data -m fast -w stop }
     $env:META_ANALYSE_TEST_ADMIN_DSN = $oldDsn
+    $env:META_ANALYSE_TEST_DSN = $oldTestDsn
     $env:QT_QPA_PLATFORM = $oldQt
 }

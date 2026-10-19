@@ -245,3 +245,12 @@ async def test_batch_rejects_invalid_budget_before_session_creation(bad_budget):
 
     with pytest.raises(ValueError, match="max_bytes must be a positive integer"):
         await acquire_many([], max_bytes=bad_budget)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_concurrency", [0, -1, True, False, 1.5, "4"])
+async def test_batch_rejects_invalid_concurrency_before_session_creation(bad_concurrency):
+    from meta_analyse.archive_ingestion import acquire_many
+
+    with pytest.raises(ValueError, match="concurrency must be a positive integer"):
+        await acquire_many([], concurrency=bad_concurrency)

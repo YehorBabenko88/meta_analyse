@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
+from types import MappingProxyType
+from typing import Mapping
 
 
 @dataclass(frozen=True)
@@ -68,7 +70,7 @@ def read_flow_history(store, *, symbol: str, start: datetime, end: datetime,
     return FlowHistorySnapshot(symbol, start, end, trades, truncated=truncated)
 
 
-def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[dict, ...]:
+def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[Mapping[str, object], ...]:
     """Bridge PostgreSQL history to the Order Flow adapter's record contract.
 
     Milliseconds are derived by integer timedelta arithmetic, never floating
@@ -102,10 +104,10 @@ def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[dict, ...]:
         delta = timestamp - epoch
         timestamp_ms = ((delta.days * 86400 + delta.seconds) * 1000
                         + delta.microseconds // 1000)
-        records.append({
+        records.append(MappingProxyType({
             "timestamp_ms": timestamp_ms,
             "price": trade.price,
             "volume": trade.quantity,
             "side": trade.side.lower(),
-        })
+        }))
     return tuple(records)

@@ -170,3 +170,24 @@ def test_import_rejects_incorrect_receipt_row_count(tmp_path):
                "sha256": file_sha256(path), "bytes": path.stat().st_size, "rows": 2}
     with pytest.raises(ValueError, match="archive rows or sha256 mismatch"):
         import_verified_archive(None, path, receipt, symbol="BTCUSDT")
+
+
+def test_import_rejects_underreported_receipt_rows(tmp_path):
+    path = tmp_path / "rows.csv"
+    path.write_text("timestamp,trdMatchID,price,size,side\n1,id1,1,1,Buy\n2,id2,1,1,Sell\n")
+    receipt = {"valid": True, "complete": False, "url": "https://example.invalid/rows",
+               "sha256": file_sha256(path), "bytes": path.stat().st_size, "rows": 1}
+    with pytest.raises(ValueError, match="archive exceeds audited row count"):
+        import_verified_archive(None, path, receipt, symbol="BTCUSDT")
+
+
+@pytest.mark.parametrize("change", [
+    {"side": "buy"}, {"trdMatchID": "   "}, {"price": "NaN"},
+    {"size": "0"}, {"timestamp": "253402300800"},
+])
+def test_trade_contract_rejects_invalid_values(change):
+    row = {"trdMatchID": "id", "timestamp": "1735689600.123456",
+           "price": "1", "size": "1", "side": "Buy"}
+    row.update(change)
+    with pytest.raises(ValueError):
+        parse_trade(row)

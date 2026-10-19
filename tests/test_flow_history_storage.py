@@ -328,3 +328,23 @@ def test_orderflow_bridge_rejects_non_decimal_trade_fields(price, quantity):
         (HistoricalTrade("id", start, price, quantity, "Buy"),))
     with pytest.raises(TypeError, match="Decimal"):
         to_orderflow_records(snapshot)
+
+
+@pytest.mark.parametrize("offset_seconds", [-1, 60])
+def test_orderflow_bridge_rejects_trades_outside_half_open_range(offset_seconds):
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    end = start + timedelta(seconds=60)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, end,
+        (HistoricalTrade("id", start + timedelta(seconds=offset_seconds),
+                         Decimal("1"), Decimal("2"), "Buy"),))
+    with pytest.raises(ValueError, match="outside requested interval"):
+        to_orderflow_records(snapshot)
+
+
+def test_orderflow_bridge_requires_explicit_snapshot_symbol():
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("", start, start + timedelta(seconds=1), ())
+    with pytest.raises(ValueError, match="symbol"):
+        to_orderflow_records(snapshot)

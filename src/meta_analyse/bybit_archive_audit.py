@@ -60,7 +60,7 @@ def audit_trade_gzip(path: str | Path, *, max_rows: int = 50_000_000,
                     if not (0 <= raw_ts < Decimal("253402300800")) or price <= 0 or size <= 0:
                         raise ValueError("invalid trade values")
                     # Bybit archive timestamps are in seconds, often fractional.
-                    timestamp_ms = int(raw_ts * 1000)
+                    timestamp_ms = int(raw_ts.scaleb(3))
                     if previous_timestamp is not None and raw_ts < previous_timestamp:
                         raise ValueError("out-of-order trades")
                 except (ValueError, TypeError, InvalidOperation, KeyError) as exc:

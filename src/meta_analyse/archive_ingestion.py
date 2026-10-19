@@ -57,6 +57,7 @@ def _load_receipt(path: Path, url: str, day: date | None = None) -> ArchiveRecei
                 and isinstance(receipt.sha256, str) and len(receipt.sha256) == 64
                 and type(receipt.first_ms) is int and receipt.first_ms >= 0
                 and type(receipt.last_ms) is int and receipt.last_ms >= receipt.first_ms
+                and receipt.last_ms < 253402300800000
                 and path.stat().st_size == receipt.bytes
                 and _digest(path) == receipt.sha256):
             return receipt

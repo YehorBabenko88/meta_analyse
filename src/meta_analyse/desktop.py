@@ -260,7 +260,10 @@ class Window(QWidget):
         self._previous_history = None
         self._history_min_request_id = self._snapshot.flow_history_request_id + 1
         self.history_table.setRowCount(0)
-        self.schedule(self.service.load_flow_history(symbol=symbol, start=start, end=end))
+        future = self.schedule(self.service.load_flow_history(symbol=symbol, start=start, end=end))
+        if future is None:
+            self.history_load_button.setEnabled(True)
+            self.history_status.setText("Flow History unavailable: worker stopped — UNVERIFIED")
 
     def toggle_paper(self, enabled):
         self.schedule(self.service.configure_paper(enabled=bool(enabled)))

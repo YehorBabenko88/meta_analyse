@@ -11,10 +11,14 @@ URL = "https://public.bybit.com/trading/BTCUSDT/BTCUSDT2025-01-01.csv.gz"
 
 
 def make_gzip(path):
-    with gzip.open(path, "wt", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=["trdMatchID", "timestamp", "price", "size", "side"])
-        writer.writeheader()
-        writer.writerow({"trdMatchID": "id1", "timestamp": "1735689600", "price": "100", "size": "2", "side": "Buy"})
+    import io
+
+    with path.open("wb") as raw:
+        with gzip.GzipFile(fileobj=raw, mode="wb", filename="", mtime=0) as compressed:
+            with io.TextIOWrapper(compressed, encoding="utf-8", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=["trdMatchID", "timestamp", "price", "size", "side"])
+                writer.writeheader()
+                writer.writerow({"trdMatchID": "id1", "timestamp": "1735689600", "price": "100", "size": "2", "side": "Buy"})
 
 
 @pytest.mark.asyncio

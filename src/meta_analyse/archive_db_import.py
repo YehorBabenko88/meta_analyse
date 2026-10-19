@@ -8,7 +8,7 @@ import json
 import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation, ROUND_DOWN
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from .storage_migrations import initialize_archive_schema
@@ -34,6 +34,8 @@ def iter_rows(path):
         for row in reader:
             if None in row:
                 raise ValueError("extra CSV fields")
+            if any(value is None for value in row.values()):
+                raise ValueError("missing CSV fields")
             yield row
 
 
@@ -49,12 +51,19 @@ def parse_trade(row):
         raise ValueError("invalid numeric trade field") from exc
     if not timestamp.is_finite() or not (0 <= timestamp < Decimal("253402300800")):
         raise ValueError("timestamp out of range")
-    if not price.is_finite() or price <= 0 or not quantity.is_finite() or quantity < 0:
+    if not price.is_finite() or price <= 0 or not quantity.is_finite() or quantity <= 0:
         raise ValueError("invalid price or quantity")
     side = row.get("side")
     if side not in ("Buy", "Sell"):
         raise ValueError("invalid trade side")
-    micros = int((timestamp * 1000000).to_integral_value(rounding=ROUND_DOWN))
+    # Compute microseconds from Decimal digits without context rounding.
+    # A context-limited Decimal multiplication can silently change the epoch.
+    digits = timestamp.as_tuple()
+    coefficient = 0
+    for digit in digits.digits:
+        coefficient = coefficient * 10 + digit
+    shift = digits.exponent + 6
+    micros = coefficient * (10 ** shift) if shift >= 0 else coefficient // (10 ** (-shift))
     try:
         time = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(microseconds=micros)
     except (ValueError, OverflowError) as exc:
@@ -67,9 +76,9 @@ def _validate_receipt(receipt):
         raise ValueError("receipt is invalid or makes unsupported completeness claim")
     if not isinstance(receipt.get("url"), str) or not receipt["url"].strip():
         raise ValueError("receipt URL is required")
-    if type(receipt.get("rows")) is not int or receipt["rows"] < 0:
+    if type(receipt.get("rows")) is not int or receipt["rows"] <= 0:
         raise ValueError("invalid receipt row count")
-    if type(receipt.get("bytes")) is not int or receipt["bytes"] < 0:
+    if type(receipt.get("bytes")) is not int or receipt["bytes"] <= 0:
         raise ValueError("invalid receipt byte count")
     sha = receipt.get("sha256")
     if not isinstance(sha, str) or len(sha) != 64 or any(c not in "0123456789abcdef" for c in sha):
@@ -108,9 +117,14 @@ def import_verified_archive(store, path, receipt, *, venue="bybit", symbol, batc
         if digest != receipt["sha256"]:
             raise ValueError("archive sha256 mismatch")
         count = 0
+        previous_timestamp = None
         for row in iter_rows(snapshot):
             if "symbol" in row and row["symbol"] != symbol:
                 raise ValueError("archive symbol mismatch")
+            timestamp = Decimal(row["timestamp"])
+            if previous_timestamp is not None and timestamp < previous_timestamp:
+                raise ValueError("decreasing raw trade timestamp")
+            previous_timestamp = timestamp
             parse_trade(row)
             count += 1
             if count > receipt["rows"]:

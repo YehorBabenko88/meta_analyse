@@ -189,3 +189,38 @@ def test_concurrent_flow_history_requests_ignore_stale_completion(monkeypatch):
         assert service.snapshot().flow_history_request_id == 2
 
     asyncio.run(scenario())
+
+
+def test_failed_latest_history_request_does_not_restore_stale_result(monkeypatch):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=1)
+        first_started = asyncio.Event()
+        release_first = asyncio.Event()
+
+        async def fake_to_thread(func, store, *, symbol, start, end, limit):
+            if symbol == "BTCUSDT":
+                first_started.set()
+                await release_first.wait()
+                return FlowHistorySnapshot(symbol, start, end, ())
+            raise ConnectionError("secret-dsn-must-not-leak")
+
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        old = asyncio.create_task(service.load_flow_history(
+            symbol="BTCUSDT", start=start, end=end))
+        await first_started.wait()
+        await service.load_flow_history(symbol="ETHUSDT", start=start, end=end)
+        assert service.snapshot().flow_history is None
+        assert service.snapshot().status.startswith("Flow History failed")
+        assert "secret-dsn-must-not-leak" not in service.snapshot().status
+        release_first.set()
+        await old
+        assert service.snapshot().flow_history is None
+        assert service.snapshot().flow_history_request_id == 2
+
+    asyncio.run(scenario())

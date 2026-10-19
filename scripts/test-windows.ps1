@@ -1,0 +1,56 @@
+[CmdletBinding()]
+param(
+    [string]$Python = 'python',
+    [string]$PgBin = '',
+    [string]$WorkRoot = (Join-Path $env:RUNNER_TEMP 'meta-analyse-ci')
+)
+$ErrorActionPreference = 'Stop'
+New-Item -ItemType Directory -Force -Path $WorkRoot | Out-Null
+$WorkRoot = (Resolve-Path $WorkRoot).Path
+if (-not $PgBin) {
+    $installed = Get-ChildItem 'C:\Program Files\PostgreSQL' -Directory -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | Where-Object { Test-Path (Join-Path $_.FullName 'bin\initdb.exe') } | Select-Object -First 1
+    if ($installed) { $PgBin = Join-Path $installed.FullName 'bin' }
+}
+if (-not $PgBin) {
+    $archive = Join-Path $WorkRoot 'postgresql.zip'
+    Invoke-WebRequest 'https://get.enterprisedb.com/postgresql/postgresql-17.6-1-windows-x64-binaries.zip' -OutFile $archive
+    $expected = 'D378882ABD001A186735ACD6F6BA716BCA6CCD192E800412D4FD15ED25376B3E'
+    if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne $expected) { throw 'PostgreSQL archive checksum mismatch' }
+    Expand-Archive -LiteralPath $archive -DestinationPath $WorkRoot
+    $PgBin = Join-Path $WorkRoot 'pgsql\bin'
+}
+$data = Join-Path $WorkRoot 'pgdata'
+$log = Join-Path $WorkRoot 'postgresql.log'
+# Reserve an available loopback port; no production database is used.
+$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+$listener.Start()
+$port = $listener.LocalEndpoint.Port
+$listener.Stop()
+& (Join-Path $PgBin 'initdb.exe') -D $data -U meta_audit --auth=trust --no-locale --encoding=UTF8
+if ($LASTEXITCODE -ne 0) { throw 'initdb failed' }
+$oldDsn = $env:META_ANALYSE_TEST_ADMIN_DSN
+$oldTestDsn = $env:META_ANALYSE_TEST_DSN
+$oldQt = $env:QT_QPA_PLATFORM
+$started = $false
+try {
+    & (Join-Path $PgBin 'pg_ctl.exe') -D $data -l $log -o "-h 127.0.0.1 -p $port" -w start
+    if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL startup failed' }
+    $started = $true
+    $env:META_ANALYSE_TEST_ADMIN_DSN = "host=127.0.0.1 port=$port user=meta_audit dbname=postgres"
+    $env:META_ANALYSE_TEST_DSN = $env:META_ANALYSE_TEST_ADMIN_DSN
+    $env:QT_QPA_PLATFORM = 'offscreen'
+    & $Python -m compileall -q src
+    if ($LASTEXITCODE -ne 0) { throw 'Compilation failed' }
+    & $Python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir (Join-Path $WorkRoot 'repeat-lifecycle')
+    if ($LASTEXITCODE -ne 0) { throw 'Repeated lifecycle tests failed; see repeat-lifecycle logs' }
+    & $Python -m pytest -q --junitxml (Join-Path $WorkRoot 'tests.xml') --basetemp (Join-Path $WorkRoot 'pytest-temp') 2>&1 | Tee-Object -FilePath (Join-Path $WorkRoot 'tests.log')
+    if ($LASTEXITCODE -ne 0) { throw 'Tests failed; see tests.log and tests.xml' }
+    & $Python scripts/check_integration_postgres.py (Join-Path $WorkRoot 'tests.xml')
+    if ($LASTEXITCODE -ne 0) { throw 'Required PostgreSQL integration cases missing, skipped or failed' }
+} finally {
+    if ($started) { & (Join-Path $PgBin 'pg_ctl.exe') -D $data -m fast -w stop }
+    $env:META_ANALYSE_TEST_ADMIN_DSN = $oldDsn
+    $env:META_ANALYSE_TEST_DSN = $oldTestDsn
+    $env:QT_QPA_PLATFORM = $oldQt
+}

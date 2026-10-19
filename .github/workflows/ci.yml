@@ -1,0 +1,101 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONASYNCIODEBUG: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - run: python -m pip install -c requirements.lock -e ".[test,archive]"
+      - run: python -m pip check
+      - name: Mandatory local HTTP archive fault regression (Windows)
+        run: |
+          python -m pip install -c requirements.lock aiohttp
+          python -c "import aiohttp"
+          python -m pytest -q tests/test_archive_http_server.py tests/test_archive_resumable_faults.py
+      - name: Windows Qt and disposable PostgreSQL integration
+        shell: pwsh
+        run: ./scripts/test-windows.ps1
+      - name: Measure synthetic 20-instrument UI load
+        shell: pwsh
+        run: python scripts/benchmark_flow_ui.py --seconds 3 --output "$env:RUNNER_TEMP/meta-analyse-ci/ui-performance.json"
+      - name: Verify repeated installation
+        shell: pwsh
+        run: |
+          ./install.ps1 -Python (Get-Command python).Source -InstallRoot "$env:RUNNER_TEMP\installer target"
+          ./install.ps1 -Python (Get-Command python).Source -InstallRoot "$env:RUNNER_TEMP\installer target"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-test-evidence
+          path: |
+            ${{ runner.temp }}/meta-analyse-ci/repeat-lifecycle/**/tests.*
+            ${{ runner.temp }}/meta-analyse-ci/tests.log
+            ${{ runner.temp }}/meta-analyse-ci/tests.xml
+            ${{ runner.temp }}/meta-analyse-ci/postgresql.log
+            ${{ runner.temp }}/meta-analyse-ci/ui-performance.json
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONASYNCIODEBUG: '1'
+      META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+      META_ANALYSE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
+      - run: python -m pip install -c requirements.lock -e ".[test,archive]"
+      - run: python -m pip check
+      - run: python -m compileall -q src
+      - name: Repeat lifecycle resource regressions in fresh processes
+        run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir repeat-lifecycle
+      - name: Mandatory local HTTP archive fault regression (Linux)
+        run: |
+          python -m pip install -c requirements.lock aiohttp
+          python -c "import aiohttp"
+          python -m pytest -q tests/test_archive_http_server.py tests/test_archive_resumable_faults.py
+      - name: Linux regressions (preserve pytest failure through tee)
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest -q --junitxml=tests.xml | tee tests.log
+      - name: Verify nine PostgreSQL integration cases executed without skips
+        run: python scripts/check_integration_postgres.py tests.xml --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
+      - run: python scripts/benchmark_flow_ui.py --seconds 3 --output ui-performance.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-test-evidence
+          path: |
+            repeat-lifecycle/**/tests.*
+            tests.xml
+            tests.log
+            ui-performance.json

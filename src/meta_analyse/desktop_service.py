@@ -10,7 +10,7 @@ from .exchange import BybitPublic
 from .ports import MetaScalp
 from .runtime import Runtime
 from .flow_bridge import FlowBridge
-from .flow_history_storage import read_flow_history
+from .flow_history_storage import FlowHistorySnapshot, _utc, read_flow_history
 
 @dataclass(frozen=True)
 class DesktopSnapshot:
@@ -251,7 +251,6 @@ class DesktopService:
                 read_flow_history, self.store, symbol=symbol, start=start, end=end, limit=limit)
             if not isinstance(result, FlowHistorySnapshot):
                 raise TypeError('Flow History reader returned invalid snapshot')
-            from .flow_history_storage import _utc
             if (result.symbol != symbol or result.start != _utc(start)
                     or result.end != _utc(end) or result.status != 'UNVERIFIED'):
                 raise ValueError('Flow History reader returned mismatched scope or status')

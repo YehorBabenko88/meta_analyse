@@ -254,7 +254,9 @@ class DesktopService:
             if not isinstance(result, FlowHistorySnapshot):
                 raise TypeError('Flow History reader returned invalid snapshot')
             if (result.symbol != symbol or result.start != _utc(start)
-                    or result.end != _utc(end) or result.status != 'UNVERIFIED'):
+                    or result.end != _utc(end) or result.status != 'UNVERIFIED'
+                    or not isinstance(result.trades, tuple)
+                    or type(result.truncated) is not bool):
                 raise ValueError('Flow History reader returned mismatched scope or status')
             if not self.closing and generation == self._history_generation:
                 self.flow_history = result

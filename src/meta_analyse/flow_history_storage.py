@@ -100,7 +100,7 @@ def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[Mapping[str, ob
             raise ValueError("unsupported historical aggressor side")
         if not trade.price.is_finite() or trade.price <= 0:
             raise ValueError('invalid historical trade price')
-        if not trade.quantity.is_finite() or trade.quantity < 0:
+        if not trade.quantity.is_finite() or trade.quantity <= 0:
             raise ValueError('invalid historical trade quantity')
         timestamp = _utc(trade.timestamp)
         if not start <= timestamp < end:

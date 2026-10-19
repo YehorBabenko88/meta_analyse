@@ -236,3 +236,12 @@ async def test_invalid_max_bytes_rejected_before_download(tmp_path, monkeypatch,
     with pytest.raises(ValueError, match="max_bytes must be a positive integer"):
         await acquire_archive(object(), URL, path, max_bytes=bad_budget)
     assert not path.exists()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_budget", [0, -1, True, 1.5, "100"])
+async def test_batch_rejects_invalid_budget_before_session_creation(bad_budget):
+    from meta_analyse.archive_ingestion import acquire_many
+
+    with pytest.raises(ValueError, match="max_bytes must be a positive integer"):
+        await acquire_many([], max_bytes=bad_budget)

@@ -299,3 +299,28 @@ async def test_out_of_range_first_timestamp_receipt_forces_reaudit(tmp_path, mon
     receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
     result = await acquire_archive(object(), URL, path)
     assert result.valid is True and len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_cached_receipt_rejects_endpoints_outside_requested_day(tmp_path, monkeypatch):
+    from datetime import date
+    from meta_analyse import archive_ingestion
+    path = tmp_path / "archive.csv.gz"
+    day = date(2025, 1, 1)
+    calls = []
+
+    async def fake_download(session, url, dest, **kwargs):
+        calls.append(url)
+        make_gzip(dest)
+        return dest
+
+    monkeypatch.setattr(archive_ingestion, "download_archive", fake_download)
+    await acquire_archive(object(), URL, path, day=day)
+    receipt_path = tmp_path / "archive.csv.gz.audit.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["first_ms"] = 1735603200000
+    receipt["last_ms"] = 1735603200000
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    result = await acquire_archive(object(), URL, path, day=day)
+    assert result.valid is True
+    assert len(calls) == 2

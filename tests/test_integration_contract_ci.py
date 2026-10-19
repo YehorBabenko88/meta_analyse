@@ -76,3 +76,11 @@ def test_integration_contract_ci_rejects_declared_count_mismatch(tmp_path):
     ET.ElementTree(root).write(report, encoding="unicode")
     result = subprocess.run([sys.executable, str(SCRIPT), str(report), "--minimum", "1"], capture_output=True)
     assert result.returncode != 0
+
+def test_integration_contract_ci_never_allows_skipped_required_exact_test(tmp_path):
+    result = _check(
+        tmp_path, [("test_mandatory", "skipped")],
+        "--require-exact", "test_mandatory", "--allow-skip", "test_mandatory",
+    )
+    assert result.returncode != 0
+    assert "REQUIRED TEST SKIPPED" in result.stderr

@@ -25,8 +25,9 @@ class ArchiveAudit:
 
 def audit_trade_gzip(path: str | Path, *, max_rows: int = 50_000_000,
                      max_uncompressed_bytes: int = 8_000_000_000) -> ArchiveAudit:
-    if max_rows < 1 or max_uncompressed_bytes < 1:
-        raise ValueError("audit budgets must be positive")
+    if (type(max_rows) is not int or max_rows <= 0
+            or type(max_uncompressed_bytes) is not int or max_uncompressed_bytes <= 0):
+        raise ValueError("audit budgets must be positive integers")
     rows = 0
     first = last = None
     previous_timestamp = None
@@ -60,7 +61,11 @@ def audit_trade_gzip(path: str | Path, *, max_rows: int = 50_000_000,
                     if not (0 <= raw_ts < Decimal("253402300800")) or price <= 0 or size <= 0:
                         raise ValueError("invalid trade values")
                     # Bybit archive timestamps are in seconds, often fractional.
-                    timestamp_ms = int(raw_ts * 1000)
+                    digits = raw_ts.as_tuple()
+                    coefficient = int(''.join(str(digit) for digit in digits.digits))
+                    shift = digits.exponent + 3
+                    timestamp_ms = (coefficient * 10 ** shift if shift >= 0
+                                    else coefficient // 10 ** (-shift))
                     if previous_timestamp is not None and raw_ts < previous_timestamp:
                         raise ValueError("out-of-order trades")
                 except (ValueError, TypeError, InvalidOperation, KeyError) as exc:

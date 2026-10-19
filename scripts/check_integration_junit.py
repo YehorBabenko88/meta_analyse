@@ -9,6 +9,7 @@ def main():
     p.add_argument("--minimum", type=int, required=True)
     p.add_argument("--require", action="append", default=[])
     p.add_argument("--allow-skip", action="append", default=[])
+    p.add_argument("--require-exact", action="append", default=[])
     a = p.parse_args()
     root = ET.parse(a.xml).getroot()
     cases = list(root.iter("testcase"))
@@ -16,13 +17,16 @@ def main():
     failures = [c for c in cases if any(c.find(t) is not None for t in ("failure", "error"))]
     skipped = [c for c in cases if c.find("skipped") is not None]
     missing = [pattern for pattern in a.require if not any(pattern in name for name in names)]
+    exact_missing = [name for name in a.require_exact if not any(c.get("name", "").split("[", 1)[0] == name for c in cases)]
     print(f"collected={len(cases)} skipped={len(skipped)} failed={len(failures)}")
     for case in skipped:
         print(f"SKIP: {case.get('classname')}.{case.get('name')}: {case.find('skipped').get('message')}")
     for pattern in missing:
         print(f"MISSING REQUIRED: {pattern}", file=sys.stderr)
     unexpected = [c for c in skipped if not any(token == c.get("name", "").split("[", 1)[0] for token in a.allow_skip)]
-    if len(cases) < a.minimum or unexpected or failures or missing:
+    for name in exact_missing:
+        print(f"MISSING EXACT TEST: {name}", file=sys.stderr)
+    if len(cases) < a.minimum or unexpected or failures or missing or exact_missing:
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ from .exchange import BybitPublic
 from .ports import MetaScalp
 from .runtime import Runtime
 from .flow_bridge import FlowBridge
-from .flow_history_storage import read_flow_history
+from .flow_history_storage import FlowHistorySnapshot, _utc, read_flow_history
 
 @dataclass(frozen=True)
 class DesktopSnapshot:
@@ -255,6 +255,15 @@ class DesktopService:
         try:
             result = await asyncio.to_thread(
                 read_flow_history, self.store, symbol=symbol, start=start, end=end, limit=limit)
+            if self.closing or generation != self._history_generation:
+                return
+            if not isinstance(result, FlowHistorySnapshot):
+                raise TypeError('Flow History reader returned invalid snapshot')
+            if (result.symbol != symbol or result.start != _utc(start)
+                    or result.end != _utc(end) or result.status != 'UNVERIFIED'
+                    or not isinstance(result.trades, tuple)
+                    or type(result.truncated) is not bool):
+                raise ValueError('Flow History reader returned mismatched scope or status')
             if not self.closing and generation == self._history_generation:
                 self.flow_history = result
                 if result.truncated:
@@ -266,7 +275,7 @@ class DesktopService:
                         self.load_orderflow_records(to_orderflow_records(result))
                     except Exception as exc:
                         self.orderflow_rows = ()
-                        self.orderflow_status = f'Order Flow unavailable: {exc} — UNVERIFIED'
+                        self.orderflow_status = 'Order Flow unavailable: invalid historical records — UNVERIFIED'
                 self.status = 'Flow History loaded — UNVERIFIED'
         except asyncio.CancelledError:
             if not self.closing and generation == self._history_generation:

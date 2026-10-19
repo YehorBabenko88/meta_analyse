@@ -84,7 +84,8 @@ jobs:
           python -m pytest -q tests/test_archive_http_server.py tests/test_archive_resumable_faults.py
       - name: Linux regressions (preserve pytest failure through tee)
         shell: bash
-        run: set -o pipefail
+        run: |
+          set -o pipefail
           python -m pytest -q --junitxml=tests.xml | tee tests.log
       - name: Verify nine PostgreSQL integration cases executed without skips
         run: python scripts/check_integration_postgres.py tests.xml

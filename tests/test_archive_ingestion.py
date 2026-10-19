@@ -166,3 +166,25 @@ async def test_invalid_cached_receipt_time_bounds_force_reaudit(tmp_path, monkey
     result = await acquire_archive(object(), URL, path)
     assert result.valid and result.first_ms <= result.last_ms
     assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_cached_receipt_cannot_bypass_smaller_byte_budget(tmp_path, monkeypatch):
+    from meta_analyse import archive_ingestion
+    path = tmp_path / "archive.csv.gz"
+    make_gzip(path)
+    calls = []
+
+    async def fake_download(session, url, dest, **kwargs):
+        calls.append(kwargs["max_bytes"])
+        if path.is_file() and path.stat().st_size > kwargs["max_bytes"]:
+            raise ValueError("archive exceeds byte budget")
+        make_gzip(dest)
+        return dest
+
+    monkeypatch.setattr(archive_ingestion, "download_archive", fake_download)
+    await acquire_archive(object(), URL, path)
+    assert path.stat().st_size > 1
+    with pytest.raises(ValueError, match="byte budget"):
+        await acquire_archive(object(), URL, path, max_bytes=1)
+    assert len(calls) == 2

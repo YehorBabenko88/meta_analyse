@@ -76,3 +76,36 @@ def test_timestamp_utc_day_boundary_without_rounding(value, expected):
     with localcontext() as context:
         context.prec = 8
         assert parse_trade(row)[1] == expected
+
+
+@pytest.mark.parametrize("timestamps,valid", [
+    (("1735689600.000900", "1735689600.000100"), False),
+    (("1735689600.000100", "1735689600.000900"), True),
+    (("1735689600.000100", "1735689600.000100"), True),
+])
+def test_import_preflight_raw_decimal_timestamp_order(tmp_path, timestamps, valid):
+    path = tmp_path / "trades.csv"
+    path.write_text("timestamp,trdMatchID,price,size,side\n" +
+                    "".join(f"{ts},id{i},1,1,Buy\n" for i, ts in enumerate(timestamps)))
+    receipt = {"valid": True, "complete": False, "url": "https://example.invalid/archive",
+               "sha256": file_sha256(path), "bytes": path.stat().st_size, "rows": 2}
+    if not valid:
+        with pytest.raises(ValueError, match="decreasing raw trade timestamp"):
+            import_verified_archive(None, path, receipt, symbol="BTCUSDT")
+    else:
+        # Valid chronological rows must pass CSV preflight and reach DB setup.
+        with pytest.raises((AttributeError, TypeError)):
+            import_verified_archive(None, path, receipt, symbol="BTCUSDT")
+
+
+@pytest.mark.parametrize("content", [
+    "timestamp,trdMatchID,price,size,side\n1,id,1,1\n",
+    "timestamp,trdMatchID,price,size,side\n1,id,1,0,Buy\n",
+])
+def test_import_preflight_rejects_missing_field_or_zero_size(tmp_path, content):
+    path = tmp_path / "trades.csv"
+    path.write_text(content)
+    receipt = {"valid": True, "complete": False, "url": "https://example.invalid/archive",
+               "sha256": file_sha256(path), "bytes": path.stat().st_size, "rows": 1}
+    with pytest.raises(ValueError):
+        import_verified_archive(None, path, receipt, symbol="BTCUSDT")

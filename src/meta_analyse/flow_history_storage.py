@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
+from types import MappingProxyType
+from typing import Mapping
 
 
 @dataclass(frozen=True)
@@ -68,7 +70,7 @@ def read_flow_history(store, *, symbol: str, start: datetime, end: datetime,
     return FlowHistorySnapshot(symbol, start, end, trades, truncated=truncated)
 
 
-def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[dict, ...]:
+def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[Mapping[str, object], ...]:
     """Bridge PostgreSQL history to the Order Flow adapter's record contract.
 
     Milliseconds are derived by integer timedelta arithmetic, never floating
@@ -76,22 +78,40 @@ def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[dict, ...]:
     """
     if not isinstance(snapshot, FlowHistorySnapshot):
         raise TypeError("FlowHistorySnapshot required")
+    if snapshot.status != "UNVERIFIED":
+        raise ValueError("unsupported historical verification status")
+    if not isinstance(snapshot.trades, tuple):
+        raise TypeError("immutable tuple of historical trades required")
+    if type(snapshot.truncated) is not bool:
+        raise TypeError("boolean truncation flag required")
+    if not isinstance(snapshot.symbol, str) or not snapshot.symbol.strip():
+        raise ValueError("explicit snapshot symbol required")
+    start, end = _utc(snapshot.start), _utc(snapshot.end)
+    if start >= end:
+        raise ValueError("invalid snapshot interval")
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
     records = []
     for trade in snapshot.trades:
+        if not isinstance(trade, HistoricalTrade):
+            raise TypeError("HistoricalTrade required")
+        if not isinstance(trade.price, Decimal) or not isinstance(trade.quantity, Decimal):
+            raise TypeError("Decimal price and quantity required")
         if not isinstance(trade.side, str) or trade.side.lower() not in ("buy", "sell"):
             raise ValueError("unsupported historical aggressor side")
         if not trade.price.is_finite() or trade.price <= 0:
             raise ValueError('invalid historical trade price')
         if not trade.quantity.is_finite() or trade.quantity < 0:
             raise ValueError('invalid historical trade quantity')
-        delta = _utc(trade.timestamp) - epoch
+        timestamp = _utc(trade.timestamp)
+        if not start <= timestamp < end:
+            raise ValueError("historical trade outside requested interval")
+        delta = timestamp - epoch
         timestamp_ms = ((delta.days * 86400 + delta.seconds) * 1000
                         + delta.microseconds // 1000)
-        records.append({
+        records.append(MappingProxyType({
             "timestamp_ms": timestamp_ms,
             "price": trade.price,
             "volume": trade.quantity,
             "side": trade.side.lower(),
-        })
+        }))
     return tuple(records)

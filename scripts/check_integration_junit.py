@@ -8,6 +8,7 @@ def main():
     p.add_argument("xml")
     p.add_argument("--minimum", type=int, required=True)
     p.add_argument("--require", action="append", default=[])
+    p.add_argument("--allow-skip", action="append", default=[])
     a = p.parse_args()
     root = ET.parse(a.xml).getroot()
     cases = list(root.iter("testcase"))
@@ -20,7 +21,8 @@ def main():
         print(f"SKIP: {case.get('classname')}.{case.get('name')}: {case.find('skipped').get('message')}")
     for pattern in missing:
         print(f"MISSING REQUIRED: {pattern}", file=sys.stderr)
-    if len(cases) < a.minimum or skipped or failures or missing:
+    unexpected = [c for c in skipped if not any(token in f"{c.get('classname', '')}.{c.get('name', '')}" for token in a.allow_skip)]
+    if len(cases) < a.minimum or unexpected or failures or missing:
         sys.exit(1)
 
 if __name__ == "__main__":

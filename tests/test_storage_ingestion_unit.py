@@ -191,3 +191,10 @@ def test_trade_contract_rejects_invalid_values(change):
     row.update(change)
     with pytest.raises(ValueError):
         parse_trade(row)
+
+
+@pytest.mark.parametrize("value", ["1e-999999999", "0e-999999999", "1e-7"])
+def test_submicrosecond_timestamps_do_not_allocate_huge_powers(value):
+    row = {"trdMatchID": "tiny", "timestamp": value, "price": "1",
+           "size": "1", "side": "Buy"}
+    assert parse_trade(row)[1] == datetime(1970, 1, 1, tzinfo=timezone.utc)

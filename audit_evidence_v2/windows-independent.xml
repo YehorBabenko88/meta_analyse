@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="0" tests="12" time="3.867" timestamp="2026-10-19T20:49:08.754753+02:00" hostname="LS5"><testcase classname="audit_v2.test_independent" name="test_decimal_timestamp_floor_does_not_round[1735775999.999999999999999999999-expected0]" time="0.002"><failure message="assert datetime.datetime(2025, 1, 2, 0, 0, tzinfo=datetime.timezone.utc) == datetime.datetime(2025, 1, 1, 23, 59, 59, 999999, tzinfo=datetime.timezone.utc)">timestamp = '1735775999.999999999999999999999'
+expected = datetime.datetime(2025, 1, 1, 23, 59, 59, 999999, tzinfo=datetime.timezone.utc)
+
+    @pytest.mark.parametrize('timestamp,expected', [
+        ('1735775999.999999999999999999999', datetime(2025,1,1,23,59,59,999999,tzinfo=timezone.utc)),
+        ('1735689600.000000999999999999999', datetime(2025,1,1,tzinfo=timezone.utc)),
+    ])
+    def test_decimal_timestamp_floor_does_not_round(timestamp, expected):
+&gt;       assert parse_trade(row(timestamp))[1] == expected
+E       assert datetime.datetime(2025, 1, 2, 0, 0, tzinfo=datetime.timezone.utc) == datetime.datetime(2025, 1, 1, 23, 59, 59, 999999, tzinfo=datetime.timezone.utc)
+
+audit_v2\test_independent.py:33: AssertionError</failure></testcase><testcase classname="audit_v2.test_independent" name="test_decimal_timestamp_floor_does_not_round[1735689600.000000999999999999999-expected1]" time="0.002"><failure message="assert datetime.datetime(2025, 1, 1, 0, 0, 0, 1, tzinfo=datetime.timezone.utc) == datetime.datetime(2025, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)">timestamp = '1735689600.000000999999999999999'
+expected = datetime.datetime(2025, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+
+    @pytest.mark.parametrize('timestamp,expected', [
+        ('1735775999.999999999999999999999', datetime(2025,1,1,23,59,59,999999,tzinfo=timezone.utc)),
+        ('1735689600.000000999999999999999', datetime(2025,1,1,tzinfo=timezone.utc)),
+    ])
+    def test_decimal_timestamp_floor_does_not_round(timestamp, expected):
+&gt;       assert parse_trade(row(timestamp))[1] == expected
+E       assert datetime.datetime(2025, 1, 1, 0, 0, 0, 1, tzinfo=datetime.timezone.utc) == datetime.datetime(2025, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+
+audit_v2\test_independent.py:33: AssertionError</failure></testcase><testcase classname="audit_v2.test_independent" name="test_audit_timestamp_below_maximum_stays_in_range" time="0.012"><failure message="AssertionError: assert 253402300800000 &lt; 253402300800000&#10; +  where 253402300800000 = ArchiveAudit(rows=1, first_ms=253402300800000, last_ms=253402300800000, valid=True, complete=False, reason='parsed successfully; completeness not independently verified').first_ms">tmp_path = WindowsPath('C:/Users/LS-5/Documents/Codex/2026-10-15/github-https-github-com-yehorbabenko88-meta/work/audit-v2-negative-final/test_audit_timestamp_below_max0')
+
+    def test_audit_timestamp_below_maximum_stays_in_range(tmp_path):
+        path = archive(tmp_path/'max.csv.gz', [row('253402300799.99999999999999999')])
+        result = audit_trade_gzip(path)
+        assert result.valid
+&gt;       assert result.first_ms &lt; 253402300800000
+E       AssertionError: assert 253402300800000 &lt; 253402300800000
+E        +  where 253402300800000 = ArchiveAudit(rows=1, first_ms=253402300800000, last_ms=253402300800000, valid=True, complete=False, reason='parsed successfully; completeness not independently verified').first_ms
+
+audit_v2\test_independent.py:40: AssertionError</failure></testcase><testcase classname="audit_v2.test_independent" name="test_csv_auditor_and_importer_agree_on_zero_quantity" time="0.011"><failure message="assert False == True">tmp_path = WindowsPath('C:/Users/LS-5/Documents/Codex/2026-10-15/github-https-github-com-yehorbabenko88-meta/work/audit-v2-negative-final/test_csv_auditor_and_importer_0')
+
+    def test_csv_auditor_and_importer_agree_on_zero_quantity(tmp_path):
+        record = row(size='0')
+        path = archive(tmp_path/'zero.csv.gz', [record])
+        audited = audit_trade_gzip(path).valid
+        try:
+            parse_trade(record)
+            imported = True
+        except ValueError:
+            imported = False
+&gt;       assert audited == imported
+E       assert False == True
+
+audit_v2\test_independent.py:52: AssertionError</failure></testcase><testcase classname="audit_v2.test_independent" name="test_history_terminal_state_stops_showing_loading[unavailable]" time="0.003"><failure message="AssertionError: assert 'loading' not in 'loading his...— unverified'&#10;  &#10;  'loading' is contained here:&#10;    loading history — unverified&#10;  ? +++++++">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x00000285453334A0&gt;
+outcome = 'unavailable'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('outcome', ['unavailable', 'error', 'cancelled'])
+    async def test_history_terminal_state_stops_showing_loading(monkeypatch, outcome):
+        import meta_analyse.desktop_service as module
+        service = DesktopService(None if outcome == 'unavailable' else object(), lambda _: None)
+        entered = asyncio.Event()
+        async def read(*args, **kwargs):
+            entered.set()
+            if outcome == 'error':
+                raise ConnectionError('controlled audit DB failure')
+            await asyncio.Event().wait()
+        monkeypatch.setattr(module.asyncio, 'to_thread', read)
+        start = datetime(2025,1,1,tzinfo=timezone.utc)
+        task = asyncio.create_task(service.load_flow_history(symbol='BTCUSDT', start=start, end=start+timedelta(days=1)))
+        if outcome == 'cancelled':
+            await entered.wait()
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+&gt;       assert 'loading' not in service.snapshot().orderflow_status.lower()
+E       AssertionError: assert 'loading' not in 'loading his...— unverified'
+E         
+E         'loading' is contained here:
+E           loading history — unverified
+E         ? +++++++
+
+audit_v2\test_independent.py:73: AssertionError</failure></testcase><testcase classname="audit_v2.test_independent" name="test_history_terminal_state_stops_showing_loading[error]" time="0.003"><failure message="AssertionError: assert 'loading' not in 'loading his...— unverified'&#10;  &#10;  'loading' is contained here:&#10;    loading history — unverified&#10;  ? +++++++">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000028545334B00&gt;
+outcome = 'error'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('outcome', ['unavailable', 'error', 'cancelled'])
+    async def test_history_terminal_state_stops_showing_loading(monkeypatch, outcome):
+        import meta_analyse.desktop_service as module
+        service = DesktopService(None if outcome == 'unavailable' else object(), lambda _: None)
+        entered = asyncio.Event()
+        async def read(*args, **kwargs):
+            entered.set()
+            if outcome == 'error':
+                raise ConnectionError('controlled audit DB failure')
+            await asyncio.Event().wait()
+        monkeypatch.setattr(module.asyncio, 'to_thread', read)
+        start = datetime(2025,1,1,tzinfo=timezone.utc)
+        task = asyncio.create_task(service.load_flow_history(symbol='BTCUSDT', start=start, end=start+timedelta(days=1)))
+        if outcome == 'cancelled':
+            await entered.wait()
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+&gt;       assert 'loading' not in service.snapshot().orderflow_status.lower()
+E       AssertionError: assert 'loading' not in 'loading his...— unverified'
+E         
+E         'loading' is contained here:
+E           loading history — unverified
+E         ? +++++++
+
+audit_v2\test_independent.py:73: AssertionError</failure></testcase><testcase classname="audit_v2.test_independent" name="test_history_terminal_state_stops_showing_loading[cancelled]" time="0.002"><failure message="AssertionError: assert 'loading' not in 'loading his...— unverified'&#10;  &#10;  'loading' is contained here:&#10;    loading history — unverified&#10;  ? +++++++">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000028545335820&gt;
+outcome = 'cancelled'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('outcome', ['unavailable', 'error', 'cancelled'])
+    async def test_history_terminal_state_stops_showing_loading(monkeypatch, outcome):
+        import meta_analyse.desktop_service as module
+        service = DesktopService(None if outcome == 'unavailable' else object(), lambda _: None)
+        entered = asyncio.Event()
+        async def read(*args, **kwargs):
+            entered.set()
+            if outcome == 'error':
+                raise ConnectionError('controlled audit DB failure')
+            await asyncio.Event().wait()
+        monkeypatch.setattr(module.asyncio, 'to_thread', read)
+        start = datetime(2025,1,1,tzinfo=timezone.utc)
+        task = asyncio.create_task(service.load_flow_history(symbol='BTCUSDT', start=start, end=start+timedelta(days=1)))
+        if outcome == 'cancelled':
+            await entered.wait()
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+&gt;       assert 'loading' not in service.snapshot().orderflow_status.lower()
+E       AssertionError: assert 'loading' not in 'loading his...— unverified'
+E         
+E         'loading' is contained here:
+E           loading history — unverified
+E         ? +++++++
+
+audit_v2\test_independent.py:73: AssertionError</failure></testcase><testcase classname="audit_v2.test_independent" name="test_pr9_fail_closed_gate_is_present_in_integration" time="0.001"><failure message="AssertionError: assert False&#10; +  where False = is_file()&#10; +    where is_file = WindowsPath('scripts/check_integration_junit.py').is_file&#10; +      where WindowsPath('scripts/check_integration_junit.py') = Path('scripts/check_integration_junit.py')">def test_pr9_fail_closed_gate_is_present_in_integration():
+&gt;       assert Path('scripts/check_integration_junit.py').is_file()
+E       AssertionError: assert False
+E        +  where False = is_file()
+E        +    where is_file = WindowsPath('scripts/check_integration_junit.py').is_file
+E        +      where WindowsPath('scripts/check_integration_junit.py') = Path('scripts/check_integration_junit.py')
+
+audit_v2\test_independent.py:77: AssertionError</failure></testcase><testcase classname="audit_v2.test_independent" name="test_cancelled_lock_wait_does_not_leak_lock" time="0.007" /><testcase classname="audit_v2.test_independent" name="test_full_archive_postgres_orderflow_desktop_user_path" time="1.655" /><testcase classname="audit_v2.test_independent" name="test_original_postgres_error_survives_both_cleanup_failures" time="0.739" /><testcase classname="audit_v2.test_independent" name="test_failed_batch_resumes_after_real_conflict_is_removed" time="1.005" /></testsuite></testsuites>

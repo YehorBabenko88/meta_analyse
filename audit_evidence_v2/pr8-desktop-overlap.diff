@@ -1,0 +1,159 @@
+diff --git a/src/meta_analyse/desktop.py b/src/meta_analyse/desktop.py
+index e47b1a6..2479978 100644
+--- a/src/meta_analyse/desktop.py
++++ b/src/meta_analyse/desktop.py
+@@ -152,6 +152,20 @@ class Window(QWidget):
+         self.history_table.setSortingEnabled(True)
+         history_layout.addWidget(self.history_table)
+         self.tabs.addTab(history, "Flow History")
++        history = QWidget()
++        history_layout = QVBoxLayout(history)
++        self.orderflow_history_status = QLabel("No validated historical trade source attached")
++        history_layout.addWidget(self.orderflow_history_status)
++        self.orderflow_history_table = QTableWidget(0, 7)
++        self.orderflow_history_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
++        self.orderflow_history_table.setSortingEnabled(True)
++        self.orderflow_history_table.setHorizontalHeaderLabels(
++            ["Time bucket (ms)", "Buy volume", "Sell volume", "Delta",
++             "Cumulative delta", "Imbalance", "Quality"])
++        history_layout.addWidget(self.orderflow_history_table)
++        self.tabs.addTab(history, "Order Flow History")
++
++
+         diagnostics = QWidget()
+         diagnostics_layout = QVBoxLayout(diagnostics)
+         diagnostics_layout.addWidget(QLabel("Persisted feed events and reported gaps; not proof of exchange completeness"))
+@@ -391,6 +405,37 @@ class Window(QWidget):
+             finally:
+                 table.setSortingEnabled(sorting)
+                 table.setUpdatesEnabled(updates)
++        self.orderflow_history_status.setText(self._snapshot.orderflow_status)
++        history_rows = self._snapshot.orderflow_rows
++        history_table = self.orderflow_history_table
++        # Immutable tuples are reused between snapshots: identity is a fast
++        # path; equality still handles equivalent independently-built snapshots.
++        previous_history = getattr(self, "_previous_orderflow_history_rows", ())
++        history_changed = history_rows is not previous_history and history_rows != previous_history
++        # Sorting reorders QTableWidget's physical rows. Updating cells by
++        # index afterwards can leave stale or duplicated values; rebuild
++        # sorted history from scratch whenever its source actually changes.
++        if history_changed:
++            was_sorting = history_table.isSortingEnabled()
++            was_updating = history_table.updatesEnabled()
++            history_table.setUpdatesEnabled(False)
++            history_table.setSortingEnabled(False)
++            try:
++                history_table.setRowCount(0)
++                history_table.setRowCount(len(history_rows))
++                for row_index, entry in enumerate(history_rows):
++                    values = (entry.bucket, entry.buy, entry.sell, entry.delta,
++                              entry.cumulative_delta, entry.imbalance, entry.quality)
++                    for column, value in enumerate(values):
++                        item = history_table.item(row_index, column)
++                        if item is None:
++                            history_table.setItem(row_index, column, FlowTableItem(value))
++                        elif item.text() != value:
++                            item.setText(value)
++                self._previous_orderflow_history_rows = history_rows
++            finally:
++                history_table.setSortingEnabled(was_sorting)
++                history_table.setUpdatesEnabled(was_updating)
+         self.diagnostics_state.setText(
+             "Connected — session counters (not exchange completeness)"
+             if self._snapshot.flow_state == "connected"
+diff --git a/src/meta_analyse/desktop_service.py b/src/meta_analyse/desktop_service.py
+index c54147b..b913207 100644
+--- a/src/meta_analyse/desktop_service.py
++++ b/src/meta_analyse/desktop_service.py
+@@ -25,6 +25,8 @@ class DesktopSnapshot:
+     market_ages: tuple = ()
+     overview: tuple = ()
+     readiness: tuple = ()
++    orderflow_rows: tuple = ()
++    orderflow_status: str = 'No validated historical trade source attached'
+     flow_history: object = None
+     flow_history_request_id: int = 0
+ 
+@@ -66,6 +68,8 @@ class DesktopService:
+         self.readiness = {}
+         self.flow_history = None
+         self._history_generation = 0
++        self.orderflow_rows = ()
++        self.orderflow_status = 'No validated historical trade source attached'
+ 
+     def initialize(self):
+         self.api = MetaScalp()
+@@ -242,6 +246,8 @@ class DesktopService:
+         self._history_generation += 1
+         generation = self._history_generation
+         self.flow_history = None
++        self.orderflow_rows = ()
++        self.orderflow_status = 'Loading history — UNVERIFIED'
+         self.status = 'Flow History loading — UNVERIFIED'
+         if self.store is None:
+             self.status = 'Flow History unavailable: PostgreSQL not configured'
+@@ -260,6 +266,16 @@ class DesktopService:
+                 raise ValueError('Flow History reader returned mismatched scope or status')
+             if not self.closing and generation == self._history_generation:
+                 self.flow_history = result
++                if result.truncated:
++                    self.orderflow_rows = ()
++                    self.orderflow_status = 'History truncated; Order Flow unavailable — UNVERIFIED'
++                else:
++                    try:
++                        from .flow_history_storage import to_orderflow_records
++                        self.load_orderflow_records(to_orderflow_records(result))
++                    except Exception as exc:
++                        self.orderflow_rows = ()
++                        self.orderflow_status = 'Order Flow unavailable: invalid historical records — UNVERIFIED'
+                 self.status = 'Flow History loaded — UNVERIFIED'
+         except asyncio.CancelledError:
+             if not self.closing and generation == self._history_generation:
+@@ -275,6 +291,29 @@ class DesktopService:
+         if rules is not None:
+             self.runtime.paper.threshold, self.runtime.paper.stop_pct, self.runtime.paper.fee_rate = rules
+ 
++    def load_orderflow_records(self, records, interval_ms=60000):
++        """Explicit, read-only history adapter; no implicit completeness claim."""
++        from .orderflow_adapters import from_records
++        from .orderflow_aggregation import aggregate_by_time
++        from .orderflow_view import make_rows
++        # Bound both memory and Qt table size; refuse truncation that could
++        # silently corrupt cumulative delta or imply complete coverage.
++        max_trades = 250_000
++        max_buckets = 10_000
++        trades = []
++        for trade in from_records(records):
++            if len(trades) >= max_trades:
++                raise ValueError('historical trade limit exceeded')
++            trades.append(trade)
++        buckets = aggregate_by_time(trades, interval_ms)
++        if len(buckets) > max_buckets:
++            raise ValueError('historical interval limit exceeded')
++        self.orderflow_rows = make_rows(buckets, quality='UNVERIFIED')
++        self.orderflow_status = (
++            f'{len(trades)} trades, {len(buckets)} intervals; '
++            + 'historical coverage UNVERIFIED'
++        )
++
+     def set_readiness(self, symbol, progress):
+         """Accept only a validated Progress object from history coordination."""
+         from .history_progress import Progress
+@@ -284,7 +323,7 @@ class DesktopService:
+ 
+     def snapshot(self):
+         if self.runtime is None:
+-            return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status, flow_history=self.flow_history, flow_history_request_id=self._history_generation)
++            return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status, flow_history=self.flow_history, flow_history_request_id=self._history_generation, orderflow_rows=self.orderflow_rows, orderflow_status=self.orderflow_status)
+         engine = self.runtime.paper
+         symbols = tuple(self.runtime.symbols)
+         stats = []
+@@ -312,7 +351,7 @@ class DesktopService:
+         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
+                                self.flow_state, self.flow_status, self.status,
+                                telemetry.events if telemetry else (), telemetry.gaps if telemetry else (),
+-                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols), self.flow_history, self._history_generation)
++                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols), self.orderflow_rows, self.orderflow_status, self.flow_history, self._history_generation)
+ 
+     async def check_health(self):
+         if self.flow_state != 'connected' or self.session is None:

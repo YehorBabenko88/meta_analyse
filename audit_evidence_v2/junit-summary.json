@@ -1,0 +1,78 @@
+{
+  "windows-full": {
+    "total": 518,
+    "passed": 518,
+    "failed": [],
+    "errors": [],
+    "skipped": []
+  },
+  "windows-independent": {
+    "total": 12,
+    "passed": 4,
+    "failed": [
+      "test_decimal_timestamp_floor_does_not_round[1735775999.999999999999999999999-expected0]",
+      "test_decimal_timestamp_floor_does_not_round[1735689600.000000999999999999999-expected1]",
+      "test_audit_timestamp_below_maximum_stays_in_range",
+      "test_csv_auditor_and_importer_agree_on_zero_quantity",
+      "test_history_terminal_state_stops_showing_loading[unavailable]",
+      "test_history_terminal_state_stops_showing_loading[error]",
+      "test_history_terminal_state_stops_showing_loading[cancelled]",
+      "test_pr9_fail_closed_gate_is_present_in_integration"
+    ],
+    "errors": [],
+    "skipped": []
+  },
+  "linux-full": {
+    "total": 518,
+    "passed": 517,
+    "failed": [],
+    "errors": [],
+    "skipped": [
+      "test_failed_pip_install_never_reports_success_or_creates_launcher"
+    ]
+  },
+  "linux-independent": {
+    "total": 12,
+    "passed": 4,
+    "failed": [
+      "test_decimal_timestamp_floor_does_not_round[1735775999.999999999999999999999-expected0]",
+      "test_decimal_timestamp_floor_does_not_round[1735689600.000000999999999999999-expected1]",
+      "test_audit_timestamp_below_maximum_stays_in_range",
+      "test_csv_auditor_and_importer_agree_on_zero_quantity",
+      "test_history_terminal_state_stops_showing_loading[unavailable]",
+      "test_history_terminal_state_stops_showing_loading[error]",
+      "test_history_terminal_state_stops_showing_loading[cancelled]",
+      "test_pr9_fail_closed_gate_is_present_in_integration"
+    ],
+    "errors": [],
+    "skipped": []
+  },
+  "original-pr10-main-ci-skips": {
+    "windows": [
+      "test_resume_and_deduplication",
+      "test_concurrent_sources_same_symbol",
+      "test_conflicting_archive_rolls_back_batch_and_checkpoint",
+      "test_partial_batch_failure_keeps_previous_committed_checkpoint",
+      "test_resume_after_failed_batch_and_repaired_archive_conflict",
+      "test_concurrent_identical_archive_is_idempotent",
+      "test_failed_import_status_preserves_committed_checkpoint",
+      "test_orderflow_reader_returns_exact_aliases",
+      "test_unlock_failure_does_not_mask_original_import_error"
+    ],
+    "linux": [
+      "test_failed_pip_install_never_reports_success_or_creates_launcher",
+      "test_resume_and_deduplication",
+      "test_concurrent_sources_same_symbol",
+      "test_conflicting_archive_rolls_back_batch_and_checkpoint",
+      "test_partial_batch_failure_keeps_previous_committed_checkpoint",
+      "test_resume_after_failed_batch_and_repaired_archive_conflict",
+      "test_concurrent_identical_archive_is_idempotent",
+      "test_failed_import_status_preserves_committed_checkpoint",
+      "test_orderflow_reader_returns_exact_aliases",
+      "test_unlock_failure_does_not_mask_original_import_error"
+    ]
+  },
+  "audit_linux_run": 39305707758,
+  "tested_audit_sha": "9e6ce6baf60caae2a29e56b4f5716f59d78cca4a",
+  "target_sha": "aa489666191137b631aab989f4834743820f4831"
+}

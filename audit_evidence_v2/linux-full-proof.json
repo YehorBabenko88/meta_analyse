@@ -1,0 +1,12 @@
+{
+  "total": 518,
+  "skipped": [
+    {
+      "classname": "tests.test_installer",
+      "name": "test_failed_pip_install_never_reports_success_or_creates_launcher",
+      "time": "0.000"
+    }
+  ],
+  "required_postgres_executed": 9,
+  "status": "PASS"
+}

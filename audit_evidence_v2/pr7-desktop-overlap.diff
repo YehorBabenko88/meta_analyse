@@ -1,0 +1,237 @@
+diff --git a/src/meta_analyse/desktop.py b/src/meta_analyse/desktop.py
+index 5bcc806..2479978 100644
+--- a/src/meta_analyse/desktop.py
++++ b/src/meta_analyse/desktop.py
+@@ -4,12 +4,13 @@ import asyncio
+ import os
+ import sys
+ import threading
++from datetime import datetime, timedelta, timezone
+ from dataclasses import replace
+ from PySide6.QtCore import QTimer, QObject, Signal, Slot, Qt
+ from PySide6.QtGui import QColor, QBrush
+ from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+                                QLabel, QListWidget, QMessageBox, QDoubleSpinBox, QCheckBox, QTabWidget,
+-                               QTableWidget, QTableWidgetItem, QAbstractItemView, QProgressBar)
++                               QTableWidget, QTableWidgetItem, QAbstractItemView, QProgressBar, QLineEdit)
+ from .storage import Store
+ from decimal import Decimal
+ from .trader_theme import TRADER_QSS
+@@ -129,6 +130,30 @@ class Window(QWidget):
+         self.tabs.addTab(flow, "Order flow")
+         history = QWidget()
+         history_layout = QVBoxLayout(history)
++        history_layout.addWidget(QLabel("PostgreSQL historical trades — UNVERIFIED; UTC interval [start, end)"))
++        history_controls = QHBoxLayout()
++        self.history_symbol = QLineEdit()
++        self.history_symbol.setPlaceholderText("Explicit symbol, e.g. BTCUSDT")
++        history_controls.addWidget(self.history_symbol)
++        now = datetime.now(timezone.utc).replace(microsecond=0)
++        self.history_start = QLineEdit((now - timedelta(hours=1)).isoformat())
++        self.history_end = QLineEdit(now.isoformat())
++        history_controls.addWidget(self.history_start)
++        history_controls.addWidget(self.history_end)
++        self.history_load_button = QPushButton("Load history")
++        self.history_load_button.clicked.connect(self.load_flow_history)
++        history_controls.addWidget(self.history_load_button)
++        history_layout.addLayout(history_controls)
++        self.history_status = QLabel("UNVERIFIED — no history requested")
++        history_layout.addWidget(self.history_status)
++        self.history_table = QTableWidget(0, 5)
++        self.history_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
++        self.history_table.setHorizontalHeaderLabels(["UTC timestamp", "Trade ID", "Side", "Price", "Quantity"])
++        self.history_table.setSortingEnabled(True)
++        history_layout.addWidget(self.history_table)
++        self.tabs.addTab(history, "Flow History")
++        history = QWidget()
++        history_layout = QVBoxLayout(history)
+         self.orderflow_history_status = QLabel("No validated historical trade source attached")
+         history_layout.addWidget(self.orderflow_history_status)
+         self.orderflow_history_table = QTableWidget(0, 7)
+@@ -138,7 +163,8 @@ class Window(QWidget):
+             ["Time bucket (ms)", "Buy volume", "Sell volume", "Delta",
+              "Cumulative delta", "Imbalance", "Quality"])
+         history_layout.addWidget(self.orderflow_history_table)
+-        self.tabs.addTab(history, "Flow history")
++        self.tabs.addTab(history, "Order Flow History")
++
+ 
+         diagnostics = QWidget()
+         diagnostics_layout = QVBoxLayout(diagnostics)
+@@ -233,6 +259,26 @@ class Window(QWidget):
+         self.schedule(self._stop_flow())
+     async def _stop_flow(self):
+         await self.service.disconnect_flow()
++    def load_flow_history(self):
++        symbol = self.history_symbol.text().strip()
++        try:
++            start = datetime.fromisoformat(self.history_start.text().strip())
++            end = datetime.fromisoformat(self.history_end.text().strip())
++            if not symbol or start.tzinfo is None or end.tzinfo is None or start >= end:
++                raise ValueError("invalid symbol or interval")
++        except ValueError:
++            QMessageBox.warning(self, "Flow History", "Specify symbol and timezone-aware ISO start/end.")
++            return
++        self.history_status.setText("Loading — UNVERIFIED")
++        self.history_load_button.setEnabled(False)
++        self._previous_history = None
++        self._history_min_request_id = self._snapshot.flow_history_request_id + 1
++        self.history_table.setRowCount(0)
++        future = self.schedule(self.service.load_flow_history(symbol=symbol, start=start, end=end))
++        if future is None:
++            self.history_load_button.setEnabled(True)
++            self.history_status.setText("Flow History unavailable: worker stopped — UNVERIFIED")
++
+     def toggle_paper(self, enabled):
+         self.schedule(self.service.configure_paper(enabled=bool(enabled)))
+     def update_rules(self):
+@@ -286,6 +332,40 @@ class Window(QWidget):
+                     if cell is not None and cell.text() in selected:
+                         selection.select(table.model().index(i, 0), table.model().index(i, table.columnCount()-1))
+                 table.selectionModel().select(selection, QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows)
++        history = self._snapshot.flow_history
++        if (history is None and self._snapshot.flow_history_request_id >= getattr(self, "_history_min_request_id", 0)
++                and self._snapshot.status.startswith("Flow History failed")):
++            self.history_load_button.setEnabled(True)
++            self.history_status.setText(self._snapshot.status + " — UNVERIFIED")
++        elif (history is None and self._snapshot.flow_history_request_id >= getattr(self, "_history_min_request_id", 0)
++                and (self._snapshot.status.startswith("Flow History unavailable")
++                     or self._snapshot.status.startswith("Flow History cancelled"))):
++            self.history_load_button.setEnabled(True)
++            self.history_status.setText(self._snapshot.status + " — UNVERIFIED")
++        if (history is not None
++                and self._snapshot.flow_history_request_id >= getattr(self, "_history_min_request_id", 0)
++                and history is not getattr(self, "_previous_history", None)):
++            self._previous_history = history
++            self.history_load_button.setEnabled(True)
++            self.history_status.setText(
++                f"{history.symbol}: {len(history.trades)} trades — UNVERIFIED"
++                + (" — TRUNCATED (narrow time range)" if history.truncated else ""))
++            table = self.history_table
++            sorting = table.isSortingEnabled()
++            table.setSortingEnabled(False)
++            try:
++                table.setRowCount(len(history.trades))
++                for row, trade in enumerate(history.trades):
++                    values = (trade.timestamp.isoformat(), trade.trade_id,
++                              trade.side, str(trade.price), str(trade.quantity))
++                    for col, value in enumerate(values):
++                        item = table.item(row, col)
++                        if item is None:
++                            table.setItem(row, col, FlowTableItem(value))
++                        elif item.text() != value:
++                            item.setText(value)
++            finally:
++                table.setSortingEnabled(sorting)
+         self.flow_status.setText(self._snapshot.flow_status)
+         self.connect_flow_button.setEnabled(self._snapshot.flow_state in ('disconnected', 'failed'))
+         self.stop_flow_button.setEnabled(self._snapshot.flow_state in ('connecting', 'connected', 'failed'))
+diff --git a/src/meta_analyse/desktop_service.py b/src/meta_analyse/desktop_service.py
+index 41ab531..b913207 100644
+--- a/src/meta_analyse/desktop_service.py
++++ b/src/meta_analyse/desktop_service.py
+@@ -10,6 +10,7 @@ from .exchange import BybitPublic
+ from .ports import MetaScalp
+ from .runtime import Runtime
+ from .flow_bridge import FlowBridge
++from .flow_history_storage import FlowHistorySnapshot, _utc, read_flow_history
+ 
+ @dataclass(frozen=True)
+ class DesktopSnapshot:
+@@ -26,6 +27,8 @@ class DesktopSnapshot:
+     readiness: tuple = ()
+     orderflow_rows: tuple = ()
+     orderflow_status: str = 'No validated historical trade source attached'
++    flow_history: object = None
++    flow_history_request_id: int = 0
+ 
+ def _client_operation(method):
+     """Own requests until cancellation/response teardown finishes before aclose."""
+@@ -63,6 +66,8 @@ class DesktopService:
+         self.overview_task = None
+         self.overview_lock = None
+         self.readiness = {}
++        self.flow_history = None
++        self._history_generation = 0
+         self.orderflow_rows = ()
+         self.orderflow_status = 'No validated historical trade source attached'
+ 
+@@ -234,6 +239,52 @@ class DesktopService:
+             self.flow_state = 'disconnected'
+             self.flow_status = 'Disconnected — data marked UNVERIFIED'
+ 
++    async def load_flow_history(self, *, symbol, start, end, limit=5000):
++        """Worker-only DB access; stale async requests cannot replace newer snapshots."""
++        if self.closing:
++            return
++        self._history_generation += 1
++        generation = self._history_generation
++        self.flow_history = None
++        self.orderflow_rows = ()
++        self.orderflow_status = 'Loading history — UNVERIFIED'
++        self.status = 'Flow History loading — UNVERIFIED'
++        if self.store is None:
++            self.status = 'Flow History unavailable: PostgreSQL not configured'
++            return
++        try:
++            result = await asyncio.to_thread(
++                read_flow_history, self.store, symbol=symbol, start=start, end=end, limit=limit)
++            if self.closing or generation != self._history_generation:
++                return
++            if not isinstance(result, FlowHistorySnapshot):
++                raise TypeError('Flow History reader returned invalid snapshot')
++            if (result.symbol != symbol or result.start != _utc(start)
++                    or result.end != _utc(end) or result.status != 'UNVERIFIED'
++                    or not isinstance(result.trades, tuple)
++                    or type(result.truncated) is not bool):
++                raise ValueError('Flow History reader returned mismatched scope or status')
++            if not self.closing and generation == self._history_generation:
++                self.flow_history = result
++                if result.truncated:
++                    self.orderflow_rows = ()
++                    self.orderflow_status = 'History truncated; Order Flow unavailable — UNVERIFIED'
++                else:
++                    try:
++                        from .flow_history_storage import to_orderflow_records
++                        self.load_orderflow_records(to_orderflow_records(result))
++                    except Exception as exc:
++                        self.orderflow_rows = ()
++                        self.orderflow_status = 'Order Flow unavailable: invalid historical records — UNVERIFIED'
++                self.status = 'Flow History loaded — UNVERIFIED'
++        except asyncio.CancelledError:
++            if not self.closing and generation == self._history_generation:
++                self.status = 'Flow History cancelled — UNVERIFIED'
++            raise
++        except Exception as exc:
++            if generation == self._history_generation:
++                self.error('Flow History', exc)
++
+     async def configure_paper(self, enabled=None, rules=None):
+         if enabled is not None:
+             self.runtime.paper.enabled = enabled
+@@ -272,7 +323,7 @@ class DesktopService:
+ 
+     def snapshot(self):
+         if self.runtime is None:
+-            return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status)
++            return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status, flow_history=self.flow_history, flow_history_request_id=self._history_generation, orderflow_rows=self.orderflow_rows, orderflow_status=self.orderflow_status)
+         engine = self.runtime.paper
+         symbols = tuple(self.runtime.symbols)
+         stats = []
+@@ -300,7 +351,7 @@ class DesktopService:
+         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
+                                self.flow_state, self.flow_status, self.status,
+                                telemetry.events if telemetry else (), telemetry.gaps if telemetry else (),
+-                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols), self.orderflow_rows, self.orderflow_status)
++                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols), self.orderflow_rows, self.orderflow_status, self.flow_history, self._history_generation)
+ 
+     async def check_health(self):
+         if self.flow_state != 'connected' or self.session is None:
+@@ -343,6 +394,7 @@ class DesktopService:
+     async def _close(self):
+         # Stop request producers before the pool; otherwise a request can finish
+         # connecting after aclose has already visited the active connections.
++        self._history_generation += 1
+         requests = tuple(self._client_tasks)
+         for task in requests:
+             task.cancel()

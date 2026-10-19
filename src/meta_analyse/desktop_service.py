@@ -249,6 +249,12 @@ class DesktopService:
         try:
             result = await asyncio.to_thread(
                 read_flow_history, self.store, symbol=symbol, start=start, end=end, limit=limit)
+            if not isinstance(result, FlowHistorySnapshot):
+                raise TypeError('Flow History reader returned invalid snapshot')
+            from .flow_history_storage import _utc
+            if (result.symbol != symbol or result.start != _utc(start)
+                    or result.end != _utc(end) or result.status != 'UNVERIFIED'):
+                raise ValueError('Flow History reader returned mismatched scope or status')
             if not self.closing and generation == self._history_generation:
                 self.flow_history = result
                 self.status = 'Flow History loaded — UNVERIFIED'

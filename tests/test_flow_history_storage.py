@@ -148,3 +148,44 @@ def test_orderflow_bridge_rejects_invalid_historical_values(side, price, quantit
         (HistoricalTrade("id-1", start, price, quantity, side),))
     with pytest.raises(ValueError):
         to_orderflow_records(snapshot)
+
+
+def test_concurrent_flow_history_requests_ignore_stale_completion(monkeypatch):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=1)
+        first_started = asyncio.Event()
+        second_started = asyncio.Event()
+        release_first = asyncio.Event()
+        release_second = asyncio.Event()
+
+        async def fake_to_thread(func, store, *, symbol, start, end, limit):
+            if symbol == "BTCUSDT":
+                first_started.set()
+                await release_first.wait()
+            else:
+                second_started.set()
+                await release_second.wait()
+            return FlowHistorySnapshot(symbol, start, end, ())
+
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        first = asyncio.create_task(service.load_flow_history(
+            symbol="BTCUSDT", start=start, end=end))
+        await first_started.wait()
+        second = asyncio.create_task(service.load_flow_history(
+            symbol="ETHUSDT", start=start, end=end))
+        await second_started.wait()
+        release_second.set()
+        await second
+        assert service.snapshot().flow_history.symbol == "ETHUSDT"
+        release_first.set()
+        await first
+        assert service.snapshot().flow_history.symbol == "ETHUSDT"
+        assert service.snapshot().flow_history_request_id == 2
+
+    asyncio.run(scenario())

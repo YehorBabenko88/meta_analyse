@@ -76,7 +76,7 @@ jobs:
       - name: Mandatory baseline integration suite
         run: python -m pytest -q tests --junitxml=integration-gate.xml
       - name: Verify baseline suite ran without skips
-        run: python scripts/check_integration_junit.py integration-gate.xml --minimum 100 --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
+        run: python scripts/check_integration_junit.py integration-gate.xml --minimum 100 --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher --require-exact test_resume_and_deduplication --require-exact test_concurrent_sources_same_symbol --require-exact test_conflicting_archive_rolls_back_batch_and_checkpoint --require-exact test_partial_batch_failure_keeps_previous_committed_checkpoint --require-exact test_resume_after_failed_batch_and_repaired_archive_conflict --require-exact test_concurrent_identical_archive_is_idempotent --require-exact test_failed_import_status_preserves_committed_checkpoint --require-exact test_orderflow_reader_returns_exact_aliases --require-exact test_unlock_failure_does_not_mask_original_import_error
       - run: python -m compileall -q src
       - name: Repeat lifecycle resource regressions in fresh processes
         run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir repeat-lifecycle

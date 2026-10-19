@@ -188,3 +188,32 @@ async def test_cached_receipt_cannot_bypass_smaller_byte_budget(tmp_path, monkey
     with pytest.raises(ValueError, match="byte budget"):
         await acquire_archive(object(), URL, path, max_bytes=1)
     assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("field", "bad_value"), [
+    ("valid", 1),
+    ("valid", "true"),
+    ("complete", 0),
+    ("complete", None),
+])
+async def test_nonboolean_cached_receipt_flags_force_reaudit(tmp_path, monkeypatch, field, bad_value):
+    from meta_analyse import archive_ingestion
+    path = tmp_path / "archive.csv.gz"
+    make_gzip(path)
+    calls = []
+
+    async def fake_download(session, url, dest, **kwargs):
+        calls.append(url)
+        make_gzip(dest)
+        return dest
+
+    monkeypatch.setattr(archive_ingestion, "download_archive", fake_download)
+    await acquire_archive(object(), URL, path)
+    receipt_path = tmp_path / "archive.csv.gz.audit.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt[field] = bad_value
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    result = await acquire_archive(object(), URL, path)
+    assert result.valid is True and result.complete is False
+    assert len(calls) == 2

@@ -76,6 +76,11 @@ def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[dict, ...]:
     """
     if not isinstance(snapshot, FlowHistorySnapshot):
         raise TypeError("FlowHistorySnapshot required")
+    if not isinstance(snapshot.symbol, str) or not snapshot.symbol.strip():
+        raise ValueError("explicit snapshot symbol required")
+    start, end = _utc(snapshot.start), _utc(snapshot.end)
+    if start >= end:
+        raise ValueError("invalid snapshot interval")
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
     records = []
     for trade in snapshot.trades:
@@ -89,7 +94,10 @@ def to_orderflow_records(snapshot: FlowHistorySnapshot) -> tuple[dict, ...]:
             raise ValueError('invalid historical trade price')
         if not trade.quantity.is_finite() or trade.quantity < 0:
             raise ValueError('invalid historical trade quantity')
-        delta = _utc(trade.timestamp) - epoch
+        timestamp = _utc(trade.timestamp)
+        if not start <= timestamp < end:
+            raise ValueError("historical trade outside requested interval")
+        delta = timestamp - epoch
         timestamp_ms = ((delta.days * 86400 + delta.seconds) * 1000
                         + delta.microseconds // 1000)
         records.append({

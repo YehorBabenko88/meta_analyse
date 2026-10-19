@@ -144,6 +144,8 @@ async def acquire_many(archives: list[tuple[str, str | Path]], *,
                        resumable: bool = False):
     if type(max_bytes) is not int or max_bytes <= 0:
         raise ValueError("max_bytes must be a positive integer")
+    if type(concurrency) is not int or concurrency <= 0:
+        raise ValueError("concurrency must be a positive integer")
     # Two workers must never write the same .partial or audit receipt path.
     # Resolve paths before opening network sessions; reject collisions early.
     destinations = [str(Path(path).resolve()) for _, path in archives]

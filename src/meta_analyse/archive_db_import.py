@@ -63,7 +63,12 @@ def parse_trade(row):
     for digit in digits.digits:
         coefficient = coefficient * 10 + digit
     shift = digits.exponent + 6
-    micros = coefficient * (10 ** shift) if shift >= 0 else coefficient // (10 ** (-shift))
+    # Avoid allocating enormous powers for valid sub-microsecond values such
+    # as 1e-999999999; their truncated epoch microseconds are exactly zero.
+    if coefficient == 0 or (shift < 0 and -shift >= len(digits.digits)):
+        micros = 0
+    else:
+        micros = coefficient * (10 ** shift) if shift >= 0 else coefficient // (10 ** (-shift))
     try:
         time = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(microseconds=micros)
     except (ValueError, OverflowError) as exc:

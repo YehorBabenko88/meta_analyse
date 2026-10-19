@@ -1,5 +1,6 @@
 import csv
 import gzip
+import json
 
 import pytest
 
@@ -79,3 +80,27 @@ async def test_failed_replacement_removes_stale_receipt(tmp_path, monkeypatch):
         await acquire_archive(object(), URL, path)
     assert len(calls) == 2
     assert not receipt_path.exists()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_rows", [0, -1, True])
+async def test_invalid_cached_receipt_row_count_forces_reaudit(tmp_path, monkeypatch, bad_rows):
+    from meta_analyse import archive_ingestion
+    path = tmp_path / "archive.csv.gz"
+    make_gzip(path)
+    calls = []
+
+    async def fake_download(session, url, dest, **kwargs):
+        calls.append(url)
+        make_gzip(dest)
+        return dest
+
+    monkeypatch.setattr(archive_ingestion, "download_archive", fake_download)
+    await acquire_archive(object(), URL, path)
+    receipt_path = tmp_path / "archive.csv.gz.audit.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["rows"] = bad_rows
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    result = await acquire_archive(object(), URL, path)
+    assert result.rows == 1
+    assert len(calls) == 2

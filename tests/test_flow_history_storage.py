@@ -3,7 +3,7 @@ from decimal import Decimal
 from dataclasses import FrozenInstanceError
 import pytest
 
-from meta_analyse.flow_history_storage import read_flow_history, FlowHistorySnapshot, HistoricalTrade, HistoricalTrade
+from meta_analyse.flow_history_storage import read_flow_history, FlowHistorySnapshot, HistoricalTrade
 
 
 class FakeConnection:
@@ -313,3 +313,76 @@ def test_orderflow_bridge_accepts_lowercase_aggressor_side():
     snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
         (HistoricalTrade("id", start, Decimal("1"), Decimal("2"), "buy"),))
     assert to_orderflow_records(snapshot)[0]["side"] == "buy"
+
+
+def test_postgres_history_populates_orderflow_without_completeness_claim(monkeypatch):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        history = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(minutes=1), (
+            HistoricalTrade("buy", start, Decimal("100"), Decimal("2"), "Buy"),
+            HistoricalTrade("sell", start + timedelta(seconds=1), Decimal("100"), Decimal("1"), "Sell"),
+        ))
+        async def fake_to_thread(func, store, **kwargs):
+            return history
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        await service.load_flow_history(symbol="BTCUSDT", start=start, end=history.end)
+        snapshot = service.snapshot()
+        assert snapshot.flow_history is history
+        assert len(snapshot.orderflow_rows) == 1
+        assert snapshot.orderflow_rows[0].delta == "1"
+        assert snapshot.orderflow_rows[0].quality == "UNVERIFIED"
+        assert "UNVERIFIED" in snapshot.orderflow_status
+    asyncio.run(scenario())
+
+
+def test_truncated_postgres_history_refuses_orderflow_aggregation(monkeypatch):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        history = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(minutes=1), (
+            HistoricalTrade("id", start, Decimal("100"), Decimal("2"), "Buy"),
+        ), truncated=True)
+        async def fake_to_thread(func, store, **kwargs):
+            return history
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        await service.load_flow_history(symbol="BTCUSDT", start=start, end=history.end)
+        snapshot = service.snapshot()
+        assert snapshot.flow_history is history
+        assert snapshot.orderflow_rows == ()
+        assert "truncated" in snapshot.orderflow_status.lower()
+        assert "UNVERIFIED" in snapshot.orderflow_status
+    asyncio.run(scenario())
+
+
+def test_cancelled_history_request_cannot_publish_orderflow(monkeypatch):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        started = asyncio.Event()
+        async def fake_to_thread(func, store, **kwargs):
+            started.set()
+            await asyncio.Event().wait()
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        task = asyncio.create_task(service.load_flow_history(symbol="BTCUSDT", start=start, end=start + timedelta(minutes=1)))
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        snapshot = service.snapshot()
+        assert snapshot.flow_history is None
+        assert snapshot.orderflow_rows == ()
+        assert snapshot.flow_history_request_id == 1
+    asyncio.run(scenario())

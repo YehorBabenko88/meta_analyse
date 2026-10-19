@@ -161,3 +161,12 @@ def test_import_rejects_csv_shape_violations_before_db(tmp_path, content):
                "rows": content.count("\n") - 1}
     with pytest.raises(ValueError):
         import_verified_archive(None, path, receipt, symbol="BTCUSDT")
+
+
+def test_import_rejects_incorrect_receipt_row_count(tmp_path):
+    path = tmp_path / "rows.csv"
+    path.write_text("timestamp,trdMatchID,price,size,side\n1,id,1,1,Buy\n")
+    receipt = {"valid": True, "complete": False, "url": "https://example.invalid/rows",
+               "sha256": file_sha256(path), "bytes": path.stat().st_size, "rows": 2}
+    with pytest.raises(ValueError, match="archive rows or sha256 mismatch"):
+        import_verified_archive(None, path, receipt, symbol="BTCUSDT")

@@ -245,3 +245,34 @@ async def test_batch_rejects_invalid_budget_before_session_creation(bad_budget):
 
     with pytest.raises(ValueError, match="max_bytes must be a positive integer"):
         await acquire_many([], max_bytes=bad_budget)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_concurrency", [0, -1, True, False, 1.5, "4"])
+async def test_batch_rejects_invalid_concurrency_before_session_creation(bad_concurrency):
+    from meta_analyse.archive_ingestion import acquire_many
+
+    with pytest.raises(ValueError, match="concurrency must be a positive integer"):
+        await acquire_many([], concurrency=bad_concurrency)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_sha", ["z" * 64, "A" * 64, "0" * 63, 123])
+async def test_noncanonical_receipt_digest_forces_reaudit(tmp_path, monkeypatch, bad_sha):
+    from meta_analyse import archive_ingestion
+    path = tmp_path / "archive.csv.gz"
+    calls = []
+
+    async def fake_download(session, url, dest, **kwargs):
+        calls.append(url)
+        make_gzip(dest)
+        return dest
+
+    monkeypatch.setattr(archive_ingestion, "download_archive", fake_download)
+    await acquire_archive(object(), URL, path)
+    receipt_path = tmp_path / "archive.csv.gz.audit.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["sha256"] = bad_sha
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    result = await acquire_archive(object(), URL, path)
+    assert result.valid is True and len(calls) == 2

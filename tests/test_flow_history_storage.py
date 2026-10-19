@@ -313,3 +313,18 @@ def test_orderflow_bridge_accepts_lowercase_aggressor_side():
     snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
         (HistoricalTrade("id", start, Decimal("1"), Decimal("2"), "buy"),))
     assert to_orderflow_records(snapshot)[0]["side"] == "buy"
+
+
+@pytest.mark.parametrize("price,quantity", [
+    (1.5, Decimal("2")),
+    (Decimal("1"), 2.5),
+    ("1.0", Decimal("2")),
+    (Decimal("1"), "2.0"),
+])
+def test_orderflow_bridge_rejects_non_decimal_trade_fields(price, quantity):
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
+        (HistoricalTrade("id", start, price, quantity, "Buy"),))
+    with pytest.raises(TypeError, match="Decimal"):
+        to_orderflow_records(snapshot)

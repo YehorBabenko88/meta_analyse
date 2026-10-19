@@ -470,3 +470,29 @@ def test_worker_rejects_nonimmutable_reader_snapshot(monkeypatch, malformed):
         assert service.snapshot().flow_history_request_id == 1
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("raw,expected_microseconds", [
+    ("1735689600.000000999", 0),
+    ("1735689600.000001999", 1),
+    ("1735689600.999999999", 999999),
+    ("253402300799.999999999", 999999),
+])
+def test_archive_timestamp_microsecond_truncation_without_decimal_rounding(raw, expected_microseconds):
+    from meta_analyse.archive_db_import import parse_trade
+    trade = parse_trade({"trdMatchID": "id", "timestamp": raw,
+                         "price": "1.000000000000000001", "size": "0.000000000000000001",
+                         "side": "Buy"})
+    assert trade[1].microsecond == expected_microseconds
+    assert trade[2] == Decimal("1.000000000000000001")
+    assert trade[3] == Decimal("0.000000000000000001")
+
+
+@pytest.mark.parametrize("bad_row", [
+    {"trdMatchID":"id","timestamp":"1","price":"1","size":"0","side":"Buy"},
+    {"trdMatchID":"id","timestamp":"1","price":"1","size":"1","side":"unknown"},
+])
+def test_archive_strict_trade_profile_rejects_bad_rows(bad_row):
+    from meta_analyse.archive_db_import import parse_trade
+    with pytest.raises(ValueError):
+        parse_trade(bad_row)

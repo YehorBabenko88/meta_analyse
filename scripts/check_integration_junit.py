@@ -21,7 +21,7 @@ def main():
         print(f"SKIP: {case.get('classname')}.{case.get('name')}: {case.find('skipped').get('message')}")
     for pattern in missing:
         print(f"MISSING REQUIRED: {pattern}", file=sys.stderr)
-    unexpected = [c for c in skipped if not any(token in f"{c.get('classname', '')}.{c.get('name', '')}" for token in a.allow_skip)]
+    unexpected = [c for c in skipped if not any(token == c.get("name", "").split("[", 1)[0] for token in a.allow_skip)]
     if len(cases) < a.minimum or unexpected or failures or missing:
         sys.exit(1)
 

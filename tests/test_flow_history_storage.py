@@ -390,3 +390,27 @@ def test_orderflow_bridge_requires_boolean_truncation_flag(truncated):
                                    (), truncated=truncated)
     with pytest.raises(TypeError, match="boolean truncation"):
         to_orderflow_records(snapshot)
+
+
+@pytest.mark.parametrize("wrong_scope", ["symbol", "start", "end", "status"])
+def test_worker_rejects_reader_snapshot_with_wrong_scope(monkeypatch, wrong_scope):
+    import asyncio
+    import meta_analyse.desktop_service as module
+    from meta_analyse.desktop_service import DesktopService
+
+    async def scenario():
+        start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+        end = start + timedelta(minutes=1)
+        async def fake_to_thread(func, store, *, symbol, start, end, limit):
+            return FlowHistorySnapshot(
+                "ETHUSDT" if wrong_scope == "symbol" else symbol,
+                start + timedelta(seconds=1) if wrong_scope == "start" else start,
+                end + timedelta(seconds=1) if wrong_scope == "end" else end,
+                (), status="VERIFIED" if wrong_scope == "status" else "UNVERIFIED")
+        monkeypatch.setattr(module.asyncio, "to_thread", fake_to_thread)
+        service = DesktopService(object(), lambda _: None)
+        await service.load_flow_history(symbol="BTCUSDT", start=start, end=end)
+        assert service.snapshot().flow_history is None
+        assert service.snapshot().flow_history_request_id == 1
+
+    asyncio.run(scenario())

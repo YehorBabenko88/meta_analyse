@@ -358,3 +358,17 @@ def test_orderflow_bridge_rejects_unsubstantiated_verification_status(status):
         (), status=status)
     with pytest.raises(ValueError, match="verification status"):
         to_orderflow_records(snapshot)
+
+
+def test_orderflow_bridge_records_are_immutable_mappings():
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
+        (HistoricalTrade("id", start, Decimal("1.234567890123456789"),
+                         Decimal("0.000000000000000001"), "Sell"),))
+    records = to_orderflow_records(snapshot)
+    assert records[0]["price"] == Decimal("1.234567890123456789")
+    assert records[0]["volume"] == Decimal("0.000000000000000001")
+    with pytest.raises(TypeError):
+        records[0]["price"] = Decimal("0")
+    assert snapshot.trades[0].price == Decimal("1.234567890123456789")

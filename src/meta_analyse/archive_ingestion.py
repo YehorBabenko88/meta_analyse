@@ -51,7 +51,7 @@ def _load_receipt(path: Path, url: str, day: date | None = None, max_bytes: int 
         data = json.loads(_receipt_path(path).read_text(encoding="utf-8"))
         receipt = ArchiveReceipt(**data)
         if (receipt.url == url and receipt.day == (day.isoformat() if day else None)
-                and receipt.valid and not receipt.complete
+                and receipt.valid is True and receipt.complete is False
                 and type(receipt.rows) is int and receipt.rows > 0
                 and type(receipt.bytes) is int and receipt.bytes > 0 and receipt.bytes <= max_bytes
                 and isinstance(receipt.sha256, str) and len(receipt.sha256) == 64

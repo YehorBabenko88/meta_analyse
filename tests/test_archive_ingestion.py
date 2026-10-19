@@ -217,3 +217,18 @@ async def test_nonboolean_cached_receipt_flags_force_reaudit(tmp_path, monkeypat
     result = await acquire_archive(object(), URL, path)
     assert result.valid is True and result.complete is False
     assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_budget", [0, -1, True, False, 1.5, "100"])
+async def test_invalid_max_bytes_rejected_before_download(tmp_path, monkeypatch, bad_budget):
+    from meta_analyse import archive_ingestion
+    path = tmp_path / "archive.csv.gz"
+
+    async def unexpected_download(*args, **kwargs):
+        pytest.fail("invalid budget must not reach network")
+
+    monkeypatch.setattr(archive_ingestion, "download_archive", unexpected_download)
+    with pytest.raises(ValueError, match="max_bytes must be a positive integer"):
+        await acquire_archive(object(), URL, path, max_bytes=bad_budget)
+    assert not path.exists()

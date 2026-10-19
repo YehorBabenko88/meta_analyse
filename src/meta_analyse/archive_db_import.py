@@ -56,7 +56,14 @@ def parse_trade(row):
     side = row.get("side")
     if side not in ("Buy", "Sell"):
         raise ValueError("invalid trade side")
-    # Convert the integer and fractional parts separately to avoid Decimal\n    # context rounding on large epoch values before microsecond truncation.\n    seconds = int(timestamp)\n    fraction = timestamp - seconds\n    micros = seconds * 1000000 + int(fraction * 1000000)
+    # Compute microseconds from Decimal digits without context rounding.
+    # A context-limited Decimal multiplication can silently change the epoch.
+    digits = timestamp.as_tuple()
+    coefficient = 0
+    for digit in digits.digits:
+        coefficient = coefficient * 10 + digit
+    shift = digits.exponent + 6
+    micros = coefficient * (10 ** shift) if shift >= 0 else coefficient // (10 ** (-shift))
     try:
         time = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(microseconds=micros)
     except (ValueError, OverflowError) as exc:

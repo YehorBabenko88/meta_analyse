@@ -52,6 +52,9 @@ def _load_receipt(path: Path, url: str, day: date | None = None) -> ArchiveRecei
         receipt = ArchiveReceipt(**data)
         if (receipt.url == url and receipt.day == (day.isoformat() if day else None)
                 and receipt.valid and not receipt.complete
+                and type(receipt.rows) is int and receipt.rows > 0
+                and type(receipt.bytes) is int and receipt.bytes > 0
+                and isinstance(receipt.sha256, str) and len(receipt.sha256) == 64
                 and path.stat().st_size == receipt.bytes
                 and _digest(path) == receipt.sha256):
             return receipt

@@ -41,3 +41,17 @@ def test_archive_csv_strict_profile(tmp_path, csv_text, valid):
     result = audit_trade_gzip(path)
     assert result.valid is valid, result.reason
     assert result.complete is False
+
+
+@pytest.mark.parametrize(("raw_timestamp", "expected_ms"), [
+    ("1735775999.999999999999999999999", 1735775999999),
+    ("253402300799.99999999999999999", 253402300799999),
+    ("1735689600.000000999999999999999", 1735689600000),
+])
+def test_timestamp_milliseconds_never_round_across_boundary(tmp_path, raw_timestamp, expected_ms):
+    path = tmp_path / "precise.csv.gz"
+    path.write_bytes(gzip.compress((HEADER + f"id1,{raw_timestamp},100,1,Buy\n").encode("utf-8")))
+    audit = audit_trade_gzip(path)
+    assert audit.valid, audit.reason
+    assert audit.first_ms == expected_ms
+    assert audit.last_ms == expected_ms

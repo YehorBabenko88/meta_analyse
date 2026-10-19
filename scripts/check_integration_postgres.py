@@ -24,8 +24,7 @@ def main():
         raise SystemExit("Usage: check_integration_postgres.py FULL_JUNIT_XML")
     checker = Path(__file__).with_name("check_integration_junit.py")
     command = [sys.executable, str(checker), sys.argv[1], "--minimum", "9"]
-    for name in REQUIRED:
-        command.extend(["--require-exact", name])
+    # Only the Linux-inapplicable Windows installer test may be skipped.\n    # Required PostgreSQL cases remain non-skippable.\n    command.extend(["--allow-skip", "test_failed_pip_install_never_reports_success_or_creates_launcher"])\n    for name in REQUIRED:\n        command.extend(["--require-exact", name])
     raise SystemExit(subprocess.call(command))
 
 if __name__ == "__main__":

@@ -131,3 +131,20 @@ def test_orderflow_bridge_preserves_decimals_and_exact_milliseconds():
                         "volume": quantity, "side": "buy"},)
     assert snapshot.status == "UNVERIFIED"
     assert snapshot.trades[0].quantity is quantity
+
+
+@pytest.mark.parametrize("side,price,quantity", [
+    ("Unknown", Decimal("1"), Decimal("1")),
+    ("buy", Decimal("1"), Decimal("1")),
+    ("Buy", Decimal("NaN"), Decimal("1")),
+    ("Sell", Decimal("0"), Decimal("1")),
+    ("Buy", Decimal("1"), Decimal("-1")),
+    ("Sell", Decimal("1"), Decimal("Infinity")),
+])
+def test_orderflow_bridge_rejects_invalid_historical_values(side, price, quantity):
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
+        (HistoricalTrade("id-1", start, price, quantity, side),))
+    with pytest.raises(ValueError):
+        to_orderflow_records(snapshot)

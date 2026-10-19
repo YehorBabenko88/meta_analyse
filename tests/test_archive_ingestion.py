@@ -133,3 +133,34 @@ async def test_invalid_cached_receipt_metadata_forces_reaudit(tmp_path, monkeypa
     result = await acquire_archive(object(), URL, path)
     assert result.valid and result.rows == 1
     assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("field", "bad_value"), [
+    ("first_ms", None),
+    ("first_ms", True),
+    ("first_ms", -1),
+    ("last_ms", None),
+    ("last_ms", False),
+    ("last_ms", -1),
+])
+async def test_invalid_cached_receipt_time_bounds_force_reaudit(tmp_path, monkeypatch, field, bad_value):
+    from meta_analyse import archive_ingestion
+    path = tmp_path / "archive.csv.gz"
+    make_gzip(path)
+    calls = []
+
+    async def fake_download(session, url, dest, **kwargs):
+        calls.append(url)
+        make_gzip(dest)
+        return dest
+
+    monkeypatch.setattr(archive_ingestion, "download_archive", fake_download)
+    await acquire_archive(object(), URL, path)
+    receipt_path = tmp_path / "archive.csv.gz.audit.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt[field] = bad_value
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    result = await acquire_archive(object(), URL, path)
+    assert result.valid and result.first_ms <= result.last_ms
+    assert len(calls) == 2

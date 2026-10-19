@@ -23,6 +23,8 @@ GOOD = "id1,1735689600.123456,100.5,1.25,Buy\n"
         (HEADER + "id1,1735689600,100,0,Buy\n", False),
         (HEADER + "id1,253402300800,100,1,Buy\n", False),
         (HEADER + "id1,1735689601,100,1,Buy\nid2,1735689600,100,1,Sell\n", False),
+        (HEADER + "id1,1735689600.000900,100,1,Buy\nid2,1735689600.000100,100,1,Sell\n", False),
+        (HEADER + "id1,1735689600.000100,100,1,Buy\nid2,1735689600.000900,100,1,Sell\n", True),
         (HEADER, False),
     ],
 )

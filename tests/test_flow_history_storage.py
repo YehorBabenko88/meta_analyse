@@ -286,3 +286,22 @@ def test_cancelled_stale_history_request_preserves_newer_success(monkeypatch):
         assert snapshot.flow_history_request_id == 2
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("offset_us,expected_ms", [
+    (0, 0),
+    (999, 0),
+    (1000, 1),
+    (1999, 1),
+    (-1, -1),
+    (-1000, -1),
+    (-1001, -2),
+])
+def test_orderflow_bridge_epoch_millisecond_boundaries(offset_us, expected_ms):
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    timestamp = epoch + timedelta(microseconds=offset_us)
+    snapshot = FlowHistorySnapshot("BTCUSDT", epoch - timedelta(seconds=1),
+        epoch + timedelta(seconds=1),
+        (HistoricalTrade("id", timestamp, Decimal("1"), Decimal("2"), "Sell"),))
+    assert to_orderflow_records(snapshot)[0]["timestamp_ms"] == expected_ms

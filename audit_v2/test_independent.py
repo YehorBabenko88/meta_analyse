@@ -205,3 +205,25 @@ def test_original_postgres_error_survives_both_cleanup_failures(audit_store, tmp
     with pytest.raises(psycopg.errors.CheckViolation, match='audit_original_failure'):
         import_verified_archive(Store(), path, receipt, symbol='BTCUSDT', batch_size=1)
     assert cleanup == ['checkpoint', 'unlock']
+
+
+def test_failed_batch_resumes_after_real_conflict_is_removed(audit_store, tmp_path):
+    def receipt_for(path, url, count):
+        return dict(valid=True, complete=False, url=url, rows=count,
+                    bytes=path.stat().st_size, sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+    seed = archive(tmp_path/'seed.gz', [dict(row('1735689601'), trdMatchID='id2', price='99')])
+    import_verified_archive(audit_store, seed, receipt_for(seed, 'https://audit.invalid/seed', 1), symbol='BTCUSDT', batch_size=1)
+    path = archive(tmp_path/'resume.gz', [row(), dict(row('1735689601'), trdMatchID='id2')])
+    receipt = receipt_for(path, 'https://audit.invalid/resume', 2)
+    with pytest.raises(ValueError, match='conflicting existing trade ID'):
+        import_verified_archive(audit_store, path, receipt, symbol='BTCUSDT', batch_size=1)
+    with audit_store.connect() as conn:
+        checkpoint, status = conn.execute('''SELECT c.committed_rows,c.status FROM meta_analyse.archive_import_checkpoints c
+            JOIN meta_analyse.archive_sources s ON s.id=c.source_id WHERE s.source_url=%s''', (receipt['url'],)).fetchone()
+        assert (checkpoint, status) == (1, 'failed')
+        conn.execute("DELETE FROM meta_analyse.historical_trades WHERE symbol='BTCUSDT' AND trade_id='id2'")
+    resumed = import_verified_archive(audit_store, path, receipt, symbol='BTCUSDT', batch_size=1)
+    assert resumed['resumed_from'] == 1
+    with audit_store.connect() as conn:
+        assert conn.execute('SELECT committed_rows,status FROM meta_analyse.archive_import_checkpoints WHERE source_id=%s', (resumed['source_id'],)).fetchone() == (2, 'imported')
+        assert conn.execute("SELECT count(*) FROM meta_analyse.historical_trades WHERE symbol='BTCUSDT'").fetchone()[0] == 2

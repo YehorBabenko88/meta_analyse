@@ -143,6 +143,8 @@ async def test_invalid_cached_receipt_metadata_forces_reaudit(tmp_path, monkeypa
     ("last_ms", None),
     ("last_ms", False),
     ("last_ms", -1),
+    ("last_ms", 253402300800000),
+    ("first_ms", 253402300800000),
 ])
 async def test_invalid_cached_receipt_time_bounds_force_reaudit(tmp_path, monkeypatch, field, bad_value):
     from meta_analyse import archive_ingestion

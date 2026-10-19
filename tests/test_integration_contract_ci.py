@@ -12,6 +12,7 @@ def _check(tmp_path, statuses, *options):
         case = ET.SubElement(root, "testcase", classname="tests.test_integration_contract_ci", name=name)
         if status != "passed":
             ET.SubElement(case, status, message=f"synthetic {status}")
+    root.set("tests", str(len(statuses)))
     report = tmp_path / "junit.xml"
     ET.ElementTree(root).write(report, encoding="unicode")
     return subprocess.run(
@@ -63,3 +64,15 @@ def test_integration_contract_ci_requires_exact_name(tmp_path):
 def test_integration_contract_ci_accepts_exact_required_name(tmp_path):
     assert _check(tmp_path, [("test_required", "passed")],
                   "--require-exact", "test_required").returncode == 0
+
+def test_integration_contract_ci_rejects_duplicate_testcase(tmp_path):
+    result = _check(tmp_path, [("duplicate", "passed"), ("duplicate", "passed")])
+    assert result.returncode != 0
+
+def test_integration_contract_ci_rejects_declared_count_mismatch(tmp_path):
+    root = ET.Element("testsuite", tests="99")
+    ET.SubElement(root, "testcase", classname="tests.test_contract", name="only_one")
+    report = tmp_path / "bad_count.xml"
+    ET.ElementTree(root).write(report, encoding="unicode")
+    result = subprocess.run([sys.executable, str(SCRIPT), str(report), "--minimum", "1"], capture_output=True)
+    assert result.returncode != 0

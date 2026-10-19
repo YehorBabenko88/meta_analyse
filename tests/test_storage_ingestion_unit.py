@@ -119,3 +119,28 @@ def test_import_rejects_malformed_csv_quoting_before_db(tmp_path):
                "sha256": file_sha256(path), "bytes": path.stat().st_size, "rows": 1}
     with pytest.raises((ValueError, __import__("csv").Error)):
         import_verified_archive(None, path, receipt, symbol="BTCUSDT")
+
+
+@pytest.mark.parametrize("change", [{"rows": 0}, {"bytes": 0}])
+def test_empty_receipt_is_rejected_before_database(tmp_path, change):
+    path = tmp_path / "trades.csv"
+    path.write_text("timestamp,trdMatchID,price,size,side\n1,id,1,1,Buy\n")
+    receipt = {"valid": True, "complete": False, "url": "https://example.invalid/archive",
+               "sha256": file_sha256(path), "bytes": path.stat().st_size, "rows": 1}
+    with pytest.raises(ValueError, match="invalid receipt"):
+        import_verified_archive(None, path, dict(receipt, **change), symbol="BTCUSDT")
+
+
+@pytest.mark.parametrize("value", [
+    "253402300800", "253402300800.000000000001", "-0.000000001",
+])
+def test_timestamp_outside_utc_range_rejected(value):
+    with pytest.raises(ValueError, match="timestamp out of range"):
+        parse_trade({"trdMatchID": "boundary", "timestamp": value,
+                     "price": "1", "size": "1", "side": "Buy"})
+
+
+def test_timestamp_max_supported_microsecond():
+    row = {"trdMatchID": "max", "timestamp": "253402300799.999999999999999999",
+           "price": "1", "size": "1", "side": "Sell"}
+    assert parse_trade(row)[1] == datetime(9999, 12, 31, 23, 59, 59, 999999, tzinfo=timezone.utc)

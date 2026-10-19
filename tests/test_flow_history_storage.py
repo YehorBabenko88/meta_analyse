@@ -348,3 +348,13 @@ def test_orderflow_bridge_requires_explicit_snapshot_symbol():
     snapshot = FlowHistorySnapshot("", start, start + timedelta(seconds=1), ())
     with pytest.raises(ValueError, match="symbol"):
         to_orderflow_records(snapshot)
+
+
+@pytest.mark.parametrize("status", ["VERIFIED", "COMPLETE", ""])
+def test_orderflow_bridge_rejects_unsubstantiated_verification_status(status):
+    from meta_analyse.flow_history_storage import to_orderflow_records
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    snapshot = FlowHistorySnapshot("BTCUSDT", start, start + timedelta(seconds=1),
+        (), status=status)
+    with pytest.raises(ValueError, match="verification status"):
+        to_orderflow_records(snapshot)

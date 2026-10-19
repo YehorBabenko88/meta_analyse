@@ -10,6 +10,7 @@ from .exchange import BybitPublic
 from .ports import MetaScalp
 from .runtime import Runtime
 from .flow_bridge import FlowBridge
+from .flow_history_storage import read_flow_history
 
 @dataclass(frozen=True)
 class DesktopSnapshot:
@@ -24,6 +25,10 @@ class DesktopSnapshot:
     market_ages: tuple = ()
     overview: tuple = ()
     readiness: tuple = ()
+    orderflow_rows: tuple = ()
+    orderflow_status: str = 'No validated historical trade source attached'
+    flow_history: object = None
+    flow_history_request_id: int = 0
 
 def _client_operation(method):
     """Own requests until cancellation/response teardown finishes before aclose."""
@@ -61,6 +66,10 @@ class DesktopService:
         self.overview_task = None
         self.overview_lock = None
         self.readiness = {}
+        self.flow_history = None
+        self._history_generation = 0
+        self.orderflow_rows = ()
+        self.orderflow_status = 'No validated historical trade source attached'
 
     def initialize(self):
         self.api = MetaScalp()
@@ -230,11 +239,71 @@ class DesktopService:
             self.flow_state = 'disconnected'
             self.flow_status = 'Disconnected — data marked UNVERIFIED'
 
+    async def load_flow_history(self, *, symbol, start, end, limit=5000):
+        """Worker-only DB access; stale async requests cannot replace newer snapshots."""
+        if self.closing:
+            return
+        self._history_generation += 1
+        generation = self._history_generation
+        self.flow_history = None
+        self.orderflow_rows = ()
+        self.orderflow_status = 'Loading history — UNVERIFIED'
+        self.status = 'Flow History loading — UNVERIFIED'
+        if self.store is None:
+            self.status = 'Flow History unavailable: PostgreSQL not configured'
+            return
+        try:
+            result = await asyncio.to_thread(
+                read_flow_history, self.store, symbol=symbol, start=start, end=end, limit=limit)
+            if not self.closing and generation == self._history_generation:
+                self.flow_history = result
+                if result.truncated:
+                    self.orderflow_rows = ()
+                    self.orderflow_status = 'History truncated; Order Flow unavailable — UNVERIFIED'
+                else:
+                    try:
+                        from .flow_history_storage import to_orderflow_records
+                        self.load_orderflow_records(to_orderflow_records(result))
+                    except Exception as exc:
+                        self.orderflow_rows = ()
+                        self.orderflow_status = f'Order Flow unavailable: {exc} — UNVERIFIED'
+                self.status = 'Flow History loaded — UNVERIFIED'
+        except asyncio.CancelledError:
+            if not self.closing and generation == self._history_generation:
+                self.status = 'Flow History cancelled — UNVERIFIED'
+            raise
+        except Exception as exc:
+            if generation == self._history_generation:
+                self.error('Flow History', exc)
+
     async def configure_paper(self, enabled=None, rules=None):
         if enabled is not None:
             self.runtime.paper.enabled = enabled
         if rules is not None:
             self.runtime.paper.threshold, self.runtime.paper.stop_pct, self.runtime.paper.fee_rate = rules
+
+    def load_orderflow_records(self, records, interval_ms=60000):
+        """Explicit, read-only history adapter; no implicit completeness claim."""
+        from .orderflow_adapters import from_records
+        from .orderflow_aggregation import aggregate_by_time
+        from .orderflow_view import make_rows
+        # Bound both memory and Qt table size; refuse truncation that could
+        # silently corrupt cumulative delta or imply complete coverage.
+        max_trades = 250_000
+        max_buckets = 10_000
+        trades = []
+        for trade in from_records(records):
+            if len(trades) >= max_trades:
+                raise ValueError('historical trade limit exceeded')
+            trades.append(trade)
+        buckets = aggregate_by_time(trades, interval_ms)
+        if len(buckets) > max_buckets:
+            raise ValueError('historical interval limit exceeded')
+        self.orderflow_rows = make_rows(buckets, quality='UNVERIFIED')
+        self.orderflow_status = (
+            f'{len(trades)} trades, {len(buckets)} intervals; '
+            + 'historical coverage UNVERIFIED'
+        )
 
     def set_readiness(self, symbol, progress):
         """Accept only a validated Progress object from history coordination."""
@@ -245,7 +314,7 @@ class DesktopService:
 
     def snapshot(self):
         if self.runtime is None:
-            return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status)
+            return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status, flow_history=self.flow_history, flow_history_request_id=self._history_generation, orderflow_rows=self.orderflow_rows, orderflow_status=self.orderflow_status)
         engine = self.runtime.paper
         symbols = tuple(self.runtime.symbols)
         stats = []
@@ -273,7 +342,7 @@ class DesktopService:
         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
                                self.flow_state, self.flow_status, self.status,
                                telemetry.events if telemetry else (), telemetry.gaps if telemetry else (),
-                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols))
+                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols), self.orderflow_rows, self.orderflow_status, self.flow_history, self._history_generation)
 
     async def check_health(self):
         if self.flow_state != 'connected' or self.session is None:
@@ -316,6 +385,7 @@ class DesktopService:
     async def _close(self):
         # Stop request producers before the pool; otherwise a request can finish
         # connecting after aclose has already visited the active connections.
+        self._history_generation += 1
         requests = tuple(self._client_tasks)
         for task in requests:
             task.cancel()

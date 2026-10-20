@@ -244,6 +244,11 @@
       "url": "https://get.enterprisedb.com/postgresql/postgresql-18.6-5-windows-x64-binaries.zip",
       "sha256": "e2246ba91d22345bc3d017586c09ede52d9df180b1eeb480f050445f1cad84e2",
       "checksum_provenance": "independently downloaded over verified HTTPS from vendor redirect; observed archive hash, not a vendor signed checksum"
+    },
+    "rejected_candidate": {
+      "sha": "d3856c7db6171707455df735e2aa9e657be10840",
+      "reason": "Windows Actions green but raw JUnit639passed11skipped: integration copied PR9 isolated script without baseline TEST_DSN and storage gate",
+      "correction": "Restore both DSNs and gate in script; independently invoke gate in Windows workflow; do not certify green icon alone"
     }
   }
 }

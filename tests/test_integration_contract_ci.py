@@ -119,3 +119,18 @@ def test_postgres_gate_rejects_unrelated_passes_and_module_collisions(tmp_path):
         ET.ElementTree(root).write(report,encoding='unicode')
         result = subprocess.run([sys.executable,str(checker),str(report)],capture_output=True,text=True)
         assert result.returncode != 0, result.stdout
+
+
+def test_postgres_gate_rejects_skipped_mandatory_cases_even_if_allowlisted(tmp_path):
+    import runpy
+    gate=SCRIPT.with_name('check_integration_postgres.py')
+    required=runpy.run_path(str(gate))['REQUIRED']
+    root=ET.Element('testsuite',tests=str(len(required)))
+    for name in required:
+        case=ET.SubElement(root,'testcase',classname='tests.test_storage_ingestion_postgres',name=name)
+        ET.SubElement(case,'skipped',message='DSN was not configured')
+    report=tmp_path/'skipped-storage.xml';ET.ElementTree(root).write(report,encoding='unicode')
+    options=[option for name in required for option in ('--allow-skip',name)]
+    result=subprocess.run([sys.executable,str(gate),str(report),*options],capture_output=True,text=True)
+    assert result.returncode != 0
+    assert 'REQUIRED IDENTITY SKIPPED' in result.stderr

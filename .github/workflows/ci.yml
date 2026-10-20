@@ -34,6 +34,9 @@ jobs:
       - name: Windows Qt and disposable PostgreSQL integration
         shell: pwsh
         run: ./scripts/test-windows.ps1 -PgBin "${{ steps.pg18.outputs.pgbin }}"
+      - name: Independently reject missing or skipped Windows storage and shutdown cases
+        shell: pwsh
+        run: python scripts/check_integration_postgres.py "$env:RUNNER_TEMP/meta-analyse-ci/tests.xml"
       - name: Measure synthetic 20-instrument UI load
         shell: pwsh
         run: python scripts/benchmark_flow_ui.py --seconds 3 --output "$env:RUNNER_TEMP/meta-analyse-ci/ui-performance.json"

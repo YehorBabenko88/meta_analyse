@@ -139,8 +139,8 @@ def import_verified_archive(store, path, receipt, *, venue="bybit", symbol, batc
         initialize_archive_schema(store)
         with store.connect() as conn:
             conn.autocommit = True
-            conn.execute("SET statement_timeout = 0")
-            conn.execute("SET lock_timeout = 60000")
+            conn.execute("SET statement_timeout = 120000")
+            conn.execute("SET lock_timeout = 15000")
             key = int.from_bytes(hashlib.sha256((venue + "\0" + symbol).encode()).digest()[:8], "big", signed=True)
             conn.execute("SELECT pg_advisory_lock(%s)", (key,))
             try:

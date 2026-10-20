@@ -166,3 +166,28 @@ async def test_failed_handshakes_preserve_exponential_backoff(monkeypatch):
                              backoff_base=0.1, backoff_max=0.4)
     await stream.run(["BTCUSDT"], stop)
     assert delays == [0.1, 0.2, 0.4, 0.4]
+
+
+@pytest.mark.asyncio
+async def test_other_symbol_traffic_does_not_hide_silent_book(monkeypatch):
+    # A busy connection can keep delivering unrelated messages while the
+    # subscribed book is silent; the watchdog must check on every iteration.
+    class BusySocket(FakeSocket):
+        async def recv(self):
+            await asyncio.sleep(0.002)
+            return json.dumps({"topic": "publicTrade.BTCUSDT", "data": []})
+    sockets = [BusySocket([]), FakeSocket([packet("snapshot", 8, 8)])]
+    stop = asyncio.Event()
+    updates = []
+    async def on_book(symbol, book, ts):
+        updates.append(book.update_id)
+        stop.set()
+    async def on_gap(*_):
+        pass
+    monkeypatch.setattr("meta_analyse.orderbook_stream.websockets.connect",
+                        lambda *a, **kw: sockets.pop(0))
+    stream = OrderBookStream(on_book, on_gap, silence_timeout=0.01,
+                             backoff_base=0.001, backoff_max=0.01)
+    await asyncio.wait_for(stream.run(["BTCUSDT"], stop), 2)
+    assert updates == [8]
+    assert stream.connection_epoch == 2

@@ -53,8 +53,11 @@ class OrderBookStream:
                     # Each symbol must receive a fresh snapshot in this epoch.
                     last_message = {s: time.monotonic() for s in symbols}
                     while not stop.is_set():
+                        if any(time.monotonic() - t >= self.silence_timeout
+                               for t in last_message.values()):
+                            raise _ResubscribeRequired("connected orderbook feed silent")
                         try:
-                            raw = await asyncio.wait_for(ws.recv(), timeout=1)
+                            raw = await asyncio.wait_for(ws.recv(), timeout=min(1, self.silence_timeout))
                         except asyncio.TimeoutError:
                             if any(time.monotonic() - t >= self.silence_timeout
                                    for t in last_message.values()):

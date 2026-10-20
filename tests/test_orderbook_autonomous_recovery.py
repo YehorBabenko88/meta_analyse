@@ -191,3 +191,27 @@ async def test_other_symbol_traffic_does_not_hide_silent_book(monkeypatch):
     await asyncio.wait_for(stream.run(["BTCUSDT"], stop), 2)
     assert updates == [8]
     assert stream.connection_epoch == 2
+
+
+@pytest.mark.asyncio
+async def test_malformed_timestamp_never_publishes_valid_book(monkeypatch):
+    malformed = json.loads(packet("snapshot", 1, 1))
+    malformed["ts"] = "not-a-timestamp"
+    sockets = [
+        FakeSocket([json.dumps(malformed), packet("delta", 2, 2)]),
+        FakeSocket([packet("snapshot", 10, 10)])
+    ]
+    stop = asyncio.Event()
+    updates, gaps = [], []
+    async def on_book(symbol, book, ts):
+        updates.append((book.update_id, ts))
+        stop.set()
+    async def on_gap(symbols, reason):
+        gaps.append(reason)
+    monkeypatch.setattr("meta_analyse.orderbook_stream.websockets.connect",
+                        lambda *a, **kw: sockets.pop(0))
+    stream = OrderBookStream(on_book, on_gap, backoff_base=0.001, backoff_max=0.01)
+    await asyncio.wait_for(stream.run(["BTCUSDT"], stop), 3)
+    assert updates == [(10, 1)]
+    assert stream.connection_epoch == 2
+    assert any("timestamp" in reason for reason in gaps)

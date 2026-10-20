@@ -56,12 +56,14 @@ async def download_archive(session, url: str, destination: str | Path,
             total = 0
             with partial.open("wb") as output:
                 async for chunk in response.content.iter_chunked(chunk_bytes):
-                    total += len(chunk)
-                    if total > max_bytes:
+                    if total + len(chunk) > max_bytes:
                         raise ValueError("archive exceeds maximum allowed bytes")
                     output.write(chunk)
+                    total += len(chunk)
                 output.flush()
                 os.fsync(output.fileno())
+            if declared is not None and total != declared:
+                raise ValueError("archive response length mismatch")
         os.replace(partial, destination)
         return destination
     except BaseException:

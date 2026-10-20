@@ -20,8 +20,7 @@ class ResumeState:
 
 
 def strong_etag(value: str | None) -> bool:
-    return bool(value and value.startswith('"') and value.endswith('"')
-                and len(value) > 2 and "\r" not in value and "\n" not in value)
+    return bool(value and re.fullmatch(r'"[\x21\x23-\x7e\x80-\xff]+"', value))
 
 
 def resume_headers(state: ResumeState) -> dict[str, str]:
@@ -45,12 +44,18 @@ def validate_partial_response(status: int, headers, state: ResumeState) -> int:
     if start != state.offset or total != state.total_bytes or end != total - 1:
         raise ValueError("range does not match saved archive")
     etag = headers.get("ETag")
-    if etag is not None and etag != state.etag:
-        raise ValueError("archive ETag changed")
+    if etag != state.etag:
+        raise ValueError("archive ETag missing or changed")
     if headers.get("Content-Encoding", "identity").lower() != "identity":
         raise ValueError("compressed HTTP transfer encoding not supported for resume")
     length = headers.get("Content-Length")
     expected = total - start
-    if length is not None and int(length) != expected:
+    if length is None:
+        raise ValueError("range response missing Content-Length")
+    try:
+        declared = int(length)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid Content-Length") from exc
+    if declared != expected:
         raise ValueError("range response length mismatch")
     return expected

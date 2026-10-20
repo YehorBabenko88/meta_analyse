@@ -17,9 +17,9 @@ async def test_opt_in_resume_uses_audited_ingestion(tmp_path, monkeypatch):
     async def resumable(session, url, destination, **kwargs):
         calls.append(("resume", url))
         with gzip.open(destination, "wt", newline="") as stream:
-            writer = csv.DictWriter(stream, fieldnames=["timestamp", "price", "size"])
+            writer = csv.DictWriter(stream, fieldnames=["trdMatchID", "timestamp", "price", "size", "side"])
             writer.writeheader()
-            writer.writerow({"timestamp": "1735689600", "price": "100", "size": "1"})
+            writer.writerow({"trdMatchID": "id1", "timestamp": "1735689600", "price": "100", "size": "1", "side": "Buy"})
         return destination
 
     async def ordinary(*args, **kwargs):

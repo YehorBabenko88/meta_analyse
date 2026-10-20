@@ -30,49 +30,83 @@ async def download_resumable(session, url: str, destination: str | Path, *,
     headers = resume_headers(state) if state is not None else {
         "Accept-Encoding": "identity"
     }
-    try:
-        async with session.get(url, headers=headers, allow_redirects=False) as response:
-            response.raise_for_status()
-            if state is not None:
-                expected = validate_partial_response(response.status, response.headers, state)
-                etag = state.etag
-                total = state.total_bytes
-                offset = state.offset
-            else:
-                if response.status != 200:
-                    raise ValueError("expected full archive response")
-                etag = response.headers.get("ETag")
-                total = response.content_length
-                if not strong_etag(etag) or total is None or total < 1:
-                    raise ValueError("resumable archive requires strong ETag and length")
-                if response.headers.get("Content-Encoding", "identity").lower() != "identity":
-                    raise ValueError("compressed HTTP transfer encoding not supported")
-                if total > max_bytes:
-                    raise ValueError("archive exceeds maximum allowed bytes")
-                offset = 0
-                expected = total
+    async with session.get(url, headers=headers, allow_redirects=False) as response:
+        response.raise_for_status()
+        if state is not None:
+            expected = validate_partial_response(response.status, response.headers, state)
+            etag = state.etag
+            total = state.total_bytes
+            offset = state.offset
+        else:
+            if response.status != 200:
+                raise ValueError("expected full archive response")
+            etag = response.headers.get("ETag")
+            total = response.content_length
+            declared = response.headers.get("Content-Length")
+            if declared is None:
+                raise ValueError("resumable archive requires explicit Content-Length")
+            try:
+                header_total = int(declared)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("invalid archive Content-Length") from exc
+            if header_total != total:
+                raise ValueError("archive Content-Length disagrees with response")
+            if not strong_etag(etag) or total is None or total < 1:
+                raise ValueError("resumable archive requires strong ETag and length")
+            if response.headers.get("Content-Encoding", "identity").lower() != "identity":
+                raise ValueError("compressed HTTP transfer encoding not supported")
             if total > max_bytes:
                 raise ValueError("archive exceeds maximum allowed bytes")
-            transferred = 0
-            with partial.open("ab" if state is not None else "wb") as stream:
+            offset = 0
+            expected = total
+        if total > max_bytes:
+            raise ValueError("archive exceeds maximum allowed bytes")
+        transferred = 0
+        transfer_error = None
+        durable = True
+        with partial.open("ab" if state is not None else "wb") as stream:
+            try:
                 async for chunk in response.content.iter_chunked(chunk_bytes):
-                    transferred += len(chunk)
-                    if transferred > expected:
+                    if transferred + len(chunk) > expected:
                         raise ValueError("archive response exceeds declared range")
                     stream.write(chunk)
-                stream.flush()
-                os.fsync(stream.fileno())
-            if transferred != expected:
-                # Preserve only bytes that were actually flushed to disk.
-                if transferred > 0:
+                    transferred += len(chunk)
+            except BaseException as exc:
+                # Preserve cancellation semantics after durable checkpointing.
+                transfer_error = exc
+            finally:
+                try:
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                except OSError:
+                    durable = False
+                    if transfer_error is None:
+                        raise
+                    # The original cancellation/transport failure takes
+                    # precedence. Without a durable checkpoint, the next
+                    # invocation discards the untrusted partial bytes.
+        if transfer_error is not None:
+            # Never let checkpoint I/O replace the original cancellation or
+            # transport failure; the next run rejects unsaved partial bytes.
+            if durable and 0 < transferred < expected:
+                try:
                     save_partial(destination, url, ResumeState(offset + transferred, etag, total))
-                raise ValueError("incomplete archive response; partial retained")
-        if partial.stat().st_size != total:
-            raise ValueError("archive size mismatch")
-        os.replace(partial, destination)
+                except OSError:
+                    pass
+            raise transfer_error
+        if transferred != expected:
+            # Preserve only bytes that were actually flushed to disk.
+            if transferred > 0:
+                save_partial(destination, url, ResumeState(offset + transferred, etag, total))
+            raise ValueError("incomplete archive response; partial retained")
+    if partial.stat().st_size != total:
+        raise ValueError("archive size mismatch")
+    os.replace(partial, destination)
+    # The completed destination is authoritative. Removing an obsolete
+    # sidecar is best effort: a cleanup failure must not report a failed
+    # download after the archive has already been atomically published.
+    try:
         sidecar.unlink(missing_ok=True)
-        return destination
-    except BaseException:
-        # The last saved sidecar remains authoritative. Unsaved appended bytes
-        # cause the next attempt to discard the partial rather than trust it.
-        raise
+    except OSError:
+        pass
+    return destination

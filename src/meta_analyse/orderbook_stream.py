@@ -52,7 +52,6 @@ class OrderBookStream:
                         f"orderbook.{self.depth}.{s}" for s in symbols]}))
                     # Each symbol must receive a fresh snapshot in this epoch.
                     last_message = {s: time.monotonic() for s in symbols}
-                    delay = self.backoff_base
                     while not stop.is_set():
                         try:
                             raw = await asyncio.wait_for(ws.recv(), timeout=1)
@@ -89,6 +88,10 @@ class OrderBookStream:
                             # Never accept a later delta in this connection/epoch.
                             raise _ResubscribeRequired("invalid orderbook; fresh snapshot required")
                         await self.on_book(symbol, book, int(msg.get("ts", 0)))
+                        # Reset backoff only after a verified snapshot, not merely
+                        # after a TCP/WebSocket handshake (which may flap rapidly).
+                        if msg.get("type") == "snapshot":
+                            delay = self.backoff_base
             except asyncio.CancelledError:
                 raise
             except Exception as exc:

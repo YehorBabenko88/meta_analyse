@@ -105,10 +105,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: parallel/archive-reliability
+          ref: 091e9db1a9c7f144a34150da81eae64cf9d7d8e3
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify pinned archive source SHA
+        run: python -c "import subprocess; expected='091e9db1a9c7f144a34150da81eae64cf9d7d8e3'; actual=subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(); print('Archive source SHA:',actual); assert actual == expected"
       - name: Install archive contract dependencies
         run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - name: Run mandatory HTTP fault contracts

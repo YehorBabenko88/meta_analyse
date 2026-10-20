@@ -10,6 +10,7 @@ from .exchange import BybitPublic
 from .ports import MetaScalp
 from .runtime import Runtime
 from .flow_bridge import FlowBridge
+from .flow_history_storage import FlowHistorySnapshot, _utc, read_flow_history
 
 @dataclass(frozen=True)
 class DesktopSnapshot:
@@ -24,6 +25,8 @@ class DesktopSnapshot:
     market_ages: tuple = ()
     overview: tuple = ()
     readiness: tuple = ()
+    flow_history: object = None
+    flow_history_request_id: int = 0
 
 def _client_operation(method):
     """Own requests until cancellation/response teardown finishes before aclose."""
@@ -61,6 +64,8 @@ class DesktopService:
         self.overview_task = None
         self.overview_lock = None
         self.readiness = {}
+        self.flow_history = None
+        self._history_generation = 0
 
     def initialize(self):
         self.api = MetaScalp()
@@ -230,6 +235,40 @@ class DesktopService:
             self.flow_state = 'disconnected'
             self.flow_status = 'Disconnected — data marked UNVERIFIED'
 
+    async def load_flow_history(self, *, symbol, start, end, limit=5000):
+        """Worker-only DB access; stale async requests cannot replace newer snapshots."""
+        if self.closing:
+            return
+        self._history_generation += 1
+        generation = self._history_generation
+        self.flow_history = None
+        self.status = 'Flow History loading — UNVERIFIED'
+        if self.store is None:
+            self.status = 'Flow History unavailable: PostgreSQL not configured'
+            return
+        try:
+            result = await asyncio.to_thread(
+                read_flow_history, self.store, symbol=symbol, start=start, end=end, limit=limit)
+            if self.closing or generation != self._history_generation:
+                return
+            if not isinstance(result, FlowHistorySnapshot):
+                raise TypeError('Flow History reader returned invalid snapshot')
+            if (result.symbol != symbol or result.start != _utc(start)
+                    or result.end != _utc(end) or result.status != 'UNVERIFIED'
+                    or not isinstance(result.trades, tuple)
+                    or type(result.truncated) is not bool):
+                raise ValueError('Flow History reader returned mismatched scope or status')
+            if not self.closing and generation == self._history_generation:
+                self.flow_history = result
+                self.status = 'Flow History loaded — UNVERIFIED'
+        except asyncio.CancelledError:
+            if not self.closing and generation == self._history_generation:
+                self.status = 'Flow History cancelled — UNVERIFIED'
+            raise
+        except Exception as exc:
+            if generation == self._history_generation:
+                self.error('Flow History', exc)
+
     async def configure_paper(self, enabled=None, rules=None):
         if enabled is not None:
             self.runtime.paper.enabled = enabled
@@ -245,7 +284,7 @@ class DesktopService:
 
     def snapshot(self):
         if self.runtime is None:
-            return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status)
+            return DesktopSnapshot(flow_state=self.flow_state, flow_status=self.flow_status, status=self.status, flow_history=self.flow_history, flow_history_request_id=self._history_generation)
         engine = self.runtime.paper
         symbols = tuple(self.runtime.symbols)
         stats = []
@@ -273,7 +312,7 @@ class DesktopService:
         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
                                self.flow_state, self.flow_status, self.status,
                                telemetry.events if telemetry else (), telemetry.gaps if telemetry else (),
-                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols))
+                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols), self.flow_history, self._history_generation)
 
     async def check_health(self):
         if self.flow_state != 'connected' or self.session is None:
@@ -316,6 +355,7 @@ class DesktopService:
     async def _close(self):
         # Stop request producers before the pool; otherwise a request can finish
         # connecting after aclose has already visited the active connections.
+        self._history_generation += 1
         requests = tuple(self._client_tasks)
         for task in requests:
             task.cancel()

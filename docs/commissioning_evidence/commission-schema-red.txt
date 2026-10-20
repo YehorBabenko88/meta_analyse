@@ -1,0 +1,31 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+______________ test_service_close_waits_for_monitor_schema_write ______________
+
+    @pytest.mark.asyncio
+    async def test_service_close_waits_for_monitor_schema_write():
+        from meta_analyse.desktop_service import DesktopService
+        entered,release=threading.Event(),threading.Event()
+        class Store:
+            def initialize(self):
+                entered.set()
+                if not release.wait(5): raise TimeoutError('audit did not release schema write')
+        class Runtime:
+            def stop(self): pass
+            async def run(self): pytest.fail('cancelled initialization must not start monitor')
+        service=DesktopService(Store(),lambda _:None);service.runtime=Runtime()
+        await service.start_monitor()
+        assert await asyncio.to_thread(entered.wait,2)
+        closing=asyncio.create_task(service.close())
+        try:
+            for _ in range(20): await asyncio.sleep(0)
+>           assert not closing.done(), 'service close acknowledged before schema write completed'
+E           AssertionError: service close acknowledged before schema write completed
+E           assert not True
+E            +  where True = <built-in method done of _asyncio.Task object at 0x000002063BC3DB40>()
+E            +    where <built-in method done of _asyncio.Task object at 0x000002063BC3DB40> = <Task finished name='Task-3' coro=<DesktopService.close() done, defined at C:\Users\LS-5\Documents\Codex\2026-10-15\gi...s-github-com-yehorbabenko88-meta\work\windows-commissioning-audit\src\meta_analyse\desktop_service.py:388> result=None>.done
+
+tests\test_commissioning_faults.py:134: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_commissioning_faults.py::test_service_close_waits_for_monitor_schema_write
+1 failed, 6 deselected in 0.41s

@@ -1,0 +1,226 @@
+postgres18-linux	Full suite and ten-case PostgreSQL gate	﻿2026-10-20T14:08:34.4742615Z ##[group]Run python -m pytest tests -q -W error::RuntimeWarning --junitxml=pg18-tests.xml | tee pg18-tests.log
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4743241Z ^[[36;1mpython -m pytest tests -q -W error::RuntimeWarning --junitxml=pg18-tests.xml | tee pg18-tests.log^[[0m
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4743899Z ^[[36;1mpython scripts/check_integration_postgres.py pg18-tests.xml --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher^[[0m
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4802479Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4802782Z env:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4802958Z   QT_QPA_PLATFORM: offscreen
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4803161Z   PYTHONASYNCIODEBUG: 1
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4803447Z   META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4803874Z   META_ANALYSE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4804235Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4804559Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4804940Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4805233Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4805521Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4805997Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:34.4806248Z ##[endgroup]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:37.5473126Z ........................................................................ [ 11%]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:39.3151417Z ........................................................................ [ 23%]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:39.7646086Z ........................................................................ [ 34%]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:40.6730033Z ........................................................................ [ 46%]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:54.6459895Z ........................................................................ [ 58%]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:55.1533633Z ........................................s............................... [ 69%]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:55.2076179Z ........................................................................ [ 81%]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:57.2509083Z .....................................................F...F.............. [ 92%]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0959013Z ............................................                             [100%]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0959626Z =================================== FAILURES ===================================
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0959990Z _____________________ test_concurrent_sources_same_symbol ______________________
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0960219Z 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0960535Z tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_concurrent_sources_same_s0')
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0961259Z 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0961439Z     def test_concurrent_sources_same_symbol(tmp_path):
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0961838Z         store = Store(DSN)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0962068Z         symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0962361Z         a = archive(tmp_path,symbol,"trade1","first")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0962631Z         b = archive(tmp_path,symbol,"trade2","second")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0962906Z         with ThreadPoolExecutor(max_workers=2) as pool:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0963227Z >           results = list(pool.map(lambda pair: import_verified_archive(
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0963579Z                 store,pair[0],pair[1],symbol=symbol,batch_size=1), (a,b)))
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0963781Z 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0963895Z tests/test_storage_ingestion_postgres.py:48: 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0964178Z _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0964617Z /opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/concurrent/futures/_base.py:619: in result_iterator
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0965012Z     yield _result_or_cancel(fs.pop())
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0965226Z           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0965735Z /opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/concurrent/futures/_base.py:317: in _result_or_cancel
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0966373Z     return fut.result(timeout)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0966570Z            ^^^^^^^^^^^^^^^^^^^
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0966890Z /opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/concurrent/futures/_base.py:449: in result
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0967264Z     return self.__get_result()
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0967465Z            ^^^^^^^^^^^^^^^^^^^
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0967809Z /opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/concurrent/futures/_base.py:401: in __get_result
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0968182Z     raise self._exception
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0968509Z /opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/concurrent/futures/thread.py:59: in run
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0968897Z     result = self.fn(*self.args, **self.kwargs)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0969134Z              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0969392Z tests/test_storage_ingestion_postgres.py:48: in <lambda>
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0969712Z     results = list(pool.map(lambda pair: import_verified_archive(
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0970029Z _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0970221Z 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0970351Z store = <meta_analyse.storage.Store object at 0x7fb3a02b29c0>
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0970752Z path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_concurrent_sources_same_s0/second.csv')
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0971425Z receipt = {'valid': True, 'complete': False, 'url': 'https://example.invalid/second', 'sha256': 'f337755c55575586bfbd901579d5344695bc00f3f4a715037a7e04282f7b4156', ...}
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0972029Z venue = 'bybit', symbol = 'TEST_STORAGE_852ab959893647b2bf8ad67b8bd5c2be'
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0972327Z batch_size = 1
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0972426Z 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0972648Z     def import_verified_archive(store, path, receipt, *, venue="bybit", symbol, batch_size=5000):
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0973102Z         """Snapshot verified bytes; atomically commit each batch with its checkpoint.
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0973417Z     
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0973660Z         An advisory session lock serializes archives of the same venue/symbol.
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0974038Z         Committed rows count input records, not distinct trade IDs. Historical
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0974408Z         completeness remains unverified even after a successful import.
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0974688Z         """
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0974856Z         receipt = dict(receipt)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0975065Z         _validate_receipt(receipt)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0975313Z         if type(batch_size) is not int or batch_size <= 0:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0975691Z             raise ValueError("batch_size must be positive")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0976362Z         if not isinstance(symbol, str) or not symbol.strip() or not isinstance(venue, str) or not venue.strip():
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0976777Z             raise ValueError("venue and symbol are required")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0977038Z         path = Path(path)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0977263Z         if path.stat().st_size != receipt["bytes"]:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0977545Z             raise ValueError("archive byte size mismatch")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0977898Z         with tempfile.TemporaryDirectory(prefix="meta-ingest-") as directory:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0978348Z             snapshot = Path(directory) / ("archive.gz" if path.suffix == ".gz" else "archive.csv")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0978749Z             with path.open("rb") as source, snapshot.open("wb") as target:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0979035Z                 remaining = receipt["bytes"]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0979260Z                 while remaining:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0979600Z                     block = source.read(min(1048576, remaining))
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0979976Z                     if not block:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0980434Z                         raise ValueError("archive shorter than receipt")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0980836Z                     target.write(block)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0981204Z                     remaining -= len(block)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0981698Z                 if source.read(1):
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0982054Z                     raise ValueError("archive longer than receipt")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0982409Z             digest = file_sha256(snapshot)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0982958Z             if digest != receipt["sha256"]:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0983318Z                 raise ValueError("archive sha256 mismatch")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0983704Z             count = 0
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0984005Z             previous_timestamp = None
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0984321Z             for row in iter_rows(snapshot):
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0984767Z                 if "symbol" in row and row["symbol"] != symbol:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0985152Z                     raise ValueError("archive symbol mismatch")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0985549Z                 timestamp = Decimal(row["timestamp"])
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0998263Z                 if previous_timestamp is not None and timestamp < previous_timestamp:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0998838Z                     raise ValueError("decreasing raw trade timestamp")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0999247Z                 previous_timestamp = timestamp
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0999577Z                 parse_trade(row)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.0999853Z                 count += 1
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1000129Z                 if count > receipt["rows"]:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1000507Z                     raise ValueError("archive exceeds audited row count")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1000917Z             if count != receipt["rows"] or file_sha256(snapshot) != digest:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1001257Z                 raise ValueError("archive rows or sha256 mismatch")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1001538Z             initialize_archive_schema(store)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1001783Z             with store.connect() as conn:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1002020Z                 conn.autocommit = True
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1002274Z                 conn.execute("SET statement_timeout = 120000")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1002548Z                 conn.execute("SET lock_timeout = 15000")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1002944Z                 key = int.from_bytes(hashlib.sha256((venue + "\0" + symbol).encode()).digest()[:8], "big", signed=True)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1003434Z                 acquired = conn.execute("SELECT pg_try_advisory_lock(%s)", (key,)).fetchone()[0]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1003773Z                 if not acquired:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1004067Z >                   raise TimeoutError("archive import already active for venue/symbol")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1004463Z E                   TimeoutError: archive import already active for venue/symbol
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1004679Z 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1004808Z src/meta_analyse/archive_db_import.py:147: TimeoutError
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1005148Z _______________ test_concurrent_identical_archive_is_idempotent ________________
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1005768Z 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1005975Z tmp_path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_concurrent_identical_arch0')
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1006247Z 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1006390Z     def test_concurrent_identical_archive_is_idempotent(tmp_path):
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1006765Z         """Two workers racing on the same archive must not duplicate records."""
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1007068Z         store = Store(DSN)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1007286Z         symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1007596Z         path, receipt = archive(tmp_path, symbol, "same_trade", "same_archive")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1007926Z         with ThreadPoolExecutor(max_workers=2) as pool:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1008179Z >           results = list(pool.map(
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1008406Z                 lambda _: import_verified_archive(
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1008698Z                     store, path, receipt, symbol=symbol, batch_size=1), range(2)))
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1008918Z 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1009026Z tests/test_storage_ingestion_postgres.py:158: 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1009301Z _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1009731Z /opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/concurrent/futures/_base.py:619: in result_iterator
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1010239Z     yield _result_or_cancel(fs.pop())
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1010453Z           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1010816Z /opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/concurrent/futures/_base.py:317: in _result_or_cancel
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1011199Z     return fut.result(timeout)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1011396Z            ^^^^^^^^^^^^^^^^^^^
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1011715Z /opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/concurrent/futures/_base.py:449: in result
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1012077Z     return self.__get_result()
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1012267Z            ^^^^^^^^^^^^^^^^^^^
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1012609Z /opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/concurrent/futures/_base.py:401: in __get_result
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1012985Z     raise self._exception
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1013306Z /opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/concurrent/futures/thread.py:59: in run
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1013677Z     result = self.fn(*self.args, **self.kwargs)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1013906Z              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1014158Z tests/test_storage_ingestion_postgres.py:159: in <lambda>
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1014427Z     lambda _: import_verified_archive(
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1014674Z _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1014857Z 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1014985Z store = <meta_analyse.storage.Store object at 0x7fb3a02b2150>
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1015399Z path = PosixPath('/tmp/pytest-of-runner/pytest-0/test_concurrent_identical_arch0/same_archive.csv')
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1016258Z receipt = {'valid': True, 'complete': False, 'url': 'https://example.invalid/same_archive', 'sha256': '592708c1188edf8f1e560a231a36fb230c18569b3a5cfdf58f17c8375c05f786', ...}
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1016859Z venue = 'bybit', symbol = 'TEST_STORAGE_f7ef144c307a4152b2ce3387d603e59b'
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1017132Z batch_size = 1
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1017225Z 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1017436Z     def import_verified_archive(store, path, receipt, *, venue="bybit", symbol, batch_size=5000):
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1017872Z         """Snapshot verified bytes; atomically commit each batch with its checkpoint.
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1018168Z     
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1018399Z         An advisory session lock serializes archives of the same venue/symbol.
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1672518Z         Committed rows count input records, not distinct trade IDs. Historical
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1673110Z         completeness remains unverified even after a successful import.
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1673393Z         """
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1673556Z         receipt = dict(receipt)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1673971Z         _validate_receipt(receipt)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1674206Z         if type(batch_size) is not int or batch_size <= 0:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1674489Z             raise ValueError("batch_size must be positive")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1674896Z         if not isinstance(symbol, str) or not symbol.strip() or not isinstance(venue, str) or not venue.strip():
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1675327Z             raise ValueError("venue and symbol are required")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1675751Z         path = Path(path)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1675970Z         if path.stat().st_size != receipt["bytes"]:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1676230Z             raise ValueError("archive byte size mismatch")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1676557Z         with tempfile.TemporaryDirectory(prefix="meta-ingest-") as directory:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1676975Z             snapshot = Path(directory) / ("archive.gz" if path.suffix == ".gz" else "archive.csv")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1677354Z             with path.open("rb") as source, snapshot.open("wb") as target:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1677640Z                 remaining = receipt["bytes"]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1677858Z                 while remaining:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1678081Z                     block = source.read(min(1048576, remaining))
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1678320Z                     if not block:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1678553Z                         raise ValueError("archive shorter than receipt")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1678947Z                     target.write(block)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1679161Z                     remaining -= len(block)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1679379Z                 if source.read(1):
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1679612Z                     raise ValueError("archive longer than receipt")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1679868Z             digest = file_sha256(snapshot)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1680089Z             if digest != receipt["sha256"]:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1680321Z                 raise ValueError("archive sha256 mismatch")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1680544Z             count = 0
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1680724Z             previous_timestamp = None
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1680946Z             for row in iter_rows(snapshot):
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1681184Z                 if "symbol" in row and row["symbol"] != symbol:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1681446Z                     raise ValueError("archive symbol mismatch")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1681695Z                 timestamp = Decimal(row["timestamp"])
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1682000Z                 if previous_timestamp is not None and timestamp < previous_timestamp:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1682342Z                     raise ValueError("decreasing raw trade timestamp")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1682609Z                 previous_timestamp = timestamp
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1682826Z                 parse_trade(row)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1683014Z                 count += 1
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1683200Z                 if count > receipt["rows"]:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1683445Z                     raise ValueError("archive exceeds audited row count")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1683748Z             if count != receipt["rows"] or file_sha256(snapshot) != digest:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1684049Z                 raise ValueError("archive rows or sha256 mismatch")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1684304Z             initialize_archive_schema(store)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1684531Z             with store.connect() as conn:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1684741Z                 conn.autocommit = True
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1684981Z                 conn.execute("SET statement_timeout = 120000")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1685242Z                 conn.execute("SET lock_timeout = 15000")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1685704Z                 key = int.from_bytes(hashlib.sha256((venue + "\0" + symbol).encode()).digest()[:8], "big", signed=True)
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1686171Z                 acquired = conn.execute("SELECT pg_try_advisory_lock(%s)", (key,)).fetchone()[0]
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1686481Z                 if not acquired:
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1686750Z >                   raise TimeoutError("archive import already active for venue/symbol")
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1687121Z E                   TimeoutError: archive import already active for venue/symbol
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1687446Z 
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1687568Z src/meta_analyse/archive_db_import.py:147: TimeoutError
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1687852Z =========================== short test summary info ============================
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1688522Z FAILED tests/test_storage_ingestion_postgres.py::test_concurrent_sources_same_symbol - TimeoutError: archive import already active for venue/symbol
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1689296Z FAILED tests/test_storage_ingestion_postgres.py::test_concurrent_identical_archive_is_idempotent - TimeoutError: archive import already active for venue/symbol
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.1689808Z 2 failed, 617 passed, 1 skipped in 23.93s
+postgres18-linux	Full suite and ten-case PostgreSQL gate	2026-10-20T14:08:59.3398543Z ##[error]Process completed with exit code 1.

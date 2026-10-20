@@ -1,6 +1,6 @@
-# Windows commissioning plan — 2026-10-20
+# Windows commissioning plan â€” 2026-10-20
 
-Status: PREPARED, NOT EXECUTED on the independent PC. Prior candidate 9d1bfff5… and its logs are unavailable; user will supply later. Reported 586 passed / 10x67 are not independently certified here.
+Status: PREPARED, NOT EXECUTED on the independent PC. Prior candidate 9d1bfff5â€¦ and its logs are unavailable; user will supply later. Reported 586 passed / 10x67 are not independently certified here.
 
 ## Target and prerequisites
 
@@ -32,3 +32,7 @@ For every stage save host.json, preflight.json, session.json, application.log, U
 If writes remain active, window stays open and after10s reports incomplete shutdown; preserve evidence and let bounded DB statements finish/rollback. Do not kill/close the loop to manufacture success. Persistent OS/driver hangs remain NO-GO and require operator incident handling.
 
 Rollback: close safely, verify worker gone and no app transaction active, preserve logs; discard only the dedicated test DB after explicit operator approval; reselect prior approved isolated source/venv. No main/production schema changes or MetaScalp level restoration are needed because this package does not perform them.
+
+## Pinned release packet
+
+Tested candidate: `13901274dac527f0aacfaf48481414b0971d6012`. Source ZIP SHA256: `5c7dc6bf58010b36cda876bb16367a538e9adeb38b41726ba153da7dd6246b76`. All 198 Git archive file hashes verified after extraction. Final reports and CI evidence are outside source.zip; frozen source reports may still say pending. Use the packet reports as the final verdict. Do not interpret package presence as approval: orderbook autonomous recovery remains NO-GO.

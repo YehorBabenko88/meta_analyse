@@ -1,0 +1,40 @@
+{
+  "platform": "Windows-2025Server-10.0.26100-SP0",
+  "python": "3.12.10",
+  "qt_platform": "offscreen",
+  "pyside6": "6.12.0",
+  "process_cpu_percent_one_core": 32.44920709388986,
+  "renderer": "partial",
+  "instruments": 20,
+  "target_events_per_second": 20000,
+  "events": 60000,
+  "producer_seconds": 3.001394000000005,
+  "actual_events_per_second": 19990.710982963217,
+  "publication_hz": 10,
+  "render_samples": 34,
+  "render_median_ms": 3.0962499999702686,
+  "render_p95_ms": 3.4689999999955035,
+  "render_max_ms": 5.378699999994296,
+  "snapshot_to_render_p95_ms": 3.5809999999969477,
+  "heartbeat_target_ms": 10,
+  "heartbeat_p95_ms": 12.680500000044503,
+  "heartbeat_max_ms": 13.900900000010097,
+  "close_event_ms": 2.123400000016318,
+  "worker_stopped": true,
+  "loop_closed": true,
+  "microbenchmark": {
+    "unchanged": {
+      "median_ms": 0.041199999998298154,
+      "p95_ms": 0.046200000042517786
+    },
+    "one_changed": {
+      "median_ms": 0.20305000001030749,
+      "p95_ms": 0.3437999999960084
+    },
+    "all_changed": {
+      "median_ms": 0.8880000000033306,
+      "p95_ms": 1.4014000000202032
+    }
+  },
+  "limits": "Synthetic callbacks/Qt only; excludes exchange parsing, SQL persistence, network and microstructure algorithms."
+}

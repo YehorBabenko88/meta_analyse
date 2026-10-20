@@ -20,21 +20,31 @@ class OrderBook:
         self.valid = False
 
     def apply(self, message: dict):
-        data = message.get("data") or {}
+        if not isinstance(message, dict) or not isinstance(message.get("data"), dict):
+            self.reset()
+            return False
+        data = message["data"]
         if data.get("s") != self.symbol:
-            raise ValueError("orderbook symbol mismatch")
+            self.reset()
+            return False
         kind = message.get("type")
-        uid = data["u"]
-        seq = data["seq"]
+        uid = data.get("u")
+        seq = data.get("seq")
         if type(uid) is not int or type(seq) is not int or uid < 0 or seq < 0:
             self.reset()
             return False
         if kind == "snapshot":
             self.reset()
-            self._levels(data)
+            try:
+                self._levels(data)
+            except (ValueError, TypeError, ArithmeticError):
+                self.reset()
+                return False
             self.update_id = uid
             self.sequence = seq
             self.valid = self._healthy()
+            if not self.valid:
+                self.reset()
             return self.valid
         if kind != "delta" or not self.valid or self.update_id is None or self.sequence is None:
             self.reset()
@@ -44,7 +54,11 @@ class OrderBook:
         if uid <= self.update_id or seq <= self.sequence:
             self.reset()
             return False
-        self._levels(data)
+        try:
+            self._levels(data)
+        except (ValueError, TypeError, ArithmeticError):
+            self.reset()
+            return False
         self.update_id = uid
         self.sequence = seq
         self.valid = self._healthy()

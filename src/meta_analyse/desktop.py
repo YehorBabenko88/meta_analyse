@@ -492,6 +492,8 @@ class Window(QWidget):
         await asyncio.gather(*tasks, return_exceptions=True)
     def _finish_close(self):
         if self.worker.is_alive():
+            if time.monotonic() - self._close_started >= 10:
+                self.status.setText("Shutdown incomplete: active writes or workers still draining; window remains open")
             return
         self.timer.stop()
         self._closed = True
@@ -505,6 +507,7 @@ class Window(QWidget):
         if self._closing:
             return
         self._closing = True
+        self._close_started = time.monotonic()
         self.setEnabled(False)
         self.status.setText("Closing connections...")
         self.timer.stop()

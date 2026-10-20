@@ -99,7 +99,6 @@ class OrderBookStream:
                         book = self.books.get(symbol)
                         if book is None:
                             continue
-                        last_message[symbol] = time.monotonic()
                         try:
                             valid = book.apply(msg)
                         except (ValueError, KeyError, TypeError, ArithmeticError):
@@ -115,6 +114,7 @@ class OrderBookStream:
                             book.reset()
                             await self.on_gap([symbol], "invalid orderbook timestamp")
                             raise _ResubscribeRequired("malformed orderbook timestamp") from exc
+                        last_message[symbol] = time.monotonic()
                         await self.on_book(symbol, BookSnapshot.from_book(book), timestamp_ms)
                         # Reset backoff only after a verified snapshot, not merely
                         # after a TCP/WebSocket handshake (which may flap rapidly).

@@ -105,3 +105,17 @@ def test_integration_contract_ci_rejects_skipped_required_identity(tmp_path):
                     "--require-identity", "tests.test_integration_contract_ci.test_required")
     assert result.returncode != 0
     assert "REQUIRED IDENTITY SKIPPED" in result.stderr
+
+
+def test_postgres_gate_rejects_unrelated_passes_and_module_collisions(tmp_path):
+    import runpy
+    required = runpy.run_path(str(SCRIPT.with_name('check_integration_postgres.py')))['REQUIRED']
+    checker = SCRIPT.with_name('check_integration_postgres.py')
+    for names in ([f'unrelated_{i}' for i in range(len(required))], required):
+        root = ET.Element('testsuite', tests=str(len(names)))
+        for name in names:
+            ET.SubElement(root,'testcase',classname='tests.unrelated',name=name)
+        report = tmp_path/'postgres.xml'
+        ET.ElementTree(root).write(report,encoding='unicode')
+        result = subprocess.run([sys.executable,str(checker),str(report)],capture_output=True,text=True)
+        assert result.returncode != 0, result.stdout

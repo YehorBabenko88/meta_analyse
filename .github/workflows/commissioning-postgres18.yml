@@ -22,6 +22,8 @@ jobs:
       META_ANALYSE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
     steps:
       - uses: actions/checkout@v4
+      - name: Verify exact Actions source SHA
+        run: python scripts/record_ci_source.py
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
@@ -29,7 +31,7 @@ jobs:
       - run: python -m pip check
       - name: Record exact PostgreSQL major
         run: python -c "import os,psycopg,json; c=psycopg.connect(os.environ['META_ANALYSE_TEST_ADMIN_DSN']); v=c.info.server_version; print(v); assert v//10000==18; open('postgres-version.json','w').write(json.dumps({'server_version':v}));c.close()"
-      - name: Full suite and ten-case PostgreSQL gate
+      - name: Full suite and eleven-case PostgreSQL and five-case shutdown gate
         shell: bash
         run: |
           python -m pytest tests -q -W error::RuntimeWarning --junitxml=pg18-tests.xml | tee pg18-tests.log
@@ -41,6 +43,7 @@ jobs:
         with:
           name: commissioning-postgres18
           path: |
+            source-sha.json
             pg18-tests.*
             postgres-version.json
             pg18-lifecycle/**/tests.*

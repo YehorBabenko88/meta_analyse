@@ -217,7 +217,9 @@ def import_verified_archive(store, path, receipt, *, venue="bybit", symbol, batc
                         with conn.transaction():
                             conn.execute("""UPDATE meta_analyse.archive_import_checkpoints
                                 SET status='failed',updated_at=now() WHERE source_id=%s""", (source_id,))
-                    except Exception:
+                    except BaseException:
+                        # A second cancellation during best-effort status cleanup
+                        # must not replace the original import/DB exception.
                         pass
                     raise
             finally:

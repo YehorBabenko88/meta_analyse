@@ -64,7 +64,8 @@ async def test_orderbook_transport_reconnect_requires_fresh_snapshot(monkeypatch
                     data=dict(s='BTCUSDT',u=uid,seq=seq,b=[[str(bid),'2']],a=[[str(ask),'2']]))
     frames = [
         [frame('snapshot',10,20,100,102),frame('delta',14,25,101,102),ConnectionError('audit disconnect')],
-        [frame('delta',*first_delta,10,12),frame('snapshot',20,100,10,12),frame('delta',23,105,11,12)],
+        [frame('delta',*first_delta,10,12)],
+        [frame('snapshot',20,100,10,12),frame('delta',23,105,11,12)],
     ]
     connections=[]
     class Socket:
@@ -79,19 +80,19 @@ async def test_orderbook_transport_reconnect_requires_fresh_snapshot(monkeypatch
     def connect(*args,**kwargs):
         index=len(connections);connections.append(index)
         return Socket(frames[index])
-    original_sleep=asyncio.sleep
-    async def virtual_backoff(seconds): await original_sleep(0)
     monkeypatch.setattr(module.websockets,'connect',connect)
-    monkeypatch.setattr(module,'asyncio',SimpleNamespace(wait_for=asyncio.wait_for,sleep=virtual_backoff,
-        TimeoutError=asyncio.TimeoutError,CancelledError=asyncio.CancelledError))
-    stop=asyncio.Event(); observed=[]; gaps=[]
+    class Stop(asyncio.Event):
+        async def wait(self):
+            # Virtualize only reconnect backoff; no wall-clock synchronization.
+            raise asyncio.TimeoutError
+    stop=Stop(); observed=[]; gaps=[]
     async def book(symbol,state,ts):
         observed.append((state.update_id,dict(state.bids)))
         if state.update_id==23: stop.set()
     async def gap(symbols,reason): gaps.append(reason)
     stream=module.OrderBookStream(book,gap)
     await asyncio.wait_for(stream.run(['BTCUSDT'],stop),2)
-    assert len(connections)==2
+    assert len(connections)==3
     assert [uid for uid,_ in observed]==[10,14,20,23]
     assert Decimal(100) not in observed[-1][1] and Decimal(101) not in observed[-1][1]
     assert stream.books['BTCUSDT'].valid and len(gaps)>=3
@@ -114,7 +115,7 @@ def test_required_postgres_gate_includes_contention_case():
     import runpy
     manifest=runpy.run_path(str(Path('scripts/check_integration_postgres.py')))
     assert 'test_contended_advisory_lock_fails_without_partial_import' in manifest['REQUIRED']
-    assert len(manifest['REQUIRED'])==10
+    assert len(manifest['REQUIRED'])==11
 
 @pytest.mark.asyncio
 async def test_service_close_waits_for_monitor_schema_write():
@@ -182,3 +183,31 @@ def test_commissioning_refuses_an_installed_package_from_another_checkout(monkey
     import preflight
     monkeypatch.setitem(sys.modules,'meta_analyse',SimpleNamespace(__file__=str(tmp_path/'different'/'__init__.py')))
     with pytest.raises(ValueError): preflight.verify_package_source(tmp_path/'candidate')
+
+
+def test_failed_status_cancellation_preserves_original_database_error(monkeypatch,tmp_path):
+    import hashlib
+    from contextlib import nullcontext
+    from meta_analyse import archive_db_import as module
+    path=tmp_path/'cleanup.csv'
+    path.write_text('timestamp,trdMatchID,price,size,side\n1,id,1,1,Buy\n')
+    receipt=dict(valid=True,complete=False,url='https://example.invalid/cleanup',
+                 sha256=hashlib.sha256(path.read_bytes()).hexdigest(),bytes=path.stat().st_size,rows=1)
+    original=ValueError('original checkpoint database failure')
+    class Result:
+        def __init__(self,value):self.value=value
+        def fetchone(self):return self.value
+    class Connection:
+        autocommit=False
+        def transaction(self):return nullcontext()
+        def execute(self,sql,params=None):
+            if 'RETURNING id,receipt_rows' in sql:return Result((1,1))
+            if 'SELECT committed_rows' in sql:raise original
+            if "status='failed'" in sql:raise asyncio.CancelledError('secondary cleanup cancellation')
+            return Result((True,))
+    class Store:
+        def connect(self):return nullcontext(Connection())
+    monkeypatch.setattr(module,'initialize_archive_schema',lambda _:None)
+    with pytest.raises(ValueError) as raised:
+        module.import_verified_archive(Store(),path,receipt,symbol='BTCUSDT')
+    assert raised.value is original

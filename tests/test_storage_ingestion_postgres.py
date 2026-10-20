@@ -292,3 +292,31 @@ def test_contended_advisory_lock_fails_without_partial_import(tmp_path):
         finally:
             holder.execute("SELECT pg_advisory_unlock(%s)", (key,))
     assert import_verified_archive(store, path, receipt, symbol=symbol)["rows"] == 1
+
+
+def test_contended_import_waits_on_server_and_resumes(tmp_path):
+    """Observe the actual advisory wait, not a timed guess about worker state."""
+    import time
+    from psycopg.conninfo import make_conninfo
+    symbol='TEST_STORAGE_'+uuid.uuid4().hex
+    app='commission_wait_'+uuid.uuid4().hex
+    store=Store(make_conninfo(DSN,application_name=app))
+    path,receipt=archive(tmp_path,symbol,'serialized','serialized')
+    key=int.from_bytes(hashlib.sha256(('bybit'+'\0'+symbol).encode()).digest()[:8],'big',signed=True)
+    with Store(DSN).connect() as holder, Store(DSN).connect() as observer:
+        observer.autocommit=True
+        holder.execute('SELECT pg_advisory_lock(%s)',(key,))
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future=pool.submit(import_verified_archive,store,path,receipt,symbol=symbol,batch_size=1)
+            try:
+                deadline=time.monotonic()+5
+                while True:
+                    waiting=observer.execute("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=%s AND wait_event='advisory')",(app,)).fetchone()[0]
+                    if waiting:break
+                    assert not future.done(),'import finished without waiting on occupied advisory lock'
+                    assert time.monotonic()<deadline,'server advisory wait not observed'
+                assert observer.execute("SELECT count(*) FROM meta_analyse.archive_sources WHERE symbol=%s",(symbol,)).fetchone()[0]==0
+            finally:
+                holder.execute('SELECT pg_advisory_unlock(%s)',(key,))
+            assert future.result(timeout=5)['rows']==1
+    assert import_verified_archive(store,path,receipt,symbol=symbol)['resumed_from']==1

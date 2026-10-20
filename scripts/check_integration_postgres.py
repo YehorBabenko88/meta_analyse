@@ -18,6 +18,7 @@ REQUIRED = (
     "test_orderflow_reader_returns_exact_aliases",
     "test_unlock_failure_does_not_mask_original_import_error",
     "test_contended_advisory_lock_fails_without_partial_import",
+    "test_contended_import_waits_on_server_and_resumes",
 )
 
 def main():
@@ -26,7 +27,13 @@ def main():
     checker = Path(__file__).with_name("check_integration_junit.py")
     command = [sys.executable, str(checker), sys.argv[1], "--minimum", str(len(REQUIRED)), *sys.argv[2:]]
     for name in REQUIRED:
-        command.extend(["--require-exact", name])
+        command.extend(["--require-identity", "tests.test_storage_ingestion_postgres." + name])
+    for name in ("test_shutdown_waits_for_thread_write_before_cancelled_task_finishes",
+                 "test_repeated_cancellation_does_not_abandon_write",
+                 "test_failed_write_after_cancellation_waits_for_rollback",
+                 "test_write_failure_without_cancellation_is_propagated",
+                 "test_successful_write_returns_result"):
+        command.extend(["--require-identity", "tests.test_integration_contract_shutdown." + name])
     raise SystemExit(subprocess.call(command))
 
 if __name__ == "__main__":

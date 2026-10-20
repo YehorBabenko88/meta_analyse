@@ -125,5 +125,125 @@
     "Short-circuit zero coefficients before positive archive timestamp exponentiation",
     "Preserve concurrent archive serialization with bounded server-side advisory lock wait"
   ],
-  "scope": "Isolated audit branch only; no merge, deployment, production DB, orders or insecure TLS"
+  "scope": "Isolated audit branch only; no merge, deployment, production DB, orders or insecure TLS",
+  "reaudit_20261020": {
+    "baseline_code_sha": "13901274dac527f0aacfaf48481414b0971d6012",
+    "baseline_reports_sha": "eb2e639fff872128542868f6b717fc1b9a8f1335",
+    "reviewed_heads": {
+      "6": "091e9db1a9c7f144a34150da81eae64cf9d7d8e3",
+      "7": "0086e338ee668f2fb1b4a9dd7253b16b8469ce13",
+      "8": "813ac6a02d23554d18d6343480c03c84ae662825",
+      "9": "383458001a65224094c43a049e20f9c9cbcef50c",
+      "10": "38cf43ec781be9c4d7ebb98fb97525b3686a3c40"
+    },
+    "selected_commits": [
+      {
+        "original": "f4803b6a3df6a7f865e28d4728764c2ef1b6e3b2",
+        "candidate": "389296972079cb8af300d9f51079eecf697fee3d"
+      },
+      {
+        "original": "84562a1c6747b0e8e9b676e411c8d3ae15230c09",
+        "candidate": "d74524e0270ce69aa05c44bc2f0541cb0e9fcd40"
+      },
+      {
+        "original": "091e9db1a9c7f144a34150da81eae64cf9d7d8e3",
+        "candidate": "a59d0f14e30d42a2eecd35752430904ebd6e5c80"
+      },
+      {
+        "original": "20d8d92118ad1726ef4457bb5faf863e0f63341d",
+        "candidate": "e1cd88622d96460f6e51f7a78ad589c6d7c2c1ac"
+      },
+      {
+        "original": "0ce3712c51feb44b250bd22b2980d4e67670772c",
+        "candidate": "81a68852b10c3d2b9c305179458cde7c82d8ceb2"
+      },
+      {
+        "original": "b4d94d4e2361df846e3af28f281aabb864aa6896",
+        "candidate": "2e776db3c7bfa3eaebe725375fdd9d500a0f4eb1"
+      },
+      {
+        "original": "2187149203ffc359af6109f18ad2e4cbaa0b74fa",
+        "candidate": "103ebf4fdef544520e7804f4040e40d1a5c1a792"
+      },
+      {
+        "original": "e42673ef8baf0c881c99841de8ccb48361a1843d",
+        "candidate": "1f9532e0e93ba022d8ef267ceb1d1b3ad2379c50"
+      },
+      {
+        "original": "4ed48fa9789db5893c8b4d1d3195f43758417572",
+        "candidate": "729b1755a52f3a5fb16e6a036cc6f277191e8f55"
+      },
+      {
+        "original": "317945faf0608dbc4e083cb887a14e3845fc021d",
+        "candidate": "c8a0dcfaba9a6d5156705dd1131cf75b28bae9b9"
+      },
+      {
+        "original": "d8e63c4d50a758111394f26d03e3307b1b59d61e",
+        "candidate": "c9a4a9748028704cdcba5a391dc69f9b7ef58631"
+      },
+      {
+        "original": "99b36b6b1ec16d0becf7fff5a123effe5f63ec49",
+        "candidate": "0d65e49dc530d307af9c264034cb308f5f5a6c69"
+      },
+      {
+        "original": "3551311280f97ec4a3363dd9bf3ff14e5a353a59",
+        "candidate": "c36eeb0fb4c3f73d3b2005efcc5c3aac8fe39f5c"
+      },
+      {
+        "original": "bf13a8e2dc12d47442740be84414eefd8fdb724f",
+        "candidate": "27a7d69d6c2264e493431db8d30c9637bb66920b"
+      },
+      {
+        "original": "f9bd8ccc1132e197ac5ff458349f223bd0975022",
+        "candidate": "32b1d4e8cd53a801e7f0b3f108bc28e5dad6f774"
+      },
+      {
+        "original": "a5b310d96f213b292f24afc5e88bd123863123fb",
+        "candidate": "711697a41d406de7d77c4c31d47a1fba83837968"
+      },
+      {
+        "original": "57f6c3de960d80ff559f8da5bf3adabd4b771771",
+        "candidate": "cb497f4e196fd9566606f02307033b6bcfff5900"
+      },
+      {
+        "original": "edcac089ef188c6d0ee4cfa94e640820c24cedce",
+        "candidate": "5f45ada7535f17b9ba2d052a1f8ba06342ae47c2"
+      },
+      {
+        "original": "0086e338ee668f2fb1b4a9dd7253b16b8469ce13",
+        "candidate": "8ecaddeedc71a49f6cef13bab7da199acd27f555"
+      },
+      {
+        "original": "97f3d7f64828e8bcec733eec44e38269fa8434e7",
+        "candidate": "f59438e183468f8cfa44c61ef868dc8371454cbb"
+      },
+      {
+        "original": "cbaea4d631355132e6df5684b6e28099a4a4f1a8",
+        "candidate": "562c670ee779eedb1f9011aeac4f2f59057a107c"
+      }
+    ],
+    "equivalent_not_replayed": {
+      "PR8": "Runtime equals baseline bounded locking; retain stronger contention timeout test and add real server-wait regression",
+      "PR9 shutdown": "Runtime drain code equals baseline; no redundant replay",
+      "PR9 gzip fixture": "Baseline already fixes gzip mtime/filename and strict CSV contract; retain baseline"
+    },
+    "explicit_resolutions": [
+      "Retain baseline ten mandatory PG cases; reject PR9 literal-backslash-n commented-out loop",
+      "Strengthen PG gate to eleven exact module.test identities plus five shutdown identities",
+      "Retain baseline JUnit checks plus PR9 unskipped unique identity checks",
+      "Provision pinned official PostgreSQL18.6 only inside disposable Windows Actions; retain strict major rejection",
+      "Run candidate archive faults and separate immutable PR6 contract with explicit source SHA"
+    ],
+    "independent_fixes": [
+      "Original DB error survives second cancellation in failed-status cleanup",
+      "Adapt reconnect regression to third epoch after invalid pre-snapshot delta; no wall-clock backoff",
+      "Deterministic actual server advisory-wait test instead of150ms sleep"
+    ],
+    "official_pg18_archive": {
+      "source_index": "https://www.enterprisedb.com/download-postgresql-binaries",
+      "url": "https://get.enterprisedb.com/postgresql/postgresql-18.6-5-windows-x64-binaries.zip",
+      "sha256": "e2246ba91d22345bc3d017586c09ede52d9df180b1eeb480f050445f1cad84e2",
+      "checksum_provenance": "independently downloaded over verified HTTPS from vendor redirect; observed archive hash, not a vendor signed checksum"
+    }
+  }
 }

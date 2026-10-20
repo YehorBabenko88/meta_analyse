@@ -1,5 +1,6 @@
 import csv
 import gzip
+from io import BytesIO, StringIO
 
 import pytest
 
@@ -10,10 +11,14 @@ URL = "https://public.bybit.com/trading/BTCUSDT/BTCUSDT2025-01-01.csv.gz"
 
 
 def make_gzip(path):
-    with gzip.open(path, "wt", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=["timestamp", "price", "size"])
+    buffer = BytesIO()
+    with gzip.GzipFile(fileobj=buffer, mode="wb", filename="", mtime=0) as compressed:
+        text = StringIO(newline="")
+        writer = csv.DictWriter(text, fieldnames=["timestamp", "price", "size"])
         writer.writeheader()
         writer.writerow({"timestamp": "1735689600", "price": "100", "size": "2"})
+        compressed.write(text.getvalue().encode("utf-8"))
+    path.write_bytes(buffer.getvalue())
 
 
 @pytest.mark.asyncio

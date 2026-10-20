@@ -1,0 +1,3 @@
+ValueError + RuntimeError: preserved=True; raised=ValueError:original
+Cancel + RuntimeError: preserved=True; raised=Cancel:cancel
+ValueError + Cancel: preserved=False; raised=Cancel:second cancel

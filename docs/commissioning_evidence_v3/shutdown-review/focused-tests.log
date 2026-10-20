@@ -1,0 +1,455 @@
+EEEEEEEEEEEEEEEEEE................s.s................................... [ 80%]
+..................                                                       [100%]
+=================================== ERRORS ====================================
+____ ERROR at setup of test_integration_contract_ci_accepts_complete_suite ____
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_accepts_complete_suite>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+_ ERROR at setup of test_integration_contract_ci_rejects_missing_required_test _
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_rejects_missing_required_test>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+___ ERROR at setup of test_integration_contract_ci_rejects_unexpected_skip ____
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_rejects_unexpected_skip>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+_ ERROR at setup of test_integration_contract_ci_allows_explicit_platform_skip _
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_allows_explicit_platform_skip>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+_ ERROR at setup of test_integration_contract_ci_rejects_failure_even_if_allowed_skip _
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_rejects_failure_even_if_allowed_skip>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+________ ERROR at setup of test_integration_contract_ci_rejects_error _________
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_rejects_error>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+____ ERROR at setup of test_integration_contract_ci_rejects_too_few_tests _____
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_rejects_too_few_tests>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+___ ERROR at setup of test_integration_contract_ci_rejects_malformed_report ___
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_rejects_malformed_report>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+_ ERROR at setup of test_integration_contract_ci_does_not_allow_substring_skip_bypass _
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_does_not_allow_substring_skip_bypass>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+_ ERROR at setup of test_integration_contract_ci_allows_parametrized_case_by_exact_base_name _
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_allows_parametrized_case_by_exact_base_name>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+_____ ERROR at setup of test_integration_contract_ci_requires_exact_name ______
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_requires_exact_name>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+_ ERROR at setup of test_integration_contract_ci_accepts_exact_required_name __
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_accepts_exact_required_name>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+__ ERROR at setup of test_integration_contract_ci_rejects_duplicate_testcase __
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_rejects_duplicate_testcase>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+_ ERROR at setup of test_integration_contract_ci_rejects_declared_count_mismatch _
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_rejects_declared_count_mismatch>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+_ ERROR at setup of test_integration_contract_ci_never_allows_skipped_required_exact_test _
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_never_allows_skipped_required_exact_test>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+_ ERROR at setup of test_integration_contract_ci_rejects_required_identity_name_collision _
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_rejects_required_identity_name_collision>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+__ ERROR at setup of test_integration_contract_ci_accepts_required_identity ___
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_accepts_required_identity>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+_ ERROR at setup of test_integration_contract_ci_rejects_skipped_required_identity _
+
+fixturedef = <FixtureDef argname='tmp_path' scope='function' baseid=''>
+request = <SubRequest 'tmp_path' for <Function test_integration_contract_ci_rejects_skipped_required_identity>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+E               PermissionError: [WinError 5] Zugriff verweigert: 'C:\\Users\\LS-5\\AppData\\Local\\Temp\\pytest-of-LS-5'
+
+..\..\parallel-integration-audit-v2\.venv\Lib\site-packages\pytest_asyncio\plugin.py:924: PermissionError
+=========================== short test summary info ===========================
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_accepts_complete_suite
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_rejects_missing_required_test
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_rejects_unexpected_skip
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_allows_explicit_platform_skip
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_rejects_failure_even_if_allowed_skip
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_rejects_error
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_rejects_too_few_tests
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_rejects_malformed_report
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_does_not_allow_substring_skip_bypass
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_allows_parametrized_case_by_exact_base_name
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_requires_exact_name
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_accepts_exact_required_name
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_rejects_duplicate_testcase
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_rejects_declared_count_mismatch
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_never_allows_skipped_required_exact_test
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_rejects_required_identity_name_collision
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_accepts_required_identity
+ERROR tests/test_integration_contract_ci.py::test_integration_contract_ci_rejects_skipped_required_identity
+70 passed, 2 skipped, 18 errors in 3.65s

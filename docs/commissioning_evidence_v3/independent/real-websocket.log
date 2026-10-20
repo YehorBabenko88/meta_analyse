@@ -1,0 +1,79 @@
+Orderbook reconnect epoch=1: invalid orderbook; fresh snapshot required
+Orderbook reconnect epoch=1: invalid orderbook; fresh snapshot required
+Orderbook reconnect epoch=1: connected orderbook feed silent
+Orderbook reconnect epoch=1: connected orderbook feed silent
+{
+  "sha": "446c72bd97cacc31f9937c9ab941d11539733be4",
+  "actual_source_sha": "446c72bd97cacc31f9937c9ab941d11539733be4",
+  "transport": "real loopback WebSocket server, no public market/network/DB",
+  "cases": [
+    {
+      "mode": "invalid",
+      "published": [
+        1,
+        10
+      ],
+      "opened": [
+        1,
+        2
+      ],
+      "closed": [
+        1,
+        2
+      ],
+      "epochs": 2,
+      "unverified_gap": true
+    },
+    {
+      "mode": "sequence",
+      "published": [
+        1,
+        10
+      ],
+      "opened": [
+        1,
+        2
+      ],
+      "closed": [
+        1,
+        2
+      ],
+      "epochs": 2,
+      "unverified_gap": true
+    },
+    {
+      "mode": "silent",
+      "published": [
+        1,
+        10
+      ],
+      "opened": [
+        1,
+        2
+      ],
+      "closed": [
+        1,
+        2
+      ],
+      "epochs": 2,
+      "unverified_gap": true
+    },
+    {
+      "mode": "busy",
+      "published": [
+        1,
+        10
+      ],
+      "opened": [
+        1,
+        2
+      ],
+      "closed": [
+        1,
+        2
+      ],
+      "epochs": 2,
+      "unverified_gap": true
+    }
+  ]
+}

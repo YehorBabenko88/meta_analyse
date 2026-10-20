@@ -1,0 +1,68 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+______ test_failed_status_cancellation_preserves_original_database_error ______
+
+self = <test_commissioning_faults.test_failed_status_cancellation_preserves_original_database_error.<locals>.Connection object at 0x000001E27F10CC80>
+sql = 'SELECT committed_rows FROM meta_analyse.archive_import_checkpoints\n                        WHERE source_id=%s'
+params = (1,)
+
+    def execute(self,sql,params=None):
+        if 'RETURNING id,receipt_rows' in sql:return Result((1,1))
+>       if 'SELECT committed_rows' in sql:raise original
+                                          ^^^^^^^^^^^^^^
+E       ValueError: original checkpoint database failure
+
+tests\test_commissioning_faults.py:205: ValueError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001E27F026E40>
+tmp_path = WindowsPath('C:/Users/LS-5/Documents/Codex/2026-10-15/github-https-github-com-yehorbabenko88-meta/work/reaudit-cleanup-red-temp/test_failed_status_cancellatio0')
+
+    def test_failed_status_cancellation_preserves_original_database_error(monkeypatch,tmp_path):
+        import hashlib
+        from contextlib import nullcontext
+        from meta_analyse import archive_db_import as module
+        path=tmp_path/'cleanup.csv'
+        path.write_text('timestamp,trdMatchID,price,size,side\n1,id,1,1,Buy\n')
+        receipt=dict(valid=True,complete=False,url='https://example.invalid/cleanup',
+                     sha256=hashlib.sha256(path.read_bytes()).hexdigest(),bytes=path.stat().st_size,rows=1)
+        original=ValueError('original checkpoint database failure')
+        class Result:
+            def __init__(self,value):self.value=value
+            def fetchone(self):return self.value
+        class Connection:
+            autocommit=False
+            def transaction(self):return nullcontext()
+            def execute(self,sql,params=None):
+                if 'RETURNING id,receipt_rows' in sql:return Result((1,1))
+                if 'SELECT committed_rows' in sql:raise original
+                if "status='failed'" in sql:raise asyncio.CancelledError('secondary cleanup cancellation')
+                return Result((True,))
+        class Store:
+            def connect(self):return nullcontext(Connection())
+        monkeypatch.setattr(module,'initialize_archive_schema',lambda _:None)
+        with pytest.raises(ValueError) as raised:
+>           module.import_verified_archive(Store(),path,receipt,symbol='BTCUSDT')
+
+tests\test_commissioning_faults.py:212: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\meta_analyse\archive_db_import.py:218: in import_verified_archive
+    conn.execute("""UPDATE meta_analyse.archive_import_checkpoints
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <test_commissioning_faults.test_failed_status_cancellation_preserves_original_database_error.<locals>.Connection object at 0x000001E27F10CC80>
+sql = "UPDATE meta_analyse.archive_import_checkpoints\n                                SET status='failed',updated_at=now() WHERE source_id=%s"
+params = (1,)
+
+    def execute(self,sql,params=None):
+        if 'RETURNING id,receipt_rows' in sql:return Result((1,1))
+        if 'SELECT committed_rows' in sql:raise original
+>       if "status='failed'" in sql:raise asyncio.CancelledError('secondary cleanup cancellation')
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       asyncio.exceptions.CancelledError: secondary cleanup cancellation
+
+tests\test_commissioning_faults.py:206: CancelledError
+=========================== short test summary info ===========================
+FAILED tests/test_commissioning_faults.py::test_failed_status_cancellation_preserves_original_database_error
+1 failed in 0.41s

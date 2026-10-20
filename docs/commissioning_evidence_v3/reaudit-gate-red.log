@@ -1,0 +1,27 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+______ test_postgres_gate_rejects_unrelated_passes_and_module_collisions ______
+
+tmp_path = WindowsPath('C:/Users/LS-5/Documents/Codex/2026-10-15/github-https-github-com-yehorbabenko88-meta/work/reaudit-gate-red-temp/test_postgres_gate_rejects_unr0')
+
+    def test_postgres_gate_rejects_unrelated_passes_and_module_collisions(tmp_path):
+        import runpy
+        required = runpy.run_path(str(SCRIPT.with_name('check_integration_postgres.py')))['REQUIRED']
+        checker = SCRIPT.with_name('check_integration_postgres.py')
+        for names in ([f'unrelated_{i}' for i in range(len(required))], required):
+            root = ET.Element('testsuite', tests=str(len(names)))
+            for name in names:
+                ET.SubElement(root,'testcase',classname='tests.unrelated',name=name)
+            report = tmp_path/'postgres.xml'
+            ET.ElementTree(root).write(report,encoding='unicode')
+            result = subprocess.run([sys.executable,str(checker),str(report)],capture_output=True,text=True)
+>           assert result.returncode != 0, result.stdout
+E           AssertionError: collected=10 skipped=0 failed=0
+E             
+E           assert 0 != 0
+E            +  where 0 = CompletedProcess(args=['C:\\Users\\LS-5\\Documents\\Codex\\2026-10-15\\github-https-github-com-yehorbabenko88-meta\\wo...\\test_postgres_gate_rejects_unr0\\postgres.xml'], returncode=0, stdout='collected=10 skipped=0 failed=0\n', stderr='').returncode
+
+tests\test_integration_contract_ci.py:121: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_integration_contract_ci.py::test_postgres_gate_rejects_unrelated_passes_and_module_collisions
+1 failed in 1.17s

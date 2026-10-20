@@ -1,39 +1,41 @@
-# Runtime test matrix — 2026-10-20
+# Runtime matrix â€” 2026-10-20 re-audit
 
-Tested code SHA: **13901274dac527f0aacfaf48481414b0971d6012**. Report-only commits after this SHA do not change the tested source. Overall NO-GO for real commissioning acceptance.
+Tested code **446c72bd97cacc31f9937c9ab941d11539733be4**. Later report-only commits are distinguished from tested source.
 
-| Environment | Full pytest | PostgreSQL | Mandatory storage cases | Repeated lifecycle |
+| Environment | Full pytest | PostgreSQL | Mandatory PG/shutdown | Lifecycle |
 |---|---|---|---|---|
-| Local Windows11, Python3.12.15, Qt6.12 offscreen | 625 passed, zero skipped | 17.6, disposable lab DB | 10/10 | 10 × 67 passed, zero skipped |
-| GitHub Windows Server2025, Python3.12.10, Qt6.12 offscreen | 625 passed, zero skipped | 17.11, disposable cluster | 10/10 | 10 × 67 passed, zero skipped |
-| GitHub Linux, Python3.12.15 | 624 passed, one Windows installer skip | 17, service | 10/10 | 10 × 67 passed, zero skipped |
-| GitHub Linux, Python3.12.15 | 624 passed, same Windows-only skip | 18.6 (server_version180006) | 10/10 | 10 × 67 passed, zero skipped |
+| Windows CI Server2025/Python3.12.10/Qt6.12 offscreen |651 passed,0 skipped|18.6|11/11+5/5|10x67 PASS,0 skipped|
+| Linux CI/Python3.12.15 |650 passed,1expected Windows installer skip|18.6|11/11+5/5|10x67 PASS,0 skipped|
+| Additional Linux18 workflow |650 passed,1same expected skip|18.6|11/11+5/5|10x67 PASS,0 skipped|
+| Supplementary local Windows11/Python3.12.15 |651 passed,0 skipped|17.6 lab only|11/11+5/5|10x67 PASS,0 skipped|
 
-CI: https://github.com/YehorBabenko88/meta_analyse/actions/runs/39437122411 and https://github.com/YehorBabenko88/meta_analyse/actions/runs/39437122173. Both successful run records pin the tested SHA. Downloaded JUnit was independently parsed: no missing required case, failure/error or unexpected skip; every repeat contains exactly 67 passing testcases. This is 40 fresh lifecycle processes / 2680 testcase passes, not 2680 physical connect/disconnect cycles.
+Exact push CI: https://github.com/YehorBabenko88/meta_analyse/actions/runs/39446586945 and https://github.com/YehorBabenko88/meta_analyse/actions/runs/39446586928 . All651 identities unique; required module.test cases, source SHA, actual server versions and every lifecycle XML independently checked. Linux only skips test_failed_pip_install_never_reports_success_or_creates_launcher. No mandatory PG/shutdown skips. Separate immutable PR6 contract8 PASS at091e9db is additional source evidence.
 
-| Negative / supplemental check | Result |
+| Independent fault/probe | Result |
 |---|---|
-| Extreme Decimal import/audit values including ±0e999999999 | Six bounded subprocess cases pass; zero audit cases failed before fix |
-| Independent commissioning fault/security module | 17 passed, included in full suite |
-| PostgreSQL concurrent distinct/identical imports | Both fail on first candidate, pass after native bounded serialization |
-| Occupied actual-NUL advisory key | Timeout without source mutation; retry after release succeeds |
-| Original failure plus cleanup/unlock failure | Original failure retained |
-| Monitor initialization and collector DB write during close | Close waits actual thread completion |
-| Book reconnect with increasing pre-snapshot delta | Delta rejected, fresh snapshot required; no stale levels |
-| Invalid book delta, then healthy deltas without disconnect | Fail-closed, no autonomous recovery: remaining NO-GO |
-| TLS current-host application public GET | HTTP200, retCode0, TLS1.3, certificate/hostname verification |
-| PowerShell syntax / Python compilation / 198 extracted source hashes | PASS; no target package execution |
+| Invalid/nonfinite delta; sequence/update regression | New epoch/socket; trailing old delta not published; fresh snapshot required |
+| Increasing delta immediately after reconnect | Rejected until snapshot |
+| Silent feed; continuous unrelated traffic | Per-symbol watchdog reconnects |
+| Real loopback WebSocket,4scenarios | Both sockets close; only snapshots1and10 publish; UNVERIFIED gap |
+| Retained snapshot | Immutable across mutation/recovery |
+| Failed-handshake backoff |0.1,0.2,0.4,0.4,0.4 deterministic jitter; stop/cancel interrupts active30s wait |
+| Real verified TLS | Untrusted/wrong-host rejected, valid localhost accepted, timeout/cancel/abort cleanup |
+| Audit-host public app REST | GET200/retCode0/TLS1.3; no target implication |
+| Extreme Decimal import/audit | Six bounded cases includingÂ±0e999999999 |
+| Real advisory contention | Server wait observed, then release/resume; stuck holder times out before source mutation |
+| Cleanup cancellation | Red masking reproduced; final original-error preservation passes |
+| JUnit unrelated/module-collision/skipped-required | Final gate rejects |
+| Rejected d3856c7 | Windows639 PASS/11skip despite green icon; not accepted |
 
-Synthetic Qt20-instrument / 20,000 events/s benchmark at tested SHA: Windows CI ~19,991 events/s, render p95 3.469ms, heartbeat p95 12.681ms, close event 2.123ms; Linux ~19,994 events/s, render p95 4.376ms, heartbeat p95 12.908ms. Both worker_stopped=true and loop_closed=true. These 3-second callback/offscreen tests exclude network, SQL persistence, exchange parsing and microstructure calculations; they are not soak or end-to-end throughput certification.
+Synthetic20-symbol/20k-events/s: Windows~19994events/s, render p95=2.730ms, heartbeat p95=12.631ms, close=1.743ms. Linux~19997events/s, render p95=4.673ms, heartbeat p95=12.984ms. Worker stopped/loop closed. Three-second offscreen callback benchmark excludes network/SQL/parsing/microstructure; not real-PC or soak evidence.
 
-| Real target gate | Status |
-|---|---|
-| Prior 9d1bfff5… / 586 tests / reported670 lifecycle results | UNVERIFIED: source and logs unavailable |
-| Separate Windows11 Pro / Python3.12 / PostgreSQL18 / installed MetaScalp | NOT RUN |
-| Target TLS and network outage/recovery | NOT RUN |
-| 30-minute smoke | NOT RUN |
-| 2-hour soak | NOT RUN |
-| 24-hour stability | NOT RUN |
-| Queue depth, dropped-event and market completeness reconciliation | NULL / UNVERIFIED |
+| Target stage | Admission | Execution |
+|---|---|---|
+| Separate Windows11 Pro/Python3.12/PG18/MetaScalp preflight | Mandatory before activation | NOT RUN |
+| Supervised30-minute read-only smoke | CONDITIONAL GO after approved target preflight/logging | NOT RUN; no PASS |
+|2-hour soak|NO-GO pending reviewed30m logs and telemetry|NOT RUN|
+|24-hour stress|NO-GO pending reviewed2h/resource/reconciliation proof|NOT RUN|
+|Queue/drop reconciliation|Unknown; blocks longer-stage promotion|NULL/UNVERIFIED|
+|Original586/9d1bfff5 claims|Not used as evidence|UNVERIFIED|
 
-Automated Windows PostgreSQL17 is not evidence of Windows PostgreSQL18 target compatibility. Successful Linux18 does not close that hardware gate.
+Raw evidence/SUMMARY.json: docs/commissioning_evidence_v3. Baseline13901274 evidence remains in docs/commissioning_evidence. CI/offscreen timings do not replace target logs.

@@ -1,0 +1,50 @@
+{
+  "source": "C:\\Users\\LS-5\\Documents\\Codex\\2026-10-15\\github-https-github-com-yehorbabenko88-meta\\work\\windows-commissioning-audit",
+  "module": "C:\\Users\\LS-5\\Documents\\Codex\\2026-10-15\\github-https-github-com-yehorbabenko88-meta\\work\\windows-commissioning-audit\\src\\meta_analyse\\http_client.py",
+  "python": "3.12.15 (main, Oct 14 2026, 01:08:45) [MSC v.1944 64 bit (AMD64)]",
+  "httpx": "0.28.1",
+  "results": [
+    {
+      "case": "self",
+      "result": "rejected",
+      "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1010)",
+      "verify": true
+    },
+    {
+      "case": "wrong",
+      "result": "rejected",
+      "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Hostname mismatch, certificate is not valid for 'localhost'. (_ssl.c:1010)",
+      "verify": {
+        "check_hostname": true,
+        "verify_mode": 2
+      }
+    },
+    {
+      "case": "good",
+      "result": "success",
+      "status": 200,
+      "check_hostname": true,
+      "verify_mode": 2
+    },
+    {
+      "case": "timeout",
+      "result": "peer EOF observed; client closed",
+      "trace": [
+        "connection.connect_tcp.started",
+        "connection.connect_tcp.complete",
+        "connection.start_tls.started",
+        "connection.start_tls.failed"
+      ]
+    },
+    {
+      "case": "cancel",
+      "result": "peer EOF observed; client closed",
+      "trace": [
+        "connection.connect_tcp.started",
+        "connection.connect_tcp.complete",
+        "connection.start_tls.started",
+        "connection.start_tls.failed"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+tls-loopback contains disposable generated test CA/server certificates and fixture private keys for loopback reproduction only. No production credentials or OS trust changes. Never install this test CA in an OS trust store. Source is the pinned candidate; evidence review copies are not an alternate app source.

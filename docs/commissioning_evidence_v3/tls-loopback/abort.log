@@ -1,0 +1,11 @@
+{
+  "case": "handshake_abort",
+  "result": "ConnectError; caller trace restored",
+  "error": "ConnectError('')",
+  "trace": [
+    "connection.connect_tcp.started",
+    "connection.connect_tcp.complete",
+    "connection.start_tls.started",
+    "connection.start_tls.failed"
+  ]
+}

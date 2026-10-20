@@ -1,0 +1,73 @@
+diff --git a/src/meta_analyse/archive_db_import.py b/src/meta_analyse/archive_db_import.py
+index 4fc9c2b..575b455 100644
+--- a/src/meta_analyse/archive_db_import.py
++++ b/src/meta_analyse/archive_db_import.py
+@@ -144,8 +144,6 @@ def import_verified_archive(store, path, receipt, *, venue="bybit", symbol, batc
+             conn.execute("SET statement_timeout = 120000")
+             conn.execute("SET lock_timeout = 15000")
+             key = int.from_bytes(hashlib.sha256((venue + "\0" + symbol).encode()).digest()[:8], "big", signed=True)
+-            # Preserve serialized concurrent imports, but bound a stuck holder
+-            # with the existing server-side lock_timeout (no polling or sleeps).
+             try:
+                 conn.execute("SELECT pg_advisory_lock(%s)", (key,))
+             except LockNotAvailable as exc:
+diff --git a/tests/test_storage_ingestion_postgres.py b/tests/test_storage_ingestion_postgres.py
+index 32d6029..6976f02 100644
+--- a/tests/test_storage_ingestion_postgres.py
++++ b/tests/test_storage_ingestion_postgres.py
+@@ -267,9 +267,11 @@ def test_unlock_failure_does_not_mask_original_import_error(tmp_path):
+     assert (checkpoint, status) == (0, "failed")
+ 
+ 
+-def test_contended_advisory_lock_fails_without_partial_import(tmp_path):
+-    """An occupied venue/symbol lock must fail closed, without creating a source."""
++def test_contended_advisory_lock_serializes_and_resumes(tmp_path):
++    """A second importer waits for the holder, then imports once released."""
+     import hashlib as _hashlib
++    import threading
++    import time
+ 
+     store = Store(DSN)
+     symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+@@ -278,17 +280,32 @@ def test_contended_advisory_lock_fails_without_partial_import(tmp_path):
+         _hashlib.sha256(("bybit" + "\0" + symbol).encode()).digest()[:8],
+         "big", signed=True,
+     )
++    started = threading.Event()
++    completed = threading.Event()
++    result = {}
++    def run_import():
++        started.set()
++        try:
++            result["value"] = import_verified_archive(
++                store, path, receipt, symbol=symbol, batch_size=1)
++        except BaseException as exc:
++            result["error"] = exc
++        finally:
++            completed.set()
++
+     with store.connect() as holder:
+         holder.execute("SELECT pg_advisory_lock(%s)", (key,))
++        worker = threading.Thread(target=run_import)
++        worker.start()
+         try:
+-            with pytest.raises(TimeoutError, match="archive import already active"):
+-                import_verified_archive(store, path, receipt, symbol=symbol, batch_size=1)
+-            with store.connect() as check:
+-                count = check.execute(
+-                    "SELECT count(*) FROM meta_analyse.archive_sources "
+-                    "WHERE venue='bybit' AND symbol=%s", (symbol,),
+-                ).fetchone()[0]
+-            assert count == 0
++            assert started.wait(timeout=5)
++            # Synchronize with the server: the worker should still be waiting.
++            time.sleep(0.15)
++            assert not completed.is_set()
+         finally:
+             holder.execute("SELECT pg_advisory_unlock(%s)", (key,))
+-    assert import_verified_archive(store, path, receipt, symbol=symbol)["rows"] == 1
++        worker.join(timeout=20)
++    assert completed.is_set(), "importer failed to finish after lock release"
++    assert "error" not in result, repr(result.get("error"))
++    assert result["value"]["rows"] == 1
++    assert import_verified_archive(store, path, receipt, symbol=symbol)["resumed_from"] == 1

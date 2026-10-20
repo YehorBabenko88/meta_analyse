@@ -9,10 +9,13 @@ New-Item -ItemType Directory -Force -Path $WorkRoot | Out-Null
 $WorkRoot = (Resolve-Path $WorkRoot).Path
 if (-not $PgBin) {
     $installed = Get-ChildItem 'C:\Program Files\PostgreSQL' -Directory -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending | Where-Object { Test-Path (Join-Path $_.FullName 'bin\initdb.exe') } | Select-Object -First 1
+        Sort-Object Name -Descending | Where-Object { $_.Name -match '^18(\.|$)' -and (Test-Path (Join-Path $_.FullName 'bin\initdb.exe')) } | Select-Object -First 1
     if ($installed) { $PgBin = Join-Path $installed.FullName 'bin' }
 }
 if (-not $PgBin) {
+    throw 'PostgreSQL 18 binaries are required for Windows CI; install PG18 on runner or provide -PgBin. Refusing legacy 17.6 fallback.'
+}
+if ($false) {
     $archive = Join-Path $WorkRoot 'postgresql.zip'
     Invoke-WebRequest 'https://get.enterprisedb.com/postgresql/postgresql-17.6-1-windows-x64-binaries.zip' -OutFile $archive
     $expected = 'D378882ABD001A186735ACD6F6BA716BCA6CCD192E800412D4FD15ED25376B3E'
@@ -20,6 +23,9 @@ if (-not $PgBin) {
     Expand-Archive -LiteralPath $archive -DestinationPath $WorkRoot
     $PgBin = Join-Path $WorkRoot 'pgsql\bin'
 }
+$version = (& (Join-Path $PgBin 'postgres.exe') --version) -join ' '
+Write-Host "Selected Windows PostgreSQL: $version"
+if ($LASTEXITCODE -ne 0 -or $version -notmatch 'PostgreSQL\) 18\.') { throw "PostgreSQL 18 required; found: $version" }
 $data = Join-Path $WorkRoot 'pgdata'
 $log = Join-Path $WorkRoot 'postgresql.log'
 # Reserve an available loopback port; no production database is used.

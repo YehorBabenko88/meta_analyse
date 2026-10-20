@@ -22,6 +22,9 @@ jobs:
           cache-dependency-path: requirements.lock
       - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
+      - name: Real Windows read-only native process and SCM boundary
+        shell: powershell
+        run: ./commissioning/check-process-probe.ps1 -Output process-probe.json
       - name: Mandatory local HTTP archive fault regression (Windows)
         run: |
           python -m pip install -c requirements.lock aiohttp
@@ -52,6 +55,7 @@ jobs:
           path: |
             ${{ runner.temp }}/meta-analyse-ci/repeat-lifecycle/**/tests.*
             source-sha.json
+            process-probe.json
             ${{ runner.temp }}/meta-analyse-ci/tests.log
             ${{ runner.temp }}/meta-analyse-ci/tests.xml
             ${{ runner.temp }}/meta-analyse-ci/postgresql.log

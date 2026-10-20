@@ -26,12 +26,15 @@ foreach ($task in $tasks) {
     $taskText=$task.TaskName + ' ' + $task.TaskPath + ' ' + (($task.Actions | ForEach-Object { $_.Execute + ' ' + $_.Arguments }) -join ' ')
     if ($taskText -match '(?i)grid' -or ($task.TaskPath -notlike '\Microsoft\Windows\*' -and $taskText -match '(?i)coordinator|collector|worker')) { $findings.Add('Grid or conflicting scheduled task') }
 }
-$unknownProcesses = 0
+$processEvidence = @()
+try { . (Join-Path $PSScriptRoot 'process-evidence.ps1') } catch { $errorsFound.Add('Native process identity collector unavailable') }
 foreach ($process in $processes) {
-    if (-not $process.ExecutablePath -and $process.ProcessId -notin @(0,4) -and $process.Name -notin @('Registry','Secure System','Memory Compression')) { $unknownProcesses++ }
+    if (-not $process.ExecutablePath) {
+        try { $processEvidence += Get-MissingProcessEvidence -ProcessRecord $process }
+        catch { $processEvidence += [ordered]@{process=[ordered]@{pid=[int]$process.ProcessId;name=$process.Name};evidence=@{collection_error='PROCESS_EVIDENCE_UNAVAILABLE'}} }
+    }
     if (($process.Name + ' ' + $process.ExecutablePath) -match '(?i)bybit.?cluster|bybit.?grid|cluster.?grid|\\grid\\|^(coordinator|worker|collector)(\.exe)? ') { $findings.Add('Grid or conflicting runtime process') }
 }
-if ($unknownProcesses) { $errorsFound.Add('Some process executable paths unavailable') }
 $homePath = [Environment]::GetFolderPath('UserProfile')
 $gridRoots = @(
     (Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'BybitClusterGrid'),
@@ -95,6 +98,8 @@ $terminalProcesses = @($processes | Where-Object { $_.Name -ieq 'MetaScalp.exe' 
     else { [ordered]@{pid=[int]$_.ProcessId;process_started=$_.CreationDate.ToUniversalTime().ToString('o');exe_path=$_.ExecutablePath;exe_sha256=(Get-FileHash -LiteralPath $_.ExecutablePath -Algorithm SHA256).Hash.ToLowerInvariant()} }
 })
 [ordered]@{
+    process_evidence=@($processEvidence)
+    process_roots=[ordered]@{system32=[Environment]::SystemDirectory;program_files=[Environment]::GetFolderPath('ProgramFiles')}
     private_inventory=[ordered]@{
         scope='All visible processes, services, scheduled tasks and TCP listeners; bounded known Grid directories, install metadata and environment names. No drive-wide absence claim.'
         services=@($services | Select-Object Name,DisplayName,State,PathName,StartName)
@@ -107,7 +112,7 @@ $terminalProcesses = @($processes | Where-Object { $_.Name -ieq 'MetaScalp.exe' 
     http_sys_state=$httpSysState;terminal_processes=$terminalProcesses
     identity=[ordered]@{hostname=[System.Net.Dns]::GetHostName();username=$current.Name;sid=$current.User.Value;machine_guid=$machine.MachineGuid;install_id=[string]$version.InstallDate;hardware_uuid=$hardware.UUID}
     os=[ordered]@{system='Windows';edition=$version.EditionID;build=[int]$version.CurrentBuildNumber}
-    grid=[ordered]@{findings=@($findings);errors=@($errorsFound);coverage_complete=($errorsFound.Count -eq 0);visible_services=$services.Count;visible_tasks=$tasks.Count;visible_processes=$processes.Count;unknown_process_paths=$unknownProcesses}
+    grid=[ordered]@{findings=@($findings);errors=@($errorsFound);coverage_complete=($errorsFound.Count -eq 0);visible_services=$services.Count;visible_tasks=$tasks.Count;visible_processes=$processes.Count}
     credential_names=@($credentialNames);production_dsn_names=@($dsnNames)
     postgres_listeners=@($postgresListeners);metascalp=@($metascalp);api_listeners=@($apiListeners)
     api_listening_ports=@($listeners | Where-Object { $_.LocalPort -ge 17845 -and $_.LocalPort -le 17855 -and $_.LocalAddress -in @('127.0.0.1','::1','0.0.0.0','::') } | ForEach-Object {[int]$_.LocalPort} | Select-Object -Unique)

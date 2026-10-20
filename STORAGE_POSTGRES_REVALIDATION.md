@@ -22,3 +22,13 @@ Scope: Draft PR #8, branch `parallel/storage-ingestion`; comparison with PR #12 
 3. Verify `asyncio.to_thread` cancellation/drain integration from PR #9/#12, including shutdown while PostgreSQL is committing and avoiding premature DB close.
 4. Test slow HTTP download, file-lock lifetime and cancellation in PR #6; these are outside this synchronous importer.
 5. No merge, deployment, or production DB access. Historical completeness remains UNVERIFIED.
+
+
+## Follow-up verification (2026-10-20)
+
+- PR #8 exact SHA `1568993a1ac94dc3e760e6b24073b83218866ff4`:
+  - Storage ingestion integration run **39441317742: SUCCESS** (integration job SUCCESS).
+  - CI run **39441317681: SUCCESS** (both Windows and Linux jobs SUCCESS).
+- The initial added contention test had an incorrect literal backslash-zero in its advisory-lock key, instead of the importer’s NUL separator. Fixed in `1568993a`; the lock serialization test and full storage suite now pass on that SHA.
+- Importer behavior remains serialized via blocking `pg_advisory_lock` with 15-second PostgreSQL `lock_timeout`; the failure on the previous SHA was in the test fixture, not a confirmed importer failure.
+- Exact-SHA CI passes do **not** constitute a long-duration load test, Windows live-data commissioning, or a full cross-branch shutdown/cancellation validation.

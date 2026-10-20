@@ -24,9 +24,12 @@ class OrderBook:
         if data.get("s") != self.symbol:
             raise ValueError("orderbook symbol mismatch")
         kind = message.get("type")
-        uid = int(data["u"])
-        seq = int(data["seq"])
-        if kind == "snapshot" or uid == 1:
+        uid = data["u"]
+        seq = data["seq"]
+        if type(uid) is not int or type(seq) is not int or uid < 0 or seq < 0:
+            self.reset()
+            return False
+        if kind == "snapshot":
             self.reset()
             self._levels(data)
             self.update_id = uid
@@ -53,7 +56,7 @@ class OrderBook:
         for field, book in (("b",self.bids),("a",self.asks)):
             for price_text,size_text in data.get(field,[]):
                 price, size = Decimal(str(price_text)), Decimal(str(size_text))
-                if price <= 0 or size < 0:
+                if not price.is_finite() or not size.is_finite() or price <= 0 or size < 0:
                     raise ValueError("invalid orderbook level")
                 if size == 0:
                     book.pop(price,None)

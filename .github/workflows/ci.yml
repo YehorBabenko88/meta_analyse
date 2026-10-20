@@ -23,7 +23,7 @@ jobs:
       - name: Mandatory baseline integration suite
         run: python -m pytest -q tests --junitxml=integration-gate.xml
       - name: Verify baseline suite ran without skips
-        run: python scripts/check_integration_junit.py integration-gate.xml --minimum 100 --allow-skip test_fifty_connect_disconnect_cycles_drain_collectors --allow-skip test_close_with_twenty_active_instruments_and_pending_db_write --allow-skip test_windows_qt_mock_network_postgres_disconnect_restart --allow-skip test_database_operations_have_bounded_timeouts
+        run: python scripts/check_integration_junit.py integration-gate.xml --minimum 100 --require-identity tests.test_integration_contract_shutdown.test_shutdown_waits_for_thread_write_before_cancelled_task_finishes --require-identity tests.test_integration_contract_shutdown.test_repeated_cancellation_does_not_abandon_write --require-identity tests.test_integration_contract_shutdown.test_failed_write_after_cancellation_waits_for_rollback --allow-skip test_fifty_connect_disconnect_cycles_drain_collectors --allow-skip test_close_with_twenty_active_instruments_and_pending_db_write --allow-skip test_windows_qt_mock_network_postgres_disconnect_restart --allow-skip test_database_operations_have_bounded_timeouts
       - name: Windows Qt and disposable PostgreSQL integration
         shell: pwsh
         run: ./scripts/test-windows.ps1
@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:17.6
+        image: postgres:18
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
@@ -73,10 +73,12 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
       - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
+      - name: Confirm PostgreSQL 18 server
+        run: python -c "import os, psycopg; conn=psycopg.connect(os.environ['META_ANALYSE_TEST_ADMIN_DSN']); version=conn.execute('SHOW server_version_num').fetchone()[0]; print('PostgreSQL server version:', version); assert 180000 <= int(version) < 190000; conn.close()"
       - name: Mandatory baseline integration suite
         run: python -m pytest -q tests --junitxml=integration-gate.xml
       - name: Verify baseline suite ran without skips
-        run: python scripts/check_integration_junit.py integration-gate.xml --minimum 100 --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
+        run: python scripts/check_integration_junit.py integration-gate.xml --minimum 100 --require-identity tests.test_integration_contract_shutdown.test_shutdown_waits_for_thread_write_before_cancelled_task_finishes --require-identity tests.test_integration_contract_shutdown.test_repeated_cancellation_does_not_abandon_write --require-identity tests.test_integration_contract_shutdown.test_failed_write_after_cancellation_waits_for_rollback --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
       - run: python -m compileall -q src
       - name: Repeat lifecycle resource regressions in fresh processes
         run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir repeat-lifecycle

@@ -1,2 +1,4 @@
 # Preserve immutable commissioning evidence bytes across Windows/Linux checkouts.
 docs/commissioning_evidence_v3/** -text
+
+docs/ls5_commissioning_evidence/** -text

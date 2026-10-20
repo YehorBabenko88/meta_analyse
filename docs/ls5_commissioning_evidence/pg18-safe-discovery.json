@@ -1,0 +1,25 @@
+{
+  "observed_utc": "2026-10-20T19:05:43.1822024Z",
+  "service": "postgresql-x64-18",
+  "service_state": "Running",
+  "binary_version": "postgres (PostgreSQL) 18.6",
+  "data_directory": "C:\\Program Files\\PostgreSQL\\18\\data",
+  "pid_file_port": 55432,
+  "pid_file_state": "ready   ",
+  "config_port": "55432",
+  "config_listen_addresses": "*",
+  "actual_bindings": [
+    {
+      "LocalAddress": "::",
+      "LocalPort": 55432
+    },
+    {
+      "LocalAddress": "0.0.0.0",
+      "LocalPort": 55432
+    }
+  ],
+  "readiness": "NOT_RUN",
+  "authentication": "NOT_RUN",
+  "database_role_isolation": "UNVERIFIED",
+  "configuration_changed": false
+}

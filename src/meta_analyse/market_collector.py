@@ -1,6 +1,7 @@
 """Collect orderbooks and open interest with isolated failure handling."""
 from __future__ import annotations
 import asyncio
+from .write_drain import drain_thread_write
 import logging
 from .market_store import MarketStore
 from .market_telemetry import MarketTelemetry
@@ -21,7 +22,7 @@ class MarketCollector:
         self.tasks=[]
 
     async def _book(self,symbol,book,exchange_ms):
-        await asyncio.to_thread(self.db.book,symbol,book,exchange_ms)
+        await drain_thread_write(self.db.book,symbol,book,exchange_ms)
         self.telemetry.observe("orderbook",symbol)
         if self.on_book:
             await self.on_book(symbol,book,exchange_ms)
@@ -40,7 +41,7 @@ class MarketCollector:
                 try:
                     points=await fetch_open_interest(self.exchange,symbol,self.oi_interval)
                     for point in points:
-                        await asyncio.to_thread(self.db.open_interest,point,self.oi_interval)
+                        await drain_thread_write(self.db.open_interest,point,self.oi_interval)
                         self.telemetry.observe("open_interest",symbol)
                 except asyncio.CancelledError:
                     raise
@@ -56,7 +57,7 @@ class MarketCollector:
             raise RuntimeError("collector already started")
         if not symbols:
             raise ValueError("no symbols")
-        await asyncio.to_thread(self.db.initialize)
+        await drain_thread_write(self.db.initialize)
         self.stop_event.clear()
         for offset in range(0,len(symbols),10):
             stream=OrderBookStream(self._book,self._gap)

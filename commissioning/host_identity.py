@@ -63,6 +63,8 @@ def safe_inventory(facts):
     grid = facts['grid']
     if grid.get('coverage_complete') is not True or grid.get('errors') or grid.get('findings'):
         raise ValueError('Grid/conflict inventory is not clear and complete')
+    if grid.get('unknown_process_paths',0) or facts.get('process_inventory',{}).get('unknown_process_paths',0):
+        raise ValueError('unresolved process identities')
     if facts.get('credential_names') or facts.get('production_dsn_names'):
         raise ValueError('credentials or production environment requires operator review')
     os_info = facts['os']
@@ -155,6 +157,20 @@ def collect_facts():
     if result.returncode:
         raise ValueError('host facts unavailable; no private output published')
     facts = json.loads(result.stdout.decode('utf-8-sig'))
+    from process_identity import assess_processes
+    original_processes=facts['private_inventory']['processes']
+    if not original_processes or len(original_processes)!=facts['grid']['visible_processes'] or len({p['ProcessId'] for p in original_processes})!=len(original_processes):
+        facts['grid']['errors'].append('Process snapshot incomplete')
+        facts['grid']['coverage_complete']=False
+    expected_missing=[p['ProcessId'] for p in original_processes if not p.get('ExecutablePath')]
+    assessment=assess_processes(facts.pop('process_evidence'),facts.pop('process_roots'),expected_missing)
+    facts['process_inventory']=assessment
+    facts['grid'].update({k:v for k,v in assessment.items() if k!='results'})
+    if assessment['unknown_process_paths']:
+        facts['grid']['errors'].append('Some process identities unresolved')
+        facts['grid']['coverage_complete']=False
+    if 'GRID_PROCESS_INDICATOR' in assessment['reason_counts']:
+        facts['grid']['findings'].append('Grid indicator in native process identity')
     state = facts.pop('http_sys_state')
     processes = facts.pop('terminal_processes')
     try:
@@ -301,12 +317,21 @@ def main():
         if args.command == 'diagnose':
             salt = secrets.token_hex(32)
             report = public_report(facts, salt)
+            reasons=[]
+            if facts['grid'].get('coverage_complete') is not True or facts['grid'].get('errors'):reasons.append('INCOMPLETE_INVENTORY')
+            if facts['grid'].get('findings'):reasons.append('GRID_CONFLICT')
+            if facts.get('credential_names') or facts.get('production_dsn_names'):reasons.append('UNAPPROVED_ENVIRONMENT')
+            # This is an expected admission rejection, not an unexplained crash
+            # after a seemingly successful report. Never include exception text.
+            try: safe_inventory(facts)
+            except ValueError:
+                if not reasons:reasons.append('INVENTORY_POLICY_REJECTED')
+            report.update(diagnostic_status='FAIL_CLOSED' if reasons else 'PASS_OBSERVATION_ONLY',reason_codes=reasons)
             save_private(args.private_observation, dict(schema=1, salt=salt,
                          fingerprint=fingerprint(facts, salt), observed_at=time.time(), facts=facts))
             Path(args.output).write_text(json.dumps(report, indent=2), encoding='utf-8')
             print(json.dumps(report, indent=2))
-            safe_inventory(facts)
-            return 0
+            return 1 if reasons else 0
         from preflight import verify_manifest
         root=verify_manifest(args.manifest, args.expected_sha, args.manifest_sha256)
         if root!=Path(__file__).resolve().parent.parent: raise ValueError('executing guard differs from packet')

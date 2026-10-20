@@ -142,7 +142,9 @@ def import_verified_archive(store, path, receipt, *, venue="bybit", symbol, batc
             conn.execute("SET statement_timeout = 120000")
             conn.execute("SET lock_timeout = 15000")
             key = int.from_bytes(hashlib.sha256((venue + "\0" + symbol).encode()).digest()[:8], "big", signed=True)
-            conn.execute("SELECT pg_advisory_lock(%s)", (key,))
+            acquired = conn.execute("SELECT pg_try_advisory_lock(%s)", (key,)).fetchone()[0]
+            if not acquired:
+                raise TimeoutError("archive import already active for venue/symbol")
             try:
                 with conn.transaction():
                     source_id, prior = conn.execute("""INSERT INTO meta_analyse.archive_sources

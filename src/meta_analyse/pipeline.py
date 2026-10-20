@@ -1,6 +1,7 @@
 """Durable raw Bybit ingestion pipeline; no inferred or synthetic trades."""
 from __future__ import annotations
 import asyncio
+from .write_drain import drain_thread_write
 import logging
 from decimal import Decimal
 from .raw_trades import RawTradeStream
@@ -31,7 +32,7 @@ class RawPipeline:
             # Serialize persistence, aggregation and callbacks per instrument.
             # DB errors propagate; no execution is considered observed before commit.
             try:
-                inserted = await asyncio.to_thread(self.db.save, event)
+                inserted = await drain_thread_write(self.db.save, event)
             except Exception:
                 aggregator.gap([event.symbol], "database_error")
                 if self.on_gap:
@@ -59,10 +60,10 @@ class RawPipeline:
                     self.health.gap(symbol)
         if self.on_gap:
             await self.on_gap(symbols, reason)
-        await asyncio.to_thread(self.db.gap, symbols, reason)
+        await drain_thread_write(self.db.gap, symbols, reason)
 
     async def start(self):
-        await asyncio.to_thread(self.db.initialize)
+        await drain_thread_write(self.db.initialize)
         symbols = list(self.aggregators)
         if not symbols:
             raise ValueError("no instruments")

@@ -24,6 +24,8 @@ class DesktopSnapshot:
     market_ages: tuple = ()
     overview: tuple = ()
     readiness: tuple = ()
+    orderflow_rows: tuple = ()
+    orderflow_status: str = 'No validated historical trade source attached'
 
 def _client_operation(method):
     """Own requests until cancellation/response teardown finishes before aclose."""
@@ -61,6 +63,8 @@ class DesktopService:
         self.overview_task = None
         self.overview_lock = None
         self.readiness = {}
+        self.orderflow_rows = ()
+        self.orderflow_status = 'No validated historical trade source attached'
 
     def initialize(self):
         self.api = MetaScalp()
@@ -236,6 +240,29 @@ class DesktopService:
         if rules is not None:
             self.runtime.paper.threshold, self.runtime.paper.stop_pct, self.runtime.paper.fee_rate = rules
 
+    def load_orderflow_records(self, records, interval_ms=60000):
+        """Explicit, read-only history adapter; no implicit completeness claim."""
+        from .orderflow_adapters import from_records
+        from .orderflow_aggregation import aggregate_by_time
+        from .orderflow_view import make_rows
+        # Bound both memory and Qt table size; refuse truncation that could
+        # silently corrupt cumulative delta or imply complete coverage.
+        max_trades = 250_000
+        max_buckets = 10_000
+        trades = []
+        for trade in from_records(records):
+            if len(trades) >= max_trades:
+                raise ValueError('historical trade limit exceeded')
+            trades.append(trade)
+        buckets = aggregate_by_time(trades, interval_ms)
+        if len(buckets) > max_buckets:
+            raise ValueError('historical interval limit exceeded')
+        self.orderflow_rows = make_rows(buckets, quality='UNVERIFIED')
+        self.orderflow_status = (
+            f'{len(trades)} trades, {len(buckets)} intervals; '
+            + 'historical coverage UNVERIFIED'
+        )
+
     def set_readiness(self, symbol, progress):
         """Accept only a validated Progress object from history coordination."""
         from .history_progress import Progress
@@ -273,7 +300,7 @@ class DesktopService:
         return DesktopSnapshot(symbols, tuple(stats), self.bridge.snapshot(),
                                self.flow_state, self.flow_status, self.status,
                                telemetry.events if telemetry else (), telemetry.gaps if telemetry else (),
-                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols))
+                               self.session.market.telemetry.ages() if telemetry else (), tuple(overview), tuple((symbol, self.readiness.get(symbol)) for symbol in symbols), self.orderflow_rows, self.orderflow_status)
 
     async def check_health(self):
         if self.flow_state != 'connected' or self.session is None:

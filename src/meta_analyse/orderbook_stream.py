@@ -1,6 +1,9 @@
 """Bybit public orderbook transport with fail-closed autonomous recovery."""
 from __future__ import annotations
 import asyncio
+from dataclasses import dataclass
+from decimal import Decimal
+from types import MappingProxyType
 import json
 import logging
 import random
@@ -9,6 +12,22 @@ import websockets
 from .orderbook import OrderBook
 
 LOG = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class BookSnapshot:
+    symbol: str
+    bids: object
+    asks: object
+    update_id: int
+    sequence: int
+    valid: bool
+
+    @classmethod
+    def from_book(cls, book):
+        return cls(book.symbol, MappingProxyType(dict(book.bids)),
+                   MappingProxyType(dict(book.asks)), book.update_id,
+                   book.sequence, book.valid)
 
 
 class _ResubscribeRequired(ConnectionError):
@@ -97,7 +116,7 @@ class OrderBookStream:
                             book.reset()
                             await self.on_gap([symbol], "invalid orderbook timestamp")
                             raise _ResubscribeRequired("malformed orderbook timestamp") from exc
-                        await self.on_book(symbol, book, timestamp_ms)
+                        await self.on_book(symbol, BookSnapshot.from_book(book), timestamp_ms)
                         # Reset backoff only after a verified snapshot, not merely
                         # after a TCP/WebSocket handshake (which may flap rapidly).
                         if msg.get("type") == "snapshot":

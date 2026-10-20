@@ -76,3 +76,32 @@ def test_integration_contract_ci_rejects_declared_count_mismatch(tmp_path):
     ET.ElementTree(root).write(report, encoding="unicode")
     result = subprocess.run([sys.executable, str(SCRIPT), str(report), "--minimum", "1"], capture_output=True)
     assert result.returncode != 0
+
+def test_integration_contract_ci_never_allows_skipped_required_exact_test(tmp_path):
+    result = _check(
+        tmp_path, [("test_mandatory", "skipped")],
+        "--require-exact", "test_mandatory", "--allow-skip", "test_mandatory",
+    )
+    assert result.returncode != 0
+    assert "REQUIRED TEST SKIPPED" in result.stderr
+
+
+def test_integration_contract_ci_rejects_required_identity_name_collision(tmp_path):
+    result = _check(tmp_path, [("test_required", "passed")],
+                    "--require-identity", "tests.other_module.test_required")
+    assert result.returncode != 0
+    assert "MISSING OR DUPLICATE REQUIRED IDENTITY" in result.stderr
+
+
+def test_integration_contract_ci_accepts_required_identity(tmp_path):
+    result = _check(tmp_path, [("test_required", "passed")],
+                    "--require-identity", "tests.test_integration_contract_ci.test_required")
+    assert result.returncode == 0
+
+
+def test_integration_contract_ci_rejects_skipped_required_identity(tmp_path):
+    result = _check(tmp_path, [("test_required", "skipped")],
+                    "--allow-skip", "test_required",
+                    "--require-identity", "tests.test_integration_contract_ci.test_required")
+    assert result.returncode != 0
+    assert "REQUIRED IDENTITY SKIPPED" in result.stderr

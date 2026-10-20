@@ -275,7 +275,7 @@ def test_contended_advisory_lock_fails_without_partial_import(tmp_path):
     symbol = "TEST_STORAGE_" + uuid.uuid4().hex
     path, receipt = archive(tmp_path, symbol, "locked_trade", "locked")
     key = int.from_bytes(
-        _hashlib.sha256(("bybit" + "\\0" + symbol).encode()).digest()[:8],
+        _hashlib.sha256(("bybit" + "\0" + symbol).encode()).digest()[:8],
         "big", signed=True,
     )
     with store.connect() as holder:

@@ -17,13 +17,14 @@ REQUIRED = (
     "test_failed_import_status_preserves_committed_checkpoint",
     "test_orderflow_reader_returns_exact_aliases",
     "test_unlock_failure_does_not_mask_original_import_error",
+    "test_contended_advisory_lock_fails_without_partial_import",
 )
 
 def main():
     if len(sys.argv) < 2:
         raise SystemExit("Usage: check_integration_postgres.py FULL_JUNIT_XML [--allow-skip TEST_NAME ...]")
     checker = Path(__file__).with_name("check_integration_junit.py")
-    command = [sys.executable, str(checker), sys.argv[1], "--minimum", "9", *sys.argv[2:]]
+    command = [sys.executable, str(checker), sys.argv[1], "--minimum", str(len(REQUIRED)), *sys.argv[2:]]
     for name in REQUIRED:
         command.extend(["--require-exact", name])
     raise SystemExit(subprocess.call(command))

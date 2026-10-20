@@ -17,6 +17,9 @@ async def drain_thread_write(func, /, *args, **kwargs):
             await asyncio.shield(task)
         except asyncio.CancelledError:
             cancelled = True
+        except Exception:
+            # Retrieve the error below after the worker is fully finished.
+            break
     # Retrieve the result only after the transaction's context manager exits.
     # On cancellation, do not replace cancellation with an exception raised by
     # a background DB operation, but always retrieve/log that exception.

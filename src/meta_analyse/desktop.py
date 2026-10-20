@@ -5,6 +5,7 @@ import os
 import sys
 import threading
 from datetime import datetime, timedelta, timezone
+import time
 from dataclasses import replace
 from PySide6.QtCore import QTimer, QObject, Signal, Slot, Qt
 from PySide6.QtGui import QColor, QBrush

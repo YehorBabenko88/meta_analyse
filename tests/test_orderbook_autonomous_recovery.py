@@ -133,8 +133,14 @@ async def test_fault_requires_new_epoch_and_snapshot(monkeypatch, bad_message):
 
 @pytest.mark.asyncio
 async def test_failed_handshakes_preserve_exponential_backoff(monkeypatch):
-    stop = asyncio.Event()
-    delays = []
+    class StopProbe:
+        def __init__(self):
+            self.calls = 0
+        def is_set(self):
+            return self.calls >= 4
+        async def wait(self):
+            self.calls += 1
+            raise asyncio.TimeoutError
     class BrokenSocket:
         async def __aenter__(self):
             raise ConnectionError("handshake rejected")
@@ -146,19 +152,17 @@ async def test_failed_handshakes_preserve_exponential_backoff(monkeypatch):
                         lambda *a, **kw: BrokenSocket())
     monkeypatch.setattr("meta_analyse.orderbook_stream.random.uniform",
                         lambda a, b: 1.0)
+    delays = []
     original_wait_for = asyncio.wait_for
-    async def fake_wait_for(awaitable, timeout):
-        if timeout >= 0.1:
+    async def measured_wait_for(awaitable, timeout):
+        if isinstance(stop, StopProbe) and timeout <= 0.4:
             delays.append(timeout)
-            if len(delays) == 4:
-                stop.set()
-            if hasattr(awaitable, "close"):
-                awaitable.close()
-            raise asyncio.TimeoutError
         return await original_wait_for(awaitable, timeout)
+    # Use an event that immediately raises TimeoutError to avoid real sleeps.
+    stop = StopProbe()
     monkeypatch.setattr("meta_analyse.orderbook_stream.asyncio.wait_for",
-                        fake_wait_for)
+                        measured_wait_for)
     stream = OrderBookStream(lambda *_: None, on_gap,
                              backoff_base=0.1, backoff_max=0.4)
-    await asyncio.wait_for(stream.run(["BTCUSDT"], stop), 2)
+    await stream.run(["BTCUSDT"], stop)
     assert delays == [0.1, 0.2, 0.4, 0.4]

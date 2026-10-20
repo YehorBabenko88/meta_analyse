@@ -2,7 +2,7 @@
 import argparse, json, os, sys, time
 from pathlib import Path
 from datetime import datetime, timezone
-from preflight import target_guard, verify_manifest, validate_local_database, verify_package_source
+from preflight import inspect
 
 
 def install_http_read_guard():
@@ -14,17 +14,38 @@ def install_http_read_guard():
     ManagedAsyncClient.send=guarded_send
 
 
+def bind_terminal_endpoint(verified,executable):
+    import asyncio
+    from host_identity import collect_facts,validate_metascalp
+    from meta_analyse.ports import MetaScalp
+    original=MetaScalp.request
+    async def discover(self):
+        current=validate_metascalp(await asyncio.to_thread(collect_facts),executable)
+        if current['sha256']!=verified['metascalp_exe_sha256'] or current['port']!=verified['metascalp_api_port']:
+            raise ConnectionError('approved MetaScalp process/API identity changed')
+        self.base=f"http://127.0.0.1:{current['port']}"
+        return self.base
+    async def request(self,method,endpoint,**kwargs):
+        await discover(self)
+        return await original(self,method,endpoint,**kwargs)
+    MetaScalp.discover=discover
+    MetaScalp.request=request
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    for name in ('manifest','expected-sha','expected-computer','log-dir'):p.add_argument('--'+name,required=True)
+    for name in ('manifest','manifest-sha256','expected-sha','expected-computer','enrollment','metascalp-exe','log-dir'):p.add_argument('--'+name,required=True)
     p.add_argument('--operator-approved-readonly-run',action='store_true',required=True)
-    a=p.parse_args();target_guard(a.expected_computer)
-    root=verify_manifest(a.manifest,a.expected_sha);verify_package_source(root)
-    if any(os.environ.get(k) for k in ('BYBIT_API_KEY','BYBIT_API_SECRET')):raise ValueError('trading credentials must be absent')
+    a=p.parse_args()
+    # Never accept stale/tampered PASS JSON: rerun all read-only checks now.
+    import asyncio
+    verified=asyncio.run(inspect(a))
     dsn=os.environ['META_ANALYSE_COMMISSIONING_DSN']
     from psycopg.conninfo import make_conninfo
-    os.environ['META_ANALYSE_DSN']=make_conninfo(**validate_local_database(dsn))
+    from host_identity import load_private,validate_bound_database
+    os.environ['META_ANALYSE_DSN']=make_conninfo(**validate_bound_database(dsn,load_private(a.enrollment),os.environ))
     install_http_read_guard()
+    bind_terminal_endpoint(verified,a.metascalp_exe)
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import QTimer
     from meta_analyse.desktop import Window
@@ -50,8 +71,15 @@ def main():
     pulse=QTimer(window);pulse.timeout.connect(heartbeat);pulse.start(100)
     timer=QTimer(window);timer.timeout.connect(record);timer.start(5000)
     app.aboutToQuit.connect(record)
+    # This authorization covers smoke only. Normal close still drains writes;
+    # never force-exit the worker or silently promote to a longer stage.
+    QTimer.singleShot(30*60*1000,window.close)
     with (out/'session.json').open('w',encoding='utf-8') as f:
-        json.dump(dict(candidate_sha=a.expected_sha,computer=os.environ.get('COMPUTERNAME'),pid=os.getpid(),started_utc=datetime.now(timezone.utc).isoformat(),mode='HTTP_READ_ONLY'),f,indent=2)
+        json.dump(dict(candidate_sha=a.expected_sha,computer=verified['computer'],host_fingerprint=verified['host_fingerprint'],enrollment_id=verified['enrollment_id'],pid=os.getpid(),started_utc=datetime.now(timezone.utc).isoformat(),mode='HTTP_READ_ONLY'),f,indent=2)
     raise SystemExit(app.exec())
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    try: main()
+    except Exception as exc:
+        print('Commissioning blocked ('+type(exc).__name__+'); no private configuration published')
+        raise SystemExit(1)

@@ -1,12 +1,16 @@
 param(
   [Parameter(Mandatory=$true)][string]$ExpectedComputer,
   [Parameter(Mandatory=$true)][int]$AppProcessId,
-  [Parameter(Mandatory=$true)][ValidateSet(30,120,1440)][int]$Minutes,
+  [Parameter(Mandatory=$true)][ValidateSet(30)][int]$Minutes,
   [Parameter(Mandatory=$true)][string]$OutputDirectory,
-  [Parameter(Mandatory=$true)][string]$CandidateSha
+  [Parameter(Mandatory=$true)][string]$CandidateSha,
+  [Parameter(Mandatory=$true)][string]$Enrollment,
+  [Parameter(Mandatory=$true)][string]$Manifest,
+  [Parameter(Mandatory=$true)][string]$ManifestSha256
 )
 $ErrorActionPreference='Stop'
-if ($env:COMPUTERNAME -ne $ExpectedComputer -or ($env:COMPUTERNAME -replace '-','') -in @('LS5','LS7')) { throw 'Wrong or protected computer' }
+& py -3.12 (Join-Path $PSScriptRoot 'host_identity.py') check --enrollment $Enrollment --manifest $Manifest --expected-sha $CandidateSha --manifest-sha256 $ManifestSha256 --expected-computer $ExpectedComputer
+if ($LASTEXITCODE -ne 0) { throw 'Specific host/source/Grid authorization failed' }
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $watch=[System.Diagnostics.Stopwatch]::StartNew()
 $completed=$false

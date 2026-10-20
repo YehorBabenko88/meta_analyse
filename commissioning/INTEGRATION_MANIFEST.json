@@ -250,5 +250,16 @@
       "reason": "Windows Actions green but raw JUnit639passed11skipped: integration copied PR9 isolated script without baseline TEST_DSN and storage gate",
       "correction": "Restore both DSNs and gate in script; independently invoke gate in Windows workflow; do not certify green icon alone"
     }
+  },
+  "ls5_adaptation_20261020": {
+    "baseline_code_sha": "446c72bd97cacc31f9937c9ab941d11539733be4",
+    "baseline_report_sha": "b10cb5e2b8c41c2472e08d5248742cedc05817e9",
+    "scope": "commissioning only; no app architecture/production changes",
+    "identity": "OS-derived installation+hardware+userSID HMAC; private DPAPI CurrentUser record,24h admission validity;LS5/user-specific; explicit operator no-Grid attestation; fresh inventory each entrypoint",
+    "source": "trusted manifest digest and full code coverage; executing root must equal verified packet",
+    "runtime": "fresh PG18 minimum-role/no-other-DB-CONNECT, loopback private cluster, approved signed MetaScalp hash/port, mandatory certificate+hostname REST verification; terminal endpoint pinned;30min graceful-close initiation only",
+    "actual_host_admission": "NO-GO:Grid footprint/incomplete coverage, private DB isolation unverified,MetaScalp API inactive; no enrollment or smoke started",
+    "changes_existing_cluster": false,
+    "installs_metascalp": false
   }
 }

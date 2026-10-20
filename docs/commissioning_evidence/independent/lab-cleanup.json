@@ -1,0 +1,6 @@
+{
+  "database": "commissioning_20261020",
+  "active_connections_before_drop": [],
+  "dropped_only_new_disposable_db": true,
+  "server_version": 170006
+}

@@ -1,0 +1,54 @@
+{
+  "sha": "446c72bd97cacc31f9937c9ab941d11539733be4",
+  "actual_target_tests": "NOT_RUN",
+  "runs": {
+    "windows-ci": {
+      "passed": 651,
+      "skipped": [],
+      "mandatory_postgres_passed": 11,
+      "mandatory_shutdown_passed": 5,
+      "lifecycle_runs": 10,
+      "tests_per_repeat": 67
+    },
+    "linux-ci": {
+      "passed": 650,
+      "skipped": [
+        "test_failed_pip_install_never_reports_success_or_creates_launcher"
+      ],
+      "mandatory_postgres_passed": 11,
+      "mandatory_shutdown_passed": 5,
+      "lifecycle_runs": 10,
+      "tests_per_repeat": 67
+    },
+    "linux18-extra-ci": {
+      "passed": 650,
+      "skipped": [
+        "test_failed_pip_install_never_reports_success_or_creates_launcher"
+      ],
+      "mandatory_postgres_passed": 11,
+      "mandatory_shutdown_passed": 5,
+      "lifecycle_runs": 10,
+      "tests_per_repeat": 67
+    },
+    "windows-local": {
+      "passed": 651,
+      "skipped": [],
+      "mandatory_postgres_passed": 11,
+      "mandatory_shutdown_passed": 5,
+      "lifecycle_runs": 10,
+      "tests_per_repeat": 67
+    }
+  },
+  "postgres_ci_version": "18.6 on Windows and Linux",
+  "local_postgres": "17.6, supplementary only",
+  "pinned_archive_contract": {
+    "sha": "091e9db1a9c7f144a34150da81eae64cf9d7d8e3",
+    "passed": 8
+  },
+  "rejected_sha": "d3856c7db6171707455df735e2aa9e657be10840",
+  "admission": {
+    "smoke30m": "CONDITIONAL GO only after approved target preflight",
+    "soak2h": "NO-GO",
+    "stress24h": "NO-GO"
+  }
+}

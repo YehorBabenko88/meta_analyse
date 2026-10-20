@@ -1,0 +1,265 @@
+{
+  "base_sha": "38cf43ec781be9c4d7ebb98fb97525b3686a3c40",
+  "reviewed_pr_heads": {
+    "6": "dcfebc713c3c8825b522fc8071b7a3411f0bf7ca",
+    "7": "8ea83076cd76e9bcf98ef4b113830ef0d4707164",
+    "8": "206f02cd82dfdb9ca4e49a94b419caa948dada32",
+    "9": "aec72c8778e22cb19888d559f47401e8da7bf464",
+    "10": "38cf43ec781be9c4d7ebb98fb97525b3686a3c40"
+  },
+  "reviewed_commits": [
+    {
+      "original": "1a0bfc6206792b1e83755d6abcd6d042f311d956",
+      "candidate": "f4f2bf12a33ad134b826fefff2eaea7c09f0e9f3",
+      "subject": "Bound extreme negative Decimal exponent conversion in archive auditor"
+    },
+    {
+      "original": "dcfebc713c3c8825b522fc8071b7a3411f0bf7ca",
+      "candidate": "eae83879373380539db5e726698f879c72a9bcd8",
+      "subject": "Regression test tiny extreme-exponent timestamps without large integer powers"
+    },
+    {
+      "original": "4ac60162a0c35aacfaae86a343d836eb526dca77",
+      "candidate": "3a8847ea7283440da79b41ec9d2fbae1f82c075f",
+      "subject": "fix(storage): avoid pathological power allocation for sub-microsecond timestamps"
+    },
+    {
+      "original": "239b68b95abad5d7ca7e46418077d7ce99610905",
+      "candidate": "5990db1368b2197cd97092fca26962f8e58385a8",
+      "subject": "test(storage): extreme tiny Decimal exponents truncate safely"
+    },
+    {
+      "original": "563497e1095b3db887968d52c4145e719ee9c95f",
+      "candidate": "4b7f7ac8958c32c5c49e19bf6933256b83bd0d6f",
+      "subject": "fix(storage): bound PostgreSQL statement and lock waits during archive import"
+    },
+    {
+      "original": "ef8deed8b7479d271c27c0f947c66639a2353a6a",
+      "candidate": "e4995e15b661a22cab2d4aec9dd79fa5fb090c35",
+      "subject": "fix(storage): fail fast on contended archive advisory lock"
+    },
+    {
+      "original": "206f02cd82dfdb9ca4e49a94b419caa948dada32",
+      "candidate": "afb3b9ca71aa807e91a52beb3e464feb58aa0d91",
+      "subject": "test(storage): verify contended advisory lock fails closed and retries"
+    },
+    {
+      "original": "3e7c3584370de3856fde5b5bc406d206524de88e",
+      "candidate": "62a9365a1071562e453253e40e7ea6b6ada4aa8c",
+      "subject": "fix(orderbook): reject delta u=1 spoofing and nonfinite or malformed sequence values"
+    },
+    {
+      "original": "9132ac3c7fe1a02ac42b8eb065f0ec079c565295",
+      "candidate": "5222435e16eba2f43f50958f575334c75136b3b3",
+      "subject": "test(orderbook): malformed IDs, nonfinite levels and delta reconnect recovery"
+    },
+    {
+      "original": "1b214ac3e118b8bf9f7774ed0fc19079ae2dd927",
+      "candidate": "1dda188d5cb567e0680eb336b47ccb2281650c20",
+      "subject": "fix(orderbook): invalidate and clear state on malformed snapshot or partial delta"
+    },
+    {
+      "original": "8ea83076cd76e9bcf98ef4b113830ef0d4707164",
+      "candidate": "72de94274b0fb0c20d6dda79fd9828c1e4093ef5",
+      "subject": "test(orderbook): malformed envelopes and partial delta must clear valid state"
+    },
+    {
+      "original": "8e1dc213f71472f7c279445411c6d19d69f0e48c",
+      "candidate": "ff5a87a73e96165b501eae16eb9cd6371858e32c",
+      "subject": "fix: keep cancelled async DB writes owned until worker threads finish"
+    },
+    {
+      "original": "603632341d499890b39073ef02296798943eb1dc",
+      "candidate": "4ff05b9d9ace626bf7a0446f1def825293226365",
+      "subject": "fix: drain active DB writes before collector cancellation completes"
+    },
+    {
+      "original": "1b13f80aac8d1e8584dca5c6b5c17894b28050b3",
+      "candidate": "6be72eb509a1e9de432e13210bac186bc2555049",
+      "subject": "fix: drain active DB writes before collector cancellation completes"
+    },
+    {
+      "original": "5b01d325ce782b6f80d998f742fb71cc0307e8e4",
+      "candidate": "e1573fef6d02f11f16d0607d9f5faa1a79beb20f",
+      "subject": "test: fault inject cancellation and repeated cancellation during DB write"
+    },
+    {
+      "original": "4ee91aaea2911de69a0a5c39a3c723174e6d6409",
+      "candidate": "b3946bff3d044189d363e5628c91256d52a41ff0",
+      "subject": "ui: report pending writes after bounded shutdown wait without closing live worker"
+    },
+    {
+      "original": "b4cedc673ee7a24b69760483c7dfc625e6fbe575",
+      "candidate": "ae9b963212b01ddfa73c05fdf95c6b4600aaec6c",
+      "subject": "fix: import monotonic clock for shutdown timeout status"
+    },
+    {
+      "original": "6af667ba63a888d896faa9ea40a94ebce262c3fd",
+      "candidate": "208a213eb6058456886d694b7b44390f10c4f5a3",
+      "subject": "ci: enforce exact 67 collected and zero skipped lifecycle cases across 10 runs"
+    },
+    {
+      "original": "1493a5c4b1bdb193b5b3f0aadf05b1b527752976",
+      "candidate": "58b32ed0e5a400c358bf0920c301b62e6f919bf6",
+      "subject": "fix: drain cancelled DB thread and preserve/log transaction failure"
+    },
+    {
+      "original": "34f485fe322d92b7ab63e4bf98159942dba0f5ab",
+      "candidate": "f83195b2769de3028ded885259ce0de3717685aa",
+      "subject": "fix: defer completed thread errors until cancellation state is resolved"
+    },
+    {
+      "original": "aec72c8778e22cb19888d559f47401e8da7bf464",
+      "candidate": "498523c4e6e5f22a4ac7a223c2f5699d03cb165e",
+      "subject": "test: verify cancellation waits for rollback and propagates uncancelled DB failures"
+    }
+  ],
+  "resolutions": [
+    "Retained both datetime/time imports in desktop.py",
+    "Retained baseline and incoming storage unit regressions"
+  ],
+  "independent_fixes": [
+    "Drain monitor schema initialization before service.close returns",
+    "Use actual NUL separator in PostgreSQL advisory contention regression",
+    "Require all ten PostgreSQL regressions in JUnit gate",
+    "Short-circuit zero coefficients before positive archive timestamp exponentiation",
+    "Preserve concurrent archive serialization with bounded server-side advisory lock wait"
+  ],
+  "scope": "Isolated audit branch only; no merge, deployment, production DB, orders or insecure TLS",
+  "reaudit_20261020": {
+    "baseline_code_sha": "13901274dac527f0aacfaf48481414b0971d6012",
+    "baseline_reports_sha": "eb2e639fff872128542868f6b717fc1b9a8f1335",
+    "reviewed_heads": {
+      "6": "091e9db1a9c7f144a34150da81eae64cf9d7d8e3",
+      "7": "0086e338ee668f2fb1b4a9dd7253b16b8469ce13",
+      "8": "813ac6a02d23554d18d6343480c03c84ae662825",
+      "9": "383458001a65224094c43a049e20f9c9cbcef50c",
+      "10": "38cf43ec781be9c4d7ebb98fb97525b3686a3c40"
+    },
+    "selected_commits": [
+      {
+        "original": "f4803b6a3df6a7f865e28d4728764c2ef1b6e3b2",
+        "candidate": "389296972079cb8af300d9f51079eecf697fee3d"
+      },
+      {
+        "original": "84562a1c6747b0e8e9b676e411c8d3ae15230c09",
+        "candidate": "d74524e0270ce69aa05c44bc2f0541cb0e9fcd40"
+      },
+      {
+        "original": "091e9db1a9c7f144a34150da81eae64cf9d7d8e3",
+        "candidate": "a59d0f14e30d42a2eecd35752430904ebd6e5c80"
+      },
+      {
+        "original": "20d8d92118ad1726ef4457bb5faf863e0f63341d",
+        "candidate": "e1cd88622d96460f6e51f7a78ad589c6d7c2c1ac"
+      },
+      {
+        "original": "0ce3712c51feb44b250bd22b2980d4e67670772c",
+        "candidate": "81a68852b10c3d2b9c305179458cde7c82d8ceb2"
+      },
+      {
+        "original": "b4d94d4e2361df846e3af28f281aabb864aa6896",
+        "candidate": "2e776db3c7bfa3eaebe725375fdd9d500a0f4eb1"
+      },
+      {
+        "original": "2187149203ffc359af6109f18ad2e4cbaa0b74fa",
+        "candidate": "103ebf4fdef544520e7804f4040e40d1a5c1a792"
+      },
+      {
+        "original": "e42673ef8baf0c881c99841de8ccb48361a1843d",
+        "candidate": "1f9532e0e93ba022d8ef267ceb1d1b3ad2379c50"
+      },
+      {
+        "original": "4ed48fa9789db5893c8b4d1d3195f43758417572",
+        "candidate": "729b1755a52f3a5fb16e6a036cc6f277191e8f55"
+      },
+      {
+        "original": "317945faf0608dbc4e083cb887a14e3845fc021d",
+        "candidate": "c8a0dcfaba9a6d5156705dd1131cf75b28bae9b9"
+      },
+      {
+        "original": "d8e63c4d50a758111394f26d03e3307b1b59d61e",
+        "candidate": "c9a4a9748028704cdcba5a391dc69f9b7ef58631"
+      },
+      {
+        "original": "99b36b6b1ec16d0becf7fff5a123effe5f63ec49",
+        "candidate": "0d65e49dc530d307af9c264034cb308f5f5a6c69"
+      },
+      {
+        "original": "3551311280f97ec4a3363dd9bf3ff14e5a353a59",
+        "candidate": "c36eeb0fb4c3f73d3b2005efcc5c3aac8fe39f5c"
+      },
+      {
+        "original": "bf13a8e2dc12d47442740be84414eefd8fdb724f",
+        "candidate": "27a7d69d6c2264e493431db8d30c9637bb66920b"
+      },
+      {
+        "original": "f9bd8ccc1132e197ac5ff458349f223bd0975022",
+        "candidate": "32b1d4e8cd53a801e7f0b3f108bc28e5dad6f774"
+      },
+      {
+        "original": "a5b310d96f213b292f24afc5e88bd123863123fb",
+        "candidate": "711697a41d406de7d77c4c31d47a1fba83837968"
+      },
+      {
+        "original": "57f6c3de960d80ff559f8da5bf3adabd4b771771",
+        "candidate": "cb497f4e196fd9566606f02307033b6bcfff5900"
+      },
+      {
+        "original": "edcac089ef188c6d0ee4cfa94e640820c24cedce",
+        "candidate": "5f45ada7535f17b9ba2d052a1f8ba06342ae47c2"
+      },
+      {
+        "original": "0086e338ee668f2fb1b4a9dd7253b16b8469ce13",
+        "candidate": "8ecaddeedc71a49f6cef13bab7da199acd27f555"
+      },
+      {
+        "original": "97f3d7f64828e8bcec733eec44e38269fa8434e7",
+        "candidate": "f59438e183468f8cfa44c61ef868dc8371454cbb"
+      },
+      {
+        "original": "cbaea4d631355132e6df5684b6e28099a4a4f1a8",
+        "candidate": "562c670ee779eedb1f9011aeac4f2f59057a107c"
+      }
+    ],
+    "equivalent_not_replayed": {
+      "PR8": "Runtime equals baseline bounded locking; retain stronger contention timeout test and add real server-wait regression",
+      "PR9 shutdown": "Runtime drain code equals baseline; no redundant replay",
+      "PR9 gzip fixture": "Baseline already fixes gzip mtime/filename and strict CSV contract; retain baseline"
+    },
+    "explicit_resolutions": [
+      "Retain baseline ten mandatory PG cases; reject PR9 literal-backslash-n commented-out loop",
+      "Strengthen PG gate to eleven exact module.test identities plus five shutdown identities",
+      "Retain baseline JUnit checks plus PR9 unskipped unique identity checks",
+      "Provision pinned official PostgreSQL18.6 only inside disposable Windows Actions; retain strict major rejection",
+      "Run candidate archive faults and separate immutable PR6 contract with explicit source SHA"
+    ],
+    "independent_fixes": [
+      "Original DB error survives second cancellation in failed-status cleanup",
+      "Adapt reconnect regression to third epoch after invalid pre-snapshot delta; no wall-clock backoff",
+      "Deterministic actual server advisory-wait test instead of150ms sleep"
+    ],
+    "official_pg18_archive": {
+      "source_index": "https://www.enterprisedb.com/download-postgresql-binaries",
+      "url": "https://get.enterprisedb.com/postgresql/postgresql-18.6-5-windows-x64-binaries.zip",
+      "sha256": "e2246ba91d22345bc3d017586c09ede52d9df180b1eeb480f050445f1cad84e2",
+      "checksum_provenance": "independently downloaded over verified HTTPS from vendor redirect; observed archive hash, not a vendor signed checksum"
+    },
+    "rejected_candidate": {
+      "sha": "d3856c7db6171707455df735e2aa9e657be10840",
+      "reason": "Windows Actions green but raw JUnit639passed11skipped: integration copied PR9 isolated script without baseline TEST_DSN and storage gate",
+      "correction": "Restore both DSNs and gate in script; independently invoke gate in Windows workflow; do not certify green icon alone"
+    }
+  },
+  "ls5_adaptation_20261020": {
+    "baseline_code_sha": "446c72bd97cacc31f9937c9ab941d11539733be4",
+    "baseline_report_sha": "b10cb5e2b8c41c2472e08d5248742cedc05817e9",
+    "scope": "commissioning only; no app architecture/production changes",
+    "identity": "OS-derived installation+hardware+userSID HMAC; private DPAPI CurrentUser record,24h admission validity;LS5/user-specific; explicit operator no-Grid attestation; fresh inventory each entrypoint",
+    "source": "trusted manifest digest and full code coverage; executing root must equal verified packet",
+    "runtime": "fresh PG18 minimum-role/no-other-DB-CONNECT, loopback private cluster, approved signed MetaScalp hash/port, mandatory certificate+hostname REST verification; terminal endpoint pinned;30min graceful-close initiation only",
+    "actual_host_admission": "NO-GO:Grid footprint/incomplete coverage, private DB isolation unverified,MetaScalp API inactive; no enrollment or smoke started",
+    "changes_existing_cluster": false,
+    "installs_metascalp": false
+  }
+}

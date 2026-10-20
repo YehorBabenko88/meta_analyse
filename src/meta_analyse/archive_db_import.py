@@ -11,6 +11,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from psycopg.errors import LockNotAvailable
+
 from .storage_migrations import initialize_archive_schema
 
 
@@ -63,7 +65,12 @@ def parse_trade(row):
     for digit in digits.digits:
         coefficient = coefficient * 10 + digit
     shift = digits.exponent + 6
-    micros = coefficient * (10 ** shift) if shift >= 0 else coefficient // (10 ** (-shift))
+    # Avoid allocating enormous powers for valid sub-microsecond values such
+    # as 1e-999999999; their truncated epoch microseconds are exactly zero.
+    if coefficient == 0 or (shift < 0 and -shift >= len(digits.digits)):
+        micros = 0
+    else:
+        micros = coefficient * (10 ** shift) if shift >= 0 else coefficient // (10 ** (-shift))
     try:
         time = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(microseconds=micros)
     except (ValueError, OverflowError) as exc:
@@ -134,10 +141,15 @@ def import_verified_archive(store, path, receipt, *, venue="bybit", symbol, batc
         initialize_archive_schema(store)
         with store.connect() as conn:
             conn.autocommit = True
-            conn.execute("SET statement_timeout = 0")
-            conn.execute("SET lock_timeout = 60000")
+            conn.execute("SET statement_timeout = 120000")
+            conn.execute("SET lock_timeout = 15000")
             key = int.from_bytes(hashlib.sha256((venue + "\0" + symbol).encode()).digest()[:8], "big", signed=True)
-            conn.execute("SELECT pg_advisory_lock(%s)", (key,))
+            # Preserve serialized concurrent imports, but bound a stuck holder
+            # with the existing server-side lock_timeout (no polling or sleeps).
+            try:
+                conn.execute("SELECT pg_advisory_lock(%s)", (key,))
+            except LockNotAvailable as exc:
+                raise TimeoutError("archive import already active for venue/symbol") from exc
             try:
                 with conn.transaction():
                     source_id, prior = conn.execute("""INSERT INTO meta_analyse.archive_sources
@@ -205,7 +217,9 @@ def import_verified_archive(store, path, receipt, *, venue="bybit", symbol, batc
                         with conn.transaction():
                             conn.execute("""UPDATE meta_analyse.archive_import_checkpoints
                                 SET status='failed',updated_at=now() WHERE source_id=%s""", (source_id,))
-                    except Exception:
+                    except BaseException:
+                        # A second cancellation during best-effort status cleanup
+                        # must not replace the original import/DB exception.
                         pass
                     raise
             finally:

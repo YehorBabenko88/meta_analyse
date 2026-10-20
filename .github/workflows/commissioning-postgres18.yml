@@ -1,0 +1,50 @@
+name: Commissioning PostgreSQL18
+on:
+  push:
+    branches: ['audit/**']
+permissions:
+  contents: read
+jobs:
+  postgres18-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.1
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONASYNCIODEBUG: '1'
+      META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+      META_ANALYSE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact Actions source SHA
+        run: python scripts/record_ci_source.py
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
+      - run: python -m pip install -c requirements.lock -e '.[test,archive]'
+      - run: python -m pip check
+      - name: Record exact PostgreSQL major
+        run: python -c "import os,psycopg,json; c=psycopg.connect(os.environ['META_ANALYSE_TEST_ADMIN_DSN']); v=c.info.server_version; print(v); assert v==180001; open('postgres-version.json','w').write(json.dumps({'server_version':v}));c.close()"
+      - name: Full suite and eleven-case PostgreSQL and five-case shutdown gate
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest tests -q -W error::RuntimeWarning --junitxml=pg18-tests.xml | tee pg18-tests.log
+          python scripts/check_integration_postgres.py pg18-tests.xml --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
+      - name: Repeat lifecycle without missing or skipped cases
+        run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir pg18-lifecycle
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: commissioning-postgres18
+          path: |
+            source-sha.json
+            pg18-tests.*
+            postgres-version.json
+            pg18-lifecycle/**/tests.*

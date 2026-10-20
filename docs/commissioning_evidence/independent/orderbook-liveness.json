@@ -1,0 +1,11 @@
+{
+  "candidate_sha": "13901274dac527f0aacfaf48481414b0971d6012",
+  "invalid_delta_fail_closed": true,
+  "automatic_resubscription": false,
+  "recovery_without_snapshot": "NOT_RECOVERED",
+  "connections": 1,
+  "published_updates": [
+    10
+  ],
+  "verdict": "NO-GO for autonomous recovery requirement; no false-valid state observed"
+}

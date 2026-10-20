@@ -1,0 +1,28 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+__________ test_contended_advisory_lock_fails_without_partial_import __________
+
+tmp_path = WindowsPath('C:/Users/LS-5/Documents/Codex/2026-10-15/github-https-github-com-yehorbabenko88-meta/work/commission-lock-red/test_contended_advisory_lock_f0')
+
+    def test_contended_advisory_lock_fails_without_partial_import(tmp_path):
+        """An occupied venue/symbol lock must fail closed, without creating a source."""
+        import hashlib as _hashlib
+    
+        store = Store(DSN)
+        symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+        path, receipt = archive(tmp_path, symbol, "locked_trade", "locked")
+        key = int.from_bytes(
+            _hashlib.sha256(("bybit" + "\\0" + symbol).encode()).digest()[:8],
+            "big", signed=True,
+        )
+        with store.connect() as holder:
+            holder.execute("SELECT pg_advisory_lock(%s)", (key,))
+            try:
+>               with pytest.raises(TimeoutError, match="archive import already active"):
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               Failed: DID NOT RAISE TimeoutError
+
+tests\test_storage_ingestion_postgres.py:284: Failed
+=========================== short test summary info ===========================
+FAILED tests/test_storage_ingestion_postgres.py::test_contended_advisory_lock_fails_without_partial_import
+1 failed, 9 deselected in 0.74s

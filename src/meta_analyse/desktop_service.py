@@ -6,6 +6,7 @@ from functools import wraps
 from dataclasses import dataclass
 from decimal import Decimal
 from .analysis_session import AnalysisSession
+from .write_drain import drain_thread_write
 from .exchange import BybitPublic
 from .ports import MetaScalp
 from .runtime import Runtime
@@ -146,7 +147,7 @@ class DesktopService:
         async def run():
             try:
                 if self.store:
-                    await asyncio.to_thread(self.store.initialize)
+                    await drain_thread_write(self.store.initialize)
                 self.status = 'Monitor running; MetaScalp feed is aggregated and unverified'
                 await self.runtime.run()
             except Exception as exc:

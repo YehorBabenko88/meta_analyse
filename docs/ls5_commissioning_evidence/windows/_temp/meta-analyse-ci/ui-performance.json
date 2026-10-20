@@ -1,0 +1,40 @@
+{
+  "platform": "Windows-2025Server-10.0.26100-SP0",
+  "python": "3.12.10",
+  "qt_platform": "offscreen",
+  "pyside6": "6.12.0",
+  "process_cpu_percent_one_core": 40.296191839015634,
+  "renderer": "partial",
+  "instruments": 20,
+  "target_events_per_second": 20000,
+  "events": 60000,
+  "producer_seconds": 3.000999200000024,
+  "actual_events_per_second": 19993.340884595877,
+  "publication_hz": 10,
+  "render_samples": 35,
+  "render_median_ms": 4.2095000000017535,
+  "render_p95_ms": 5.841799999984687,
+  "render_max_ms": 10.037700000054883,
+  "snapshot_to_render_p95_ms": 6.2078999999926054,
+  "heartbeat_target_ms": 10,
+  "heartbeat_p95_ms": 11.778100000015002,
+  "heartbeat_max_ms": 20.90970000000425,
+  "close_event_ms": 2.6497000000063053,
+  "worker_stopped": true,
+  "loop_closed": true,
+  "microbenchmark": {
+    "unchanged": {
+      "median_ms": 0.06610000002638117,
+      "p95_ms": 0.09919999996554907
+    },
+    "one_changed": {
+      "median_ms": 0.38485000001742264,
+      "p95_ms": 0.5431000000157837
+    },
+    "all_changed": {
+      "median_ms": 1.2292000000115877,
+      "p95_ms": 2.1705999999994674
+    }
+  },
+  "limits": "Synthetic callbacks/Qt only; excludes exchange parsing, SQL persistence, network and microstructure algorithms."
+}

@@ -1,0 +1,182 @@
+{
+  "candidate_sha": "5928b4e3aadac55d64bdd013c83ed698cfd8d838",
+  "actual_ls5": "NO-GO",
+  "timed_tests": "NOT RUN",
+  "runs": {
+    "linux": [
+      {
+        "file": "linux/tests.xml",
+        "cases": 698,
+        "skips": [
+          "test_failed_pip_install_never_reports_success_or_creates_launcher"
+        ]
+      },
+      {
+        "file": "linux/repeat-lifecycle/run-01/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "linux/repeat-lifecycle/run-02/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "linux/repeat-lifecycle/run-03/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "linux/repeat-lifecycle/run-04/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "linux/repeat-lifecycle/run-05/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "linux/repeat-lifecycle/run-06/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "linux/repeat-lifecycle/run-07/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "linux/repeat-lifecycle/run-08/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "linux/repeat-lifecycle/run-09/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "linux/repeat-lifecycle/run-10/tests.xml",
+        "cases": 67,
+        "skips": []
+      }
+    ],
+    "windows": [
+      {
+        "file": "windows/_temp/meta-analyse-ci/tests.xml",
+        "cases": 698,
+        "skips": []
+      },
+      {
+        "file": "windows/_temp/meta-analyse-ci/repeat-lifecycle/run-01/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "windows/_temp/meta-analyse-ci/repeat-lifecycle/run-02/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "windows/_temp/meta-analyse-ci/repeat-lifecycle/run-03/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "windows/_temp/meta-analyse-ci/repeat-lifecycle/run-04/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "windows/_temp/meta-analyse-ci/repeat-lifecycle/run-05/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "windows/_temp/meta-analyse-ci/repeat-lifecycle/run-06/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "windows/_temp/meta-analyse-ci/repeat-lifecycle/run-07/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "windows/_temp/meta-analyse-ci/repeat-lifecycle/run-08/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "windows/_temp/meta-analyse-ci/repeat-lifecycle/run-09/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "windows/_temp/meta-analyse-ci/repeat-lifecycle/run-10/tests.xml",
+        "cases": 67,
+        "skips": []
+      }
+    ],
+    "pg18": [
+      {
+        "file": "pg18/commissioning-postgres18/pg18-tests.xml",
+        "cases": 698,
+        "skips": [
+          "test_failed_pip_install_never_reports_success_or_creates_launcher"
+        ]
+      },
+      {
+        "file": "pg18/commissioning-postgres18/pg18-lifecycle/run-01/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "pg18/commissioning-postgres18/pg18-lifecycle/run-02/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "pg18/commissioning-postgres18/pg18-lifecycle/run-03/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "pg18/commissioning-postgres18/pg18-lifecycle/run-04/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "pg18/commissioning-postgres18/pg18-lifecycle/run-05/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "pg18/commissioning-postgres18/pg18-lifecycle/run-06/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "pg18/commissioning-postgres18/pg18-lifecycle/run-07/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "pg18/commissioning-postgres18/pg18-lifecycle/run-08/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "pg18/commissioning-postgres18/pg18-lifecycle/run-09/tests.xml",
+        "cases": 67,
+        "skips": []
+      },
+      {
+        "file": "pg18/commissioning-postgres18/pg18-lifecycle/run-10/tests.xml",
+        "cases": 67,
+        "skips": []
+      }
+    ]
+  }
+}

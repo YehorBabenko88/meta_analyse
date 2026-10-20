@@ -20,18 +20,31 @@ class OrderBook:
         self.valid = False
 
     def apply(self, message: dict):
-        data = message.get("data") or {}
-        if data.get("s") != self.symbol:
-            raise ValueError("orderbook symbol mismatch")
-        kind = message.get("type")
-        uid = int(data["u"])
-        seq = int(data["seq"])
-        if kind == "snapshot" or uid == 1:
+        if not isinstance(message, dict) or not isinstance(message.get("data"), dict):
             self.reset()
-            self._levels(data)
+            return False
+        data = message["data"]
+        if data.get("s") != self.symbol:
+            self.reset()
+            return False
+        kind = message.get("type")
+        uid = data.get("u")
+        seq = data.get("seq")
+        if type(uid) is not int or type(seq) is not int or uid < 0 or seq < 0:
+            self.reset()
+            return False
+        if kind == "snapshot":
+            self.reset()
+            try:
+                self._levels(data)
+            except (ValueError, TypeError, ArithmeticError):
+                self.reset()
+                return False
             self.update_id = uid
             self.sequence = seq
             self.valid = self._healthy()
+            if not self.valid:
+                self.reset()
             return self.valid
         if kind != "delta" or not self.valid or self.update_id is None or self.sequence is None:
             self.reset()
@@ -41,7 +54,11 @@ class OrderBook:
         if uid <= self.update_id or seq <= self.sequence:
             self.reset()
             return False
-        self._levels(data)
+        try:
+            self._levels(data)
+        except (ValueError, TypeError, ArithmeticError):
+            self.reset()
+            return False
         self.update_id = uid
         self.sequence = seq
         self.valid = self._healthy()
@@ -53,7 +70,7 @@ class OrderBook:
         for field, book in (("b",self.bids),("a",self.asks)):
             for price_text,size_text in data.get(field,[]):
                 price, size = Decimal(str(price_text)), Decimal(str(size_text))
-                if price <= 0 or size < 0:
+                if not price.is_finite() or not size.is_finite() or price <= 0 or size < 0:
                     raise ValueError("invalid orderbook level")
                 if size == 0:
                     book.pop(price,None)

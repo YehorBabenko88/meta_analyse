@@ -1,0 +1,19 @@
+Orderbook reconnect epoch=1: invalid orderbook; fresh snapshot required
+Orderbook reconnect epoch=1: invalid orderbook; fresh snapshot required
+Orderbook reconnect epoch=1: invalid orderbook; fresh snapshot required
+Orderbook reconnect epoch=1: connected orderbook feed silent
+Orderbook reconnect epoch=1: connected orderbook feed silent
+Orderbook reconnect epoch=1: offline
+Orderbook reconnect epoch=2: offline
+Orderbook reconnect epoch=3: offline
+Orderbook reconnect epoch=4: offline
+Orderbook reconnect epoch=5: offline
+SOURCE C:\Users\LS-5\Documents\Codex\2026-10-15\github-https-github-com-yehorbabenko88-meta\work\recovery-v3-evidence\source\src\meta_analyse\orderbook_stream.py
+PASS invalid delta epochs 2 published [1, 10] retained immutable
+PASS sequence regression epochs 2 published [1, 10] retained immutable
+PASS update-id regression epochs 2 published [1, 10] retained immutable
+PASS silent established feed epochs 2
+PASS busy unrelated socket epochs 2
+PASS numeric sequence jumps permitted by documented strictly increasing Bybit rule [1, 9]
+PASS bounded exponential backoff [0.1, 0.2, 0.4, 0.4, 0.4]
+OBSERVATION cancellation closes socket but internal_valid= True gap_count= 1

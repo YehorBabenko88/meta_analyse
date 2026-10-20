@@ -1,0 +1,26 @@
+{
+  "host_fingerprint": "9bb114ecf560f8251502aeec78a0cf870d481dda7c98624989ad98a101533ffc",
+  "os": {
+    "system": "Windows",
+    "edition": "Professional",
+    "build": 26300
+  },
+  "grid_findings": 4,
+  "inventory_errors": 1,
+  "coverage_complete": false,
+  "credential_variable_count": 0,
+  "production_dsn_variable_count": 0,
+  "status": "OBSERVATION_ONLY_NOT_AUTHORIZATION",
+  "expected_hostname_matches": true,
+  "expected_windows_user_matches": true,
+  "identity_input_fields_present": {
+    "hostname": true,
+    "username": true,
+    "sid": true,
+    "machine_guid": true,
+    "install_id": true,
+    "hardware_uuid": true
+  },
+  "authorization_created": false,
+  "actual_smoke_started": false
+}

@@ -1,0 +1,21 @@
+{
+  "utc": "2026-10-20T14:08:03.687437+00:00",
+  "candidate_sha": "a43ed74087629e1b51373831742bb9fd41519ba0",
+  "python": "3.12.15 (main, Oct 14 2026, 01:08:45) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "openssl": "OpenSSL 3.5.9 29 Sep 2026",
+  "method": "GET",
+  "endpoint": "https://api.bybit.com/v5/market/time",
+  "status": 200,
+  "retCode": 0,
+  "tls_version": "TLSv1.3",
+  "cipher": "TLS_AES_128_GCM_SHA256",
+  "verification": "application default, no override",
+  "override_presence": {
+    "SSL_CERT_FILE": false,
+    "SSL_CERT_DIR": false,
+    "HTTPS_PROXY": false,
+    "HTTP_PROXY": false
+  },
+  "scope": "current audit host, NOT separate commissioning PC"
+}

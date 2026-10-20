@@ -1,0 +1,54 @@
+{
+  "utc": "2026-10-20T15:10:51.093745+00:00",
+  "python": "3.12.15",
+  "host": "api.bybit.com",
+  "url": "https://api.bybit.com/v5/market/time",
+  "tls_verification": "required",
+  "proxy_environment_present": {
+    "HTTPS_PROXY": false,
+    "https_proxy": false,
+    "HTTP_PROXY": false,
+    "http_proxy": false,
+    "ALL_PROXY": false,
+    "all_proxy": false,
+    "NO_PROXY": false,
+    "no_proxy": false
+  },
+  "steps": {
+    "dns": {
+      "ok": true,
+      "ipv4": [
+        "18.64.103.114",
+        "18.64.103.39",
+        "18.64.103.61",
+        "18.64.103.75"
+      ],
+      "ipv6": []
+    },
+    "ipv4": {
+      "ok": true,
+      "tls": "TLSv1.3",
+      "cipher": "TLS_AES_128_GCM_SHA256",
+      "elapsed_ms": 16,
+      "certificate_subject": "((('commonName', '*.bybit.com'),),)",
+      "issuer": "((('countryName', 'US'),), (('organizationName', 'Amazon'),), (('commonName', 'Amazon RSA 2048 M01'),))",
+      "not_after": "Feb 24 23:59:59 2027 GMT"
+    },
+    "ipv6": {
+      "ok": false,
+      "reason": "no DNS address"
+    },
+    "https": {
+      "ok": true,
+      "status": 200,
+      "retCode": 0,
+      "elapsed_ms": 218,
+      "via_proxy_possible": false
+    }
+  },
+  "trust": {
+    "verify_mode": 2,
+    "check_hostname": true,
+    "default_verify_paths": "DefaultVerifyPaths(cafile=None, capath=None, openssl_cafile_env='SSL_CERT_FILE', openssl_cafile='C:\\\\Program Files\\\\Common Files\\\\SSL\\\\cert.pem', openssl_capath_env='SSL_CERT_DIR', openssl_capath='C:\\\\Program Files\\\\Common Files\\\\SSL\\\\certs')"
+  }
+}

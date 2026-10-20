@@ -161,3 +161,40 @@ def test_import_rejects_csv_shape_violations_before_db(tmp_path, content):
                "rows": content.count("\n") - 1}
     with pytest.raises(ValueError):
         import_verified_archive(None, path, receipt, symbol="BTCUSDT")
+
+
+def test_import_rejects_incorrect_receipt_row_count(tmp_path):
+    path = tmp_path / "rows.csv"
+    path.write_text("timestamp,trdMatchID,price,size,side\n1,id,1,1,Buy\n")
+    receipt = {"valid": True, "complete": False, "url": "https://example.invalid/rows",
+               "sha256": file_sha256(path), "bytes": path.stat().st_size, "rows": 2}
+    with pytest.raises(ValueError, match="archive rows or sha256 mismatch"):
+        import_verified_archive(None, path, receipt, symbol="BTCUSDT")
+
+
+def test_import_rejects_underreported_receipt_rows(tmp_path):
+    path = tmp_path / "rows.csv"
+    path.write_text("timestamp,trdMatchID,price,size,side\n1,id1,1,1,Buy\n2,id2,1,1,Sell\n")
+    receipt = {"valid": True, "complete": False, "url": "https://example.invalid/rows",
+               "sha256": file_sha256(path), "bytes": path.stat().st_size, "rows": 1}
+    with pytest.raises(ValueError, match="archive exceeds audited row count"):
+        import_verified_archive(None, path, receipt, symbol="BTCUSDT")
+
+
+@pytest.mark.parametrize("change", [
+    {"side": "buy"}, {"trdMatchID": "   "}, {"price": "NaN"},
+    {"size": "0"}, {"timestamp": "253402300800"},
+])
+def test_trade_contract_rejects_invalid_values(change):
+    row = {"trdMatchID": "id", "timestamp": "1735689600.123456",
+           "price": "1", "size": "1", "side": "Buy"}
+    row.update(change)
+    with pytest.raises(ValueError):
+        parse_trade(row)
+
+
+@pytest.mark.parametrize("value", ["1e-999999999", "0e-999999999", "1e-7"])
+def test_submicrosecond_timestamps_do_not_allocate_huge_powers(value):
+    row = {"trdMatchID": "tiny", "timestamp": value, "price": "1",
+           "size": "1", "side": "Buy"}
+    assert parse_trade(row)[1] == datetime(1970, 1, 1, tzinfo=timezone.utc)

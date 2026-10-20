@@ -1,0 +1,5 @@
+813ac6a docs(storage): record green exact-SHA PostgreSQL and Windows/Linux CI evidence
+1568993 fix(test): use NUL byte advisory-lock key separator matching importer
+ea83c0d test(storage): assert bounded advisory-lock serialization instead of immediate rejection
+81ac392 docs(storage): revalidate PR8 against audited PR12 PostgreSQL candidate
+77ee153 fix(storage): restore bounded serialized PostgreSQL advisory lock per audit

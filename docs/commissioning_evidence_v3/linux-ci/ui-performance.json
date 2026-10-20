@@ -1,0 +1,40 @@
+{
+  "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+  "python": "3.12.15",
+  "qt_platform": "offscreen",
+  "pyside6": "6.12.0",
+  "process_cpu_percent_one_core": 32.99113788620478,
+  "renderer": "partial",
+  "instruments": 20,
+  "target_events_per_second": 20000,
+  "events": 60000,
+  "producer_seconds": 3.000461219999977,
+  "actual_events_per_second": 19996.92567264724,
+  "publication_hz": 10,
+  "render_samples": 32,
+  "render_median_ms": 2.4649179999869375,
+  "render_p95_ms": 4.673000999986243,
+  "render_max_ms": 5.692843999980823,
+  "snapshot_to_render_p95_ms": 4.816917999988846,
+  "heartbeat_target_ms": 10,
+  "heartbeat_p95_ms": 12.983708000007255,
+  "heartbeat_max_ms": 25.195727999999917,
+  "close_event_ms": 2.319645000000037,
+  "worker_stopped": true,
+  "loop_closed": true,
+  "microbenchmark": {
+    "unchanged": {
+      "median_ms": 0.05014050000795578,
+      "p95_ms": 0.0625639999896066
+    },
+    "one_changed": {
+      "median_ms": 0.2848530000107985,
+      "p95_ms": 0.31125799998221737
+    },
+    "all_changed": {
+      "median_ms": 1.1409090000142896,
+      "p95_ms": 1.1747749999813095
+    }
+  },
+  "limits": "Synthetic callbacks/Qt only; excludes exchange parsing, SQL persistence, network and microstructure algorithms."
+}

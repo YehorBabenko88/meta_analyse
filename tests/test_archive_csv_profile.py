@@ -71,3 +71,14 @@ def test_archive_rejects_unterminated_quoted_csv_field(tmp_path):
     audit = audit_trade_gzip(path)
     assert audit.valid is False
     assert audit.complete is False
+
+
+@pytest.mark.parametrize("raw_timestamp", ["1e-999999999", "0e-999999999", "1e-7"])
+def test_archive_extreme_tiny_timestamp_does_not_allocate_huge_power(tmp_path, raw_timestamp):
+    path = tmp_path / "tiny.csv.gz"
+    path.write_bytes(gzip.compress((HEADER + f"id1,{raw_timestamp},100,1,Buy\n").encode("utf-8")))
+    audit = audit_trade_gzip(path)
+    assert audit.valid, audit.reason
+    assert audit.first_ms == 0
+    assert audit.last_ms == 0
+    assert audit.complete is False

@@ -2,7 +2,6 @@
 from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
-from decimal import Decimal
 from types import MappingProxyType
 import json
 import logging

@@ -267,9 +267,11 @@ def test_unlock_failure_does_not_mask_original_import_error(tmp_path):
     assert (checkpoint, status) == (0, "failed")
 
 
-def test_contended_advisory_lock_fails_without_partial_import(tmp_path):
-    """An occupied venue/symbol lock must fail closed, without creating a source."""
+def test_contended_advisory_lock_serializes_and_resumes(tmp_path):
+    """A second importer waits for the holder, then imports once released."""
     import hashlib as _hashlib
+    import threading
+    import time
 
     store = Store(DSN)
     symbol = "TEST_STORAGE_" + uuid.uuid4().hex
@@ -278,17 +280,32 @@ def test_contended_advisory_lock_fails_without_partial_import(tmp_path):
         _hashlib.sha256(("bybit" + "\\0" + symbol).encode()).digest()[:8],
         "big", signed=True,
     )
+    started = threading.Event()
+    completed = threading.Event()
+    result = {}
+    def run_import():
+        started.set()
+        try:
+            result["value"] = import_verified_archive(
+                store, path, receipt, symbol=symbol, batch_size=1)
+        except BaseException as exc:
+            result["error"] = exc
+        finally:
+            completed.set()
+
     with store.connect() as holder:
         holder.execute("SELECT pg_advisory_lock(%s)", (key,))
+        worker = threading.Thread(target=run_import)
+        worker.start()
         try:
-            with pytest.raises(TimeoutError, match="archive import already active"):
-                import_verified_archive(store, path, receipt, symbol=symbol, batch_size=1)
-            with store.connect() as check:
-                count = check.execute(
-                    "SELECT count(*) FROM meta_analyse.archive_sources "
-                    "WHERE venue='bybit' AND symbol=%s", (symbol,),
-                ).fetchone()[0]
-            assert count == 0
+            assert started.wait(timeout=5)
+            # Synchronize with the server: the worker should still be waiting.
+            time.sleep(0.15)
+            assert not completed.is_set()
         finally:
             holder.execute("SELECT pg_advisory_unlock(%s)", (key,))
-    assert import_verified_archive(store, path, receipt, symbol=symbol)["rows"] == 1
+        worker.join(timeout=20)
+    assert completed.is_set(), "importer failed to finish after lock release"
+    assert "error" not in result, repr(result.get("error"))
+    assert result["value"]["rows"] == 1
+    assert import_verified_archive(store, path, receipt, symbol=symbol)["resumed_from"] == 1

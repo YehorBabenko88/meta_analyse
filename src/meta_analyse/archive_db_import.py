@@ -11,6 +11,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from psycopg.errors import LockNotAvailable
+
 from .storage_migrations import initialize_archive_schema
 
 
@@ -142,9 +144,10 @@ def import_verified_archive(store, path, receipt, *, venue="bybit", symbol, batc
             conn.execute("SET statement_timeout = 120000")
             conn.execute("SET lock_timeout = 15000")
             key = int.from_bytes(hashlib.sha256((venue + "\0" + symbol).encode()).digest()[:8], "big", signed=True)
-            acquired = conn.execute("SELECT pg_try_advisory_lock(%s)", (key,)).fetchone()[0]
-            if not acquired:
-                raise TimeoutError("archive import already active for venue/symbol")
+            try:
+                conn.execute("SELECT pg_advisory_lock(%s)", (key,))
+            except LockNotAvailable as exc:
+                raise TimeoutError("archive import already active for venue/symbol") from exc
             try:
                 with conn.transaction():
                     source_id, prior = conn.execute("""INSERT INTO meta_analyse.archive_sources

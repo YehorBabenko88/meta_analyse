@@ -4,11 +4,13 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runs', type=int, default=10)
+    parser.add_argument('--expected-tests', type=int, default=67)
     parser.add_argument('--output-dir', type=Path, required=True)
     args = parser.parse_args()
     if args.runs < 1:
@@ -31,6 +33,16 @@ def main():
         print('\n'.join(lines[-12:]), flush=True)
         if result.returncode:
             return result.returncode
+        try:
+            root = ET.parse(run_dir / 'tests.xml').getroot()
+            cases = list(root.iter('testcase'))
+            bad = [case for case in cases if any(case.find(tag) is not None for tag in ('failure', 'error', 'skipped'))]
+            if len(cases) != args.expected_tests or bad:
+                print(f'Lifecycle contract failure: expected={args.expected_tests}, actual={len(cases)}, nonpassed={len(bad)}', flush=True)
+                return 1
+        except (OSError, ET.ParseError) as exc:
+            print(f'Lifecycle JUnit missing or invalid: {exc}', flush=True)
+            return 1
     return 0
 
 

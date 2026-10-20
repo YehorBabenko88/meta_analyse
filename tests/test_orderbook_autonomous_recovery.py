@@ -215,3 +215,32 @@ async def test_malformed_timestamp_never_publishes_valid_book(monkeypatch):
     assert updates == [(10, 1)]
     assert stream.connection_epoch == 2
     assert any("timestamp" in reason for reason in gaps)
+
+
+@pytest.mark.asyncio
+async def test_published_snapshot_is_immutable_and_not_mutated_by_later_delta(monkeypatch):
+    from decimal import Decimal
+    sockets = [FakeSocket([
+        packet("snapshot", 1, 1),
+        packet("delta", 2, 2),
+    ])]
+    stop = asyncio.Event()
+    published = []
+    async def on_book(symbol, book, ts):
+        published.append(book)
+        if len(published) == 2:
+            stop.set()
+    async def on_gap(*_):
+        pass
+    monkeypatch.setattr("meta_analyse.orderbook_stream.websockets.connect",
+                        lambda *a, **kw: sockets.pop(0))
+    stream = OrderBookStream(on_book, on_gap)
+    await asyncio.wait_for(stream.run(["BTCUSDT"], stop), 2)
+    first, second = published
+    assert first is not second
+    assert first.update_id == 1 and second.update_id == 2
+    assert first.bids[Decimal("100")] == Decimal("1")
+    with pytest.raises(TypeError):
+        first.bids[Decimal("100")] = Decimal("99")
+    with pytest.raises(Exception):
+        first.update_id = 99

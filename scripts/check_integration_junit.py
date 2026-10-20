@@ -10,6 +10,8 @@ def main():
     p.add_argument("--require", action="append", default=[])
     p.add_argument("--allow-skip", action="append", default=[])
     p.add_argument("--require-exact", action="append", default=[])
+    p.add_argument("--require-identity", action="append", default=[],
+                   help="Required exact classname.testname, unskipped and unique")
     a = p.parse_args()
     root = ET.parse(a.xml).getroot()
     cases = list(root.iter("testcase"))
@@ -32,6 +34,19 @@ def main():
     skipped = [c for c in cases if c.find("skipped") is not None]
     missing = [pattern for pattern in a.require if not any(pattern in name for name in names)]
     exact_missing = [name for name in a.require_exact if not any(c.get("name", "").split("[", 1)[0] == name for c in cases)]
+    identity_missing = []
+    identity_skipped = []
+    for required in a.require_identity:
+        matched = [c for c in cases if
+                   f"{c.get('classname', '')}.{c.get('name', '').split('[', 1)[0]}" == required]
+        if len(matched) != 1:
+            identity_missing.append(required)
+        elif matched[0].find("skipped") is not None:
+            identity_skipped.append(required)
+    for required in identity_missing:
+        print(f"MISSING OR DUPLICATE REQUIRED IDENTITY: {required}", file=sys.stderr)
+    for required in identity_skipped:
+        print(f"REQUIRED IDENTITY SKIPPED: {required}", file=sys.stderr)
     print(f"collected={len(cases)} skipped={len(skipped)} failed={len(failures)}")
     for case in skipped:
         print(f"SKIP: {case.get('classname')}.{case.get('name')}: {case.find('skipped').get('message')}")
@@ -50,7 +65,7 @@ def main():
         print(f"DUPLICATE TESTCASES: {duplicates}", file=sys.stderr)
     if count_mismatch:
         print(f"INVALID TEST COUNT: declared={declared} actual={len(cases)}", file=sys.stderr)
-    if len(cases) < a.minimum or unexpected or failures or missing or exact_missing or duplicates or count_mismatch or skipped_required:
+    if len(cases) < a.minimum or unexpected or failures or missing or exact_missing or duplicates or count_mismatch or skipped_required or identity_missing or identity_skipped:
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -32,6 +32,7 @@ class OrderBookStream:
         self.backoff_base = backoff_base
         self.backoff_max = backoff_max
         self.connection_epoch = 0
+        self.queue_limit = 1024
 
     async def run(self, symbols, stop):
         if not symbols or len(symbols) > 10:
@@ -46,7 +47,7 @@ class OrderBookStream:
                 await self.on_gap(symbols, "orderbook reconnect requires fresh snapshots")
                 async with websockets.connect(
                     self.url, ping_interval=20, ping_timeout=15,
-                    max_queue=1024, max_size=8_388_608, close_timeout=2
+                    max_queue=self.queue_limit, max_size=8_388_608, close_timeout=2
                 ) as ws:
                     await ws.send(json.dumps({"op": "subscribe", "args": [
                         f"orderbook.{self.depth}.{s}" for s in symbols]}))

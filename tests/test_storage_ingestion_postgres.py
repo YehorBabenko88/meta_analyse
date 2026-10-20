@@ -265,3 +265,30 @@ def test_unlock_failure_does_not_mask_original_import_error(tmp_path):
             WHERE s.symbol=%s AND s.sha256=%s""",
             (symbol, receipt["sha256"])).fetchone()
     assert (checkpoint, status) == (0, "failed")
+
+
+def test_contended_advisory_lock_fails_without_partial_import(tmp_path):
+    """An occupied venue/symbol lock must fail closed, without creating a source."""
+    import hashlib as _hashlib
+
+    store = Store(DSN)
+    symbol = "TEST_STORAGE_" + uuid.uuid4().hex
+    path, receipt = archive(tmp_path, symbol, "locked_trade", "locked")
+    key = int.from_bytes(
+        _hashlib.sha256(("bybit" + "\\0" + symbol).encode()).digest()[:8],
+        "big", signed=True,
+    )
+    with store.connect() as holder:
+        holder.execute("SELECT pg_advisory_lock(%s)", (key,))
+        try:
+            with pytest.raises(TimeoutError, match="archive import already active"):
+                import_verified_archive(store, path, receipt, symbol=symbol, batch_size=1)
+            with store.connect() as check:
+                count = check.execute(
+                    "SELECT count(*) FROM meta_analyse.archive_sources "
+                    "WHERE venue='bybit' AND symbol=%s", (symbol,),
+                ).fetchone()[0]
+            assert count == 0
+        finally:
+            holder.execute("SELECT pg_advisory_unlock(%s)", (key,))
+    assert import_verified_archive(store, path, receipt, symbol=symbol)["rows"] == 1

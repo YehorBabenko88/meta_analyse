@@ -20,8 +20,11 @@ def bind_terminal_endpoint(verified,executable):
     from meta_analyse.ports import MetaScalp
     original=MetaScalp.request
     async def discover(self):
-        current=validate_metascalp(await asyncio.to_thread(collect_facts),executable)
-        if current['sha256']!=verified['metascalp_exe_sha256'] or current['port']!=verified['metascalp_api_port']:
+        try:
+            current=validate_metascalp(await asyncio.to_thread(collect_facts),executable)
+        except ValueError as exc:
+            raise ConnectionError('approved MetaScalp process/API identity unavailable') from exc
+        if current['sha256']!=verified['metascalp_exe_sha256'] or current['port']!=verified['metascalp_api_port'] or current['pid']!=verified['metascalp_pid'] or current['process_started']!=verified['metascalp_process_started']:
             raise ConnectionError('approved MetaScalp process/API identity changed')
         self.base=f"http://127.0.0.1:{current['port']}"
         return self.base

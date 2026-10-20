@@ -20,7 +20,11 @@ foreach ($service in $services) {
     if (($service.Name + ' ' + $service.DisplayName + ' ' + $service.PathName) -match '(?i)bybit.?cluster|bybit.?grid|cluster.?grid|\\grid\\') { $findings.Add('Grid service footprint') }
 }
 foreach ($task in $tasks) {
-    if ($task.TaskPath -notlike '\Microsoft\Windows\*' -and (($task.TaskName + ' ' + $task.TaskPath + ' ' + (($task.Actions | ForEach-Object { $_.Execute }) -join ' ')) -match '(?i)grid|coordinator|collector|worker')) { $findings.Add('Grid or conflicting scheduled task') }
+    # This one system task is explicitly accounted for, rather than excluding
+    # every task under Microsoft\Windows from inspection.
+    if ($task.TaskPath -eq '\Microsoft\Windows\Sustainability\' -and $task.TaskName -eq 'PowerGridForecastTask') { continue }
+    $taskText=$task.TaskName + ' ' + $task.TaskPath + ' ' + (($task.Actions | ForEach-Object { $_.Execute + ' ' + $_.Arguments }) -join ' ')
+    if ($taskText -match '(?i)grid' -or ($task.TaskPath -notlike '\Microsoft\Windows\*' -and $taskText -match '(?i)coordinator|collector|worker')) { $findings.Add('Grid or conflicting scheduled task') }
 }
 $unknownProcesses = 0
 foreach ($process in $processes) {
@@ -67,7 +71,7 @@ foreach ($path in @($candidatePaths | Select-Object -Unique)) {
         $file = Get-Item -LiteralPath $path
         try {
             $signature = Get-AuthenticodeSignature -LiteralPath $path
-            $metascalp.Add([ordered]@{path=$path;sha256=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant();file_version=$file.VersionInfo.FileVersion;signature=$signature.Status.ToString()})
+            $metascalp.Add([ordered]@{path=$path;sha256=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant();file_version=$file.VersionInfo.FileVersion;signature=$signature.Status.ToString();publisher=$signature.SignerCertificate.Subject})
         } catch { $errorsFound.Add('MetaScalp signature/hash verification unavailable') }
     }
 }
@@ -84,7 +88,23 @@ foreach ($listener in $listeners) {
         try { $apiListeners += [ordered]@{port=[int]$listener.LocalPort;address=$listener.LocalAddress;exe_sha256=(Get-FileHash -LiteralPath $process.ExecutablePath -Algorithm SHA256).Hash.ToLowerInvariant()} } catch { $errorsFound.Add('API process identity unavailable') }
     }
 }
+$httpSysState = (& netsh.exe http show servicestate view=requestq verbose=yes) -join "`n"
+if ($LASTEXITCODE -ne 0) { $errorsFound.Add('HTTP.sys queue inventory unavailable') }
+$terminalProcesses = @($processes | Where-Object { $_.Name -ieq 'MetaScalp.exe' } | ForEach-Object {
+    if (-not $_.ExecutablePath -or -not $_.CreationDate) { $errorsFound.Add('MetaScalp process identity incomplete') }
+    else { [ordered]@{pid=[int]$_.ProcessId;process_started=$_.CreationDate.ToUniversalTime().ToString('o');exe_path=$_.ExecutablePath;exe_sha256=(Get-FileHash -LiteralPath $_.ExecutablePath -Algorithm SHA256).Hash.ToLowerInvariant()} }
+})
 [ordered]@{
+    private_inventory=[ordered]@{
+        scope='All visible processes, services, scheduled tasks and TCP listeners; bounded known Grid directories, install metadata and environment names. No drive-wide absence claim.'
+        services=@($services | Select-Object Name,DisplayName,State,PathName,StartName)
+        processes=@($processes | Select-Object Name,ProcessId,ParentProcessId,ExecutablePath,CreationDate)
+        tasks=@($tasks | Select-Object TaskPath,TaskName,State,@{Name='Actions';Expression={@($_.Actions | Select-Object Execute,Arguments,ClassId)}})
+        listeners=@($listeners | Select-Object LocalAddress,LocalPort,OwningProcess)
+        checked_grid_roots=$gridRoots
+        excluded_system_task='\Microsoft\Windows\Sustainability\PowerGridForecastTask'
+    }
+    http_sys_state=$httpSysState;terminal_processes=$terminalProcesses
     identity=[ordered]@{hostname=[System.Net.Dns]::GetHostName();username=$current.Name;sid=$current.User.Value;machine_guid=$machine.MachineGuid;install_id=[string]$version.InstallDate;hardware_uuid=$hardware.UUID}
     os=[ordered]@{system='Windows';edition=$version.EditionID;build=[int]$version.CurrentBuildNumber}
     grid=[ordered]@{findings=@($findings);errors=@($errorsFound);coverage_complete=($errorsFound.Count -eq 0);visible_services=$services.Count;visible_tasks=$tasks.Count;visible_processes=$processes.Count;unknown_process_paths=$unknownProcesses}

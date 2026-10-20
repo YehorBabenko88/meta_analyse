@@ -18,6 +18,34 @@ import subprocess
 import time
 
 IDENTITY_FIELDS = ('hostname', 'username', 'sid', 'machine_guid', 'install_id', 'hardware_uuid')
+TARGET_HOST = 'ADMINIT-JQ1IQSV'
+TARGET_USER = r'ADMINIT-JQ1IQSV\Administrator'
+TARGET_EXE = r'C:\Users\Administrator\AppData\Local\MetaScalp\current\MetaScalp.exe'
+TARGET_EXE_SHA256 = '9f55837fafbf42b713ebe9206a23afb39ff5ff6de4911d676e7840ae657088df'
+
+
+def http_sys_owner(text, port):
+    """Fail closed on unknown/localized netsh format or shared/ambiguous queue."""
+    owners = []
+    for block in re.split(r'(?m)^Request queue name:', text)[1:]:
+        urls = re.findall(r'(?im)^\s+(HTTP://\S+)', block)
+        if not any(re.search(rf':{port}(?::|/)', url) for url in urls):
+            continue
+        if any(not re.fullmatch(rf'HTTP://127\.0\.0\.1:{port}(?::127\.0\.0\.1)?/', url, re.I) for url in urls):
+            raise ValueError('HTTP.sys endpoint is not exclusive loopback')
+        count = re.search(r'Number of active processes attached:\s*(\d+)', block)
+        ids = re.findall(r'(?m)^\s+ID:\s*(\d+), image:', block)
+        if not count or count[1] != '1' or len(ids) != 1:
+            raise ValueError('HTTP.sys queue ownership is ambiguous')
+        owners.append(int(ids[0]))
+    if len(owners) != 1:
+        raise ValueError('exact HTTP.sys API queue not established')
+    return owners[0]
+
+
+def target_identity(facts):
+    if (facts['identity']['hostname'].casefold(), facts['identity']['username'].casefold()) != (TARGET_HOST.casefold(), TARGET_USER.casefold()):
+        raise ValueError('this enrollment is restricted to ADMINIT-JQ1IQSV Administrator')
 
 
 def fingerprint(facts, salt):
@@ -55,15 +83,14 @@ def check_process_environment(environment):
 def make_policy(facts, *, salt, candidate_sha, manifest_sha256, dbname, user, port,
                 data_directory, metascalp, operator_approved, confirm_no_grid, now=None):
     safe_inventory(facts)
-    if facts['identity']['hostname'].casefold()!='ls5' or facts['identity']['username'].casefold()!='ls5\\ls-5':
-        raise ValueError('this reviewed enrollment procedure is restricted to the specified LS5 operator')
+    target_identity(facts)
     if operator_approved is not True or confirm_no_grid is not True:
         raise ValueError('explicit operator approval and no-Grid attestation required')
     if not all(re.fullmatch(r'meta_commission_[a-z0-9_]+', v) for v in (dbname, user)):
         raise ValueError('dedicated session database and role required')
     if not re.fullmatch(r'[0-9a-f]{40}', candidate_sha) or not re.fullmatch(r'[0-9a-f]{64}', manifest_sha256):
         raise ValueError('full candidate and trusted manifest hashes required')
-    if not 1024 <= int(port) <= 65535 or not ntpath.isabs(data_directory):
+    if int(port) != 55480 or not ntpath.isabs(data_directory):
         raise ValueError('explicit nonprivileged port and absolute private cluster directory required')
     installed=validate_metascalp(facts,metascalp['path'])
     if installed['sha256']!=metascalp['sha256']:
@@ -79,6 +106,12 @@ def make_policy(facts, *, salt, candidate_sha, manifest_sha256, dbname, user, po
 
 def validate_policy(facts, policy, *, expected_name, candidate_sha, manifest_sha256, now=None):
     safe_inventory(facts)
+    target_identity(facts)
+    db = policy['database']
+    if db['port'] != 55480 or not all(re.fullmatch(r'meta_commission_[a-z0-9_]+', db[k]) for k in ('dbname', 'user')):
+        raise ValueError('target private database binding required')
+    if validate_metascalp(facts, policy['metascalp']['path']) != {k: v for k, v in policy['metascalp'].items() if k != 'path'}:
+        raise ValueError('MetaScalp process changed; fresh enrollment required')
     current = time.time() if now is None else now
     if policy.get('schema') != 1 or policy.get('operator_approved') is not True or policy.get('confirm_no_grid') is not True:
         raise ValueError('invalid private operator authorization')
@@ -100,6 +133,9 @@ def public_report(facts, salt):
                 coverage_complete=facts['grid']['coverage_complete'],
                 credential_variable_count=len(facts.get('credential_names', [])),
                 production_dsn_variable_count=len(facts.get('production_dsn_names', [])),
+                inventory={k:v for k,v in facts['grid'].items() if k not in ('findings',)},
+                postgres_listeners=[{k:p[k] for k in ('port','address')} for p in facts.get('postgres_listeners',[])],
+                api_identity_established=bool(facts.get('api_listeners')),
                 status='OBSERVATION_ONLY_NOT_AUTHORIZATION')
 
 
@@ -113,12 +149,24 @@ def collect_facts():
     environment=dict(os.environ)
     # Do not inherit PowerShell7 module paths into the Windows PowerShell child.
     environment['PSModulePath']=str(Path(directory.value)/'WindowsPowerShell/v1.0/Modules')
-    result = subprocess.run([shell, '-NoProfile', '-NonInteractive', '-File',
+    result = subprocess.run([shell, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
                              str(Path(__file__).with_name('host-facts.ps1'))],
                             capture_output=True, timeout=90,env=environment)
     if result.returncode:
         raise ValueError('host facts unavailable; no private output published')
-    return json.loads(result.stdout.decode('utf-8-sig'))
+    facts = json.loads(result.stdout.decode('utf-8-sig'))
+    state = facts.pop('http_sys_state')
+    processes = facts.pop('terminal_processes')
+    try:
+        owner = http_sys_owner(state, 17845)
+        matches = [p for p in processes if p['pid'] == owner]
+        if len(matches) != 1: raise ValueError('HTTP.sys owner process unavailable')
+        facts['api_listeners'] = [dict(port=17845, address='127.0.0.1', **matches[0])]
+    except ValueError:
+        facts['api_listeners'] = []
+        facts['grid']['errors'].append('HTTP.sys owner identity incomplete')
+        facts['grid']['coverage_complete'] = False
+    return facts
 
 
 def dpapi(data, *, decrypt=False):
@@ -191,17 +239,24 @@ def require_preflight(evidence):
 
 
 def validate_metascalp(facts, executable):
+    if ntpath.normcase(ntpath.normpath(str(executable))) != ntpath.normcase(TARGET_EXE):
+        raise ValueError('exact reviewed MetaScalp path required')
     matches = [m for m in facts.get('metascalp', []) if
                ntpath.normcase(ntpath.normpath(m['path'])) == ntpath.normcase(ntpath.normpath(str(executable)))
                and m['signature'] == 'Valid']
     if len(matches) != 1:
         raise ValueError('installed signed MetaScalp executable not established')
     item = matches[0]
-    ports = [p['port'] for p in facts.get('api_listeners', []) if
-             p['address'] in ('127.0.0.1', '::1') and p['exe_sha256'] == item['sha256']]
+    if item['sha256'] != TARGET_EXE_SHA256 or not re.search(r'(?:^|,\s*)CN=Grigoryan Construct LLC(?:,|$)', item.get('publisher', '')):
+        raise ValueError('exact reviewed MetaScalp hash/publisher required')
+    ports = [p for p in facts.get('api_listeners', []) if
+             p['address'] == '127.0.0.1' and p['port'] == 17845 and p['exe_sha256'] == item['sha256']
+             and p.get('pid') and p.get('process_started') and ntpath.normcase(ntpath.normpath(p.get('exe_path', ''))) == ntpath.normcase(TARGET_EXE)]
     if not ports:
         raise ValueError('signed MetaScalp does not own a loopback API listener')
-    return dict(sha256=item['sha256'], file_version=item.get('file_version'), port=ports[0])
+    if len(ports) != 1: raise ValueError('ambiguous MetaScalp listener')
+    return dict(sha256=item['sha256'], file_version=item.get('file_version'), port=17845,
+                pid=ports[0]['pid'], process_started=ports[0]['process_started'])
 
 
 def authorize(args, facts=None):
@@ -247,9 +302,10 @@ def main():
             salt = secrets.token_hex(32)
             report = public_report(facts, salt)
             save_private(args.private_observation, dict(schema=1, salt=salt,
-                         fingerprint=fingerprint(facts, salt), observed_at=time.time()))
+                         fingerprint=fingerprint(facts, salt), observed_at=time.time(), facts=facts))
             Path(args.output).write_text(json.dumps(report, indent=2), encoding='utf-8')
             print(json.dumps(report, indent=2))
+            safe_inventory(facts)
             return 0
         from preflight import verify_manifest
         root=verify_manifest(args.manifest, args.expected_sha, args.manifest_sha256)

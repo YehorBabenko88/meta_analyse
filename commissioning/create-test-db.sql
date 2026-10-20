@@ -1,8 +1,10 @@
--- OPERATOR ONLY. Never execute against the existing LS5 service cluster.
+-- OPERATOR ONLY. Never execute against the existing service cluster on 5432.
 -- Run only after specific-host authorization and manual creation of a NEW
 -- loopback cluster with bootstrap role meta_commission_bootstrap.
 \set ON_ERROR_STOP on
 SELECT current_database()='postgres'
+   AND current_setting('server_version_num')::integer=180001
+   AND current_setting('port')::integer=55480
    AND current_user='meta_commission_bootstrap'
    AND current_setting('data_directory')=:'expected_data_directory'
    AND current_setting('port')::integer=:'expected_port'::integer

@@ -6,23 +6,23 @@ import host_identity as h
 
 @pytest.fixture
 def facts():
-    return dict(identity=dict(hostname='LS5',username='LS5\\LS-5',sid='S-1-test',machine_guid='installation-a',install_id='2026-install',hardware_uuid='hardware-a'),
+    return dict(identity=dict(hostname='ADMINIT-JQ1IQSV',username='ADMINIT-JQ1IQSV\\Administrator',sid='S-1-test',machine_guid='installation-a',install_id='2026-install',hardware_uuid='hardware-a'),
         os=dict(system='Windows',edition='Professional',build=26300),
         grid=dict(findings=[],errors=[],coverage_complete=True),credential_names=[],production_dsn_names=[],
         postgres_listeners=[dict(port=55480,address='127.0.0.1',data_directory='C:/private/commission/pgdata')],
-        metascalp=[dict(path='C:/MetaScalp.exe',signature='Valid',sha256='a'*64,file_version='fixture')],
-        api_listeners=[dict(port=17845,address='127.0.0.1',exe_sha256='a'*64)])
+        metascalp=[dict(path=h.TARGET_EXE,signature='Valid',sha256=h.TARGET_EXE_SHA256,file_version='1.0.291',publisher='CN=Grigoryan Construct LLC')],
+        api_listeners=[dict(port=17845,address='127.0.0.1',exe_sha256=h.TARGET_EXE_SHA256,pid=22676,process_started='test',exe_path=h.TARGET_EXE)])
 
 @pytest.fixture
 def policy(facts):
     return h.make_policy(facts,salt='a'*64,candidate_sha='1'*40,manifest_sha256='2'*64,
         dbname='meta_commission_case',user='meta_commission_case',port=55480,
-        data_directory='C:/private/commission/pgdata',metascalp=dict(path='C:/MetaScalp.exe',sha256='a'*64),operator_approved=True,confirm_no_grid=True,now=1000)
+        data_directory='C:/private/commission/pgdata',metascalp=dict(path=h.TARGET_EXE,sha256=h.TARGET_EXE_SHA256),operator_approved=True,confirm_no_grid=True,now=1000)
 
 def check(facts,policy):
-    return h.validate_policy(facts,policy,expected_name='LS5',candidate_sha='1'*40,manifest_sha256='2'*64,now=1001)
+    return h.validate_policy(facts,policy,expected_name='ADMINIT-JQ1IQSV',candidate_sha='1'*40,manifest_sha256='2'*64,now=1001)
 
-def test_specific_verified_host_can_pass(facts,policy): assert check(facts,policy)=='LS5'
+def test_specific_verified_host_can_pass(facts,policy): assert check(facts,policy)=='ADMINIT-JQ1IQSV'
 
 @pytest.mark.parametrize('field',['machine_guid','hardware_uuid','install_id','sid'])
 def test_same_hostname_other_identity_fails(facts,policy,field):
@@ -56,7 +56,7 @@ def test_hidden_libpq_override_fails(policy):
     with pytest.raises(ValueError):h.validate_bound_database('host=127.0.0.1 port=55480 dbname=meta_commission_case user=meta_commission_case',policy,{'PGOPTIONS':'anything'})
 
 def test_wrong_sha_fails(facts,policy):
-    with pytest.raises(ValueError):h.validate_policy(facts,policy,expected_name='LS5',candidate_sha='3'*40,manifest_sha256='2'*64,now=1001)
+    with pytest.raises(ValueError):h.validate_policy(facts,policy,expected_name='ADMINIT-JQ1IQSV',candidate_sha='3'*40,manifest_sha256='2'*64,now=1001)
 
 def test_unverified_postgres_metascalp_or_tls_fail():
     for key in ['postgres','metascalp','tls']:
@@ -84,10 +84,10 @@ def test_manifest_empty_or_wrong_sha_never_passes(tmp_path):
 
 @pytest.mark.parametrize('condition',['missing','invalid-signature','no-api'])
 def test_metascalp_missing_untrusted_or_api_absent_is_blocking(facts,condition):
-    facts['metascalp']=[] if condition=='missing' else [dict(path='C:/MetaScalp.exe',signature='Valid' if condition=='no-api' else 'NotSigned',sha256='a'*64)]
+    facts['metascalp']=[] if condition=='missing' else [dict(path=h.TARGET_EXE,signature='Valid' if condition=='no-api' else 'NotSigned',sha256=h.TARGET_EXE_SHA256)]
     facts['api_listening_ports']=[]
     facts['api_listeners']=[]
-    with pytest.raises(ValueError):h.validate_metascalp(facts,'C:/MetaScalp.exe')
+    with pytest.raises(ValueError):h.validate_metascalp(facts,h.TARGET_EXE)
 
 def test_cross_machine_private_authorization_decryption_fails(monkeypatch,tmp_path):
     monkeypatch.setattr(h,'dpapi',lambda data,**kw: (_ for _ in ()).throw(ValueError('not this user/machine')))
@@ -150,7 +150,7 @@ async def test_runtime_terminal_does_not_rescan_another_port(monkeypatch,facts):
     monkeypatch.setattr(MetaScalp,'discover',MetaScalp.discover)
     monkeypatch.setattr(MetaScalp,'request',MetaScalp.request)
     monkeypatch.setattr(h,'collect_facts',lambda:facts)
-    run_readonly.bind_terminal_endpoint(dict(metascalp_exe_sha256='a'*64,metascalp_api_port=17845),'C:/MetaScalp.exe')
+    run_readonly.bind_terminal_endpoint(dict(metascalp_exe_sha256=h.TARGET_EXE_SHA256,metascalp_api_port=17845,metascalp_pid=22676,metascalp_process_started='test'),h.TARGET_EXE)
     client=MetaScalp()
     try:
         assert await client.discover()=='http://127.0.0.1:17845'
@@ -163,7 +163,7 @@ def test_ls7_or_another_operator_cannot_enroll(facts):
     facts['identity']['username']='LS7\\LS-7'
     with pytest.raises(ValueError):h.make_policy(facts,salt='a'*64,candidate_sha='1'*40,manifest_sha256='2'*64,
         dbname='meta_commission_case',user='meta_commission_case',port=55480,data_directory='C:/private/pgdata',
-        metascalp=dict(path='C:/MetaScalp.exe',sha256='a'*64),operator_approved=True,confirm_no_grid=True)
+        metascalp=dict(path=h.TARGET_EXE,sha256=h.TARGET_EXE_SHA256),operator_approved=True,confirm_no_grid=True)
 
 @pytest.mark.parametrize('fault',['superuser','createdb','createrole','replication','bypassrls','membership','public-connect','wrong-owner','wrong-version'])
 def test_excess_database_privileges_and_cross_database_connect_are_rejected(policy,fault):

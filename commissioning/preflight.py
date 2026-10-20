@@ -71,7 +71,7 @@ def verify_package_source(root):
 
 def verify_database_role(conn,policy):
     version=int(conn.execute('SHOW server_version_num').fetchone()[0])
-    if version//10000!=18: raise ValueError('PostgreSQL18 required on target')
+    if version != 180001: raise ValueError('PostgreSQL 18.1 exactly required on target')
     db=conn.execute("SELECT current_database(),current_user,session_user,pg_get_userbyid(datdba) FROM pg_database WHERE datname=current_database()").fetchone()
     bound=policy['database']
     if db!=(bound['dbname'],bound['user'],bound['user'],bound['user']):
@@ -96,7 +96,7 @@ async def inspect(args):
     installed=validate_metascalp(facts,exe)
     approved=policy['metascalp']
     import ntpath
-    if installed['sha256']!=approved['sha256'] or installed['port']!=approved['port'] or ntpath.normcase(ntpath.normpath(str(exe)))!=ntpath.normcase(ntpath.normpath(approved['path'])):
+    if installed != {k:v for k,v in approved.items() if k != 'path'} or ntpath.normcase(ntpath.normpath(str(exe)))!=ntpath.normcase(ntpath.normpath(approved['path'])):
         raise ValueError('MetaScalp identity/API endpoint differs from private approval')
     if hashlib.sha256(exe.read_bytes()).hexdigest()!=installed['sha256']:
         raise ValueError('MetaScalp executable changed after signature check')
@@ -111,6 +111,7 @@ async def inspect(args):
         openssl=ssl.OPENSSL_VERSION,certifi_version=certifi.__version__,postgres_version=version,
         database=db[0],metascalp_exe_sha256=installed['sha256'],metascalp_version=installed['file_version'],
         metascalp_api_port=installed['port'],
+        metascalp_pid=installed['pid'],metascalp_process_started=installed['process_started'],
         ca_override_present={k:bool(os.environ.get(k)) for k in ('SSL_CERT_FILE','SSL_CERT_DIR','HTTPS_PROXY','HTTP_PROXY')},
         long_runtime_tests='NOT_RUN')
     from meta_analyse.ports import MetaScalp
@@ -118,9 +119,12 @@ async def inspect(args):
     try:
         response=await terminal.client.get(f"http://127.0.0.1:{installed['port']}/ping")
         response.raise_for_status()
-        if not isinstance(response.json(),dict) or 'meta' not in str(response.json()).lower():
+        if response.json() != {'app':'MetaScalp','version':'1.0.291'}:
             raise ValueError('MetaScalp local API contract mismatch')
     finally: await terminal.close()
+    from host_identity import collect_facts
+    if validate_metascalp(collect_facts(),exe) != installed:
+        raise ValueError('MetaScalp process identity changed during ping')
     exchange=BybitPublic()
     try:
         context=exchange.client._transport._pool._ssl_context

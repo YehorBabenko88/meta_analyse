@@ -65,6 +65,7 @@ def audit_trade_gzip(path: str | Path, *, max_rows: int = 50_000_000,
                     coefficient = int(''.join(str(digit) for digit in digits.digits))
                     shift = digits.exponent + 3
                     timestamp_ms = (coefficient * 10 ** shift if shift >= 0
+                                    else 0 if coefficient == 0 or -shift >= len(digits.digits)
                                     else coefficient // 10 ** (-shift))
                     if previous_timestamp is not None and raw_ts < previous_timestamp:
                         raise ValueError("out-of-order trades")

@@ -96,3 +96,69 @@ async def test_shutdown_interrupts_reconnect_backoff(monkeypatch):
                         lambda *a, **kw: BrokenSocket())
     stream = OrderBookStream(lambda *_: None, on_gap)
     await asyncio.wait_for(stream.run(["BTCUSDT"], stop), 1)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_message", [
+    packet("delta", 2, 2, bad=True),
+    packet("delta", 1, 2),
+    packet("delta", 2, 1),
+    packet("snapshot", 3, 3, bad=True),
+    "{broken json",
+])
+async def test_fault_requires_new_epoch_and_snapshot(monkeypatch, bad_message):
+    sockets = [
+        FakeSocket([packet("snapshot", 1, 1), bad_message,
+                    packet("delta", 4, 4)]),
+        FakeSocket([packet("snapshot", 10, 10)])
+    ]
+    created = list(sockets)
+    stop = asyncio.Event()
+    updates, gaps = [], []
+    async def on_book(symbol, book, ts):
+        updates.append((book.update_id, book.valid))
+        if len(updates) == 2:
+            stop.set()
+    async def on_gap(symbols, reason):
+        gaps.append(reason)
+    monkeypatch.setattr("meta_analyse.orderbook_stream.websockets.connect",
+                        lambda *a, **kw: sockets.pop(0))
+    stream = OrderBookStream(on_book, on_gap, backoff_base=0.001, backoff_max=0.01)
+    await asyncio.wait_for(stream.run(["BTCUSDT"], stop), 3)
+    assert updates == [(1, True), (10, True)]
+    assert stream.connection_epoch == 2
+    assert all(sock.closed for sock in created)
+    assert any("UNVERIFIED" in reason for reason in gaps)
+
+
+@pytest.mark.asyncio
+async def test_failed_handshakes_preserve_exponential_backoff(monkeypatch):
+    stop = asyncio.Event()
+    delays = []
+    class BrokenSocket:
+        async def __aenter__(self):
+            raise ConnectionError("handshake rejected")
+        async def __aexit__(self, *_):
+            pass
+    async def on_gap(*_):
+        pass
+    monkeypatch.setattr("meta_analyse.orderbook_stream.websockets.connect",
+                        lambda *a, **kw: BrokenSocket())
+    monkeypatch.setattr("meta_analyse.orderbook_stream.random.uniform",
+                        lambda a, b: 1.0)
+    original_wait_for = asyncio.wait_for
+    async def fake_wait_for(awaitable, timeout):
+        if timeout >= 0.1:
+            delays.append(timeout)
+            if len(delays) == 4:
+                stop.set()
+            if hasattr(awaitable, "close"):
+                awaitable.close()
+            raise asyncio.TimeoutError
+        return await original_wait_for(awaitable, timeout)
+    monkeypatch.setattr("meta_analyse.orderbook_stream.asyncio.wait_for",
+                        fake_wait_for)
+    stream = OrderBookStream(lambda *_: None, on_gap,
+                             backoff_base=0.1, backoff_max=0.4)
+    await asyncio.wait_for(stream.run(["BTCUSDT"], stop), 2)
+    assert delays == [0.1, 0.2, 0.4, 0.4]

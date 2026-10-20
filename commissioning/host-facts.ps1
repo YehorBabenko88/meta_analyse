@@ -46,7 +46,7 @@ foreach ($scope in @('Process','User','Machine')) {
         foreach ($key in $variables.Keys) {
             if (-not $variables[$key]) { continue }
             if ($key -match '(?i)^(API_KEY|API_SECRET)$|(?:BYBIT|BINANCE|OKX|KUCOIN|COINBASE|EXCHANGE).*(?:KEY|SECRET|TOKEN)') { $credentialNames.Add("${scope}:$key") }
-            if ($key -ne 'META_ANALYSE_COMMISSIONING_DSN' -and $key -match '(?i)DSN|DATABASE_URL|GRID.*(?:DATABASE|DB_|PG)|^PG(?:HOST|PORT|DATABASE|USER|PASSWORD|SERVICE|OPTIONS|PASSFILE|SSLMODE)') { $dsnNames.Add("${scope}:$key") }
+            if ($key -ne 'META_ANALYSE_COMMISSIONING_DSN' -and ($key -match '(?i)DSN|DATABASE_URL|GRID.*(?:DATABASE|DB_|PG)|^PG(?:HOST|PORT|DATABASE|USER|PASSWORD|SERVICE|OPTIONS|PASSFILE|SSLMODE)' -or [string]$variables[$key] -match '(?i)^postgres(?:ql)?://|(?:^|\s)(?:host|dbname|user|password)=')) { $dsnNames.Add("${scope}:$key") }
         }
     } catch { $errorsFound.Add('Environment-name inventory unavailable') }
 }

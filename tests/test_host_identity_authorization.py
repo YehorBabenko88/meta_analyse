@@ -185,3 +185,9 @@ def test_excess_database_privileges_and_cross_database_connect_are_rejected(poli
             if 'has_database_privilege' in sql:return Row((1 if fault=='public-connect' else 0,))
             pytest.fail('unexpected SQL')
     with pytest.raises(ValueError):preflight.verify_database_role(Connection(),policy)
+
+def test_custom_named_production_dsn_and_exchange_secret_are_blocked():
+    for environment in ({'CUSTOM_CONNECTION':'postgresql://fixture:fixture@198.51.100.1/production'},
+                        {'SOMETHING':'host=remote dbname=production user=operator'},
+                        {'BINANCE_API_SECRET':'fixture'}):
+        with pytest.raises(ValueError):h.check_process_environment(environment)

@@ -42,6 +42,16 @@ def safe_inventory(facts):
         raise ValueError('Windows11 Pro required')
 
 
+def check_process_environment(environment):
+    for key,value in environment.items():
+        if not value: continue
+        if re.search(r'^(API_KEY|API_SECRET)$|(?:BYBIT|BINANCE|OKX|KUCOIN|COINBASE|EXCHANGE).*(?:KEY|SECRET|TOKEN)',key,re.I):
+            raise ValueError('exchange credentials are forbidden')
+        if key!='META_ANALYSE_COMMISSIONING_DSN' and (re.search(r'DSN|DATABASE_URL|GRID.*(?:DATABASE|DB_|PG)|^PG(?:HOST|PORT|DATABASE|USER|PASSWORD|SERVICE|OPTIONS|PASSFILE|SSLMODE)',key,re.I) or
+                re.search(r'^postgres(?:ql)?://|(?:^|\s)(?:host|dbname|user|password)=',str(value),re.I)):
+            raise ValueError('unapproved database environment; values are not published')
+
+
 def make_policy(facts, *, salt, candidate_sha, manifest_sha256, dbname, user, port,
                 data_directory, metascalp, operator_approved, confirm_no_grid, now=None):
     safe_inventory(facts)
@@ -202,6 +212,7 @@ def authorize(args, facts=None):
     root = verify_manifest(args.manifest, args.expected_sha, args.manifest_sha256)
     if root!=Path(__file__).resolve().parent.parent:
         raise ValueError('executing guard/install source differs from verified packet')
+    check_process_environment(os.environ)
     facts = collect_facts() if facts is None else facts
     policy = load_private(args.enrollment)
     name = validate_policy(facts, policy, expected_name=args.expected_computer,

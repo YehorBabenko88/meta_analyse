@@ -29,7 +29,8 @@ async def test_collector_stop_retains_pending_database_write(monkeypatch):
     assert writes == ['committed']
 
 @pytest.mark.parametrize('operation', ['import', 'audit'])
-def test_extreme_decimal_validation_finishes_in_bounded_subprocess(operation, tmp_path):
+@pytest.mark.parametrize('timestamp', ['1e-999999999', '0e999999999', '-0e999999999'])
+def test_extreme_decimal_validation_finishes_in_bounded_subprocess(operation, timestamp, tmp_path):
     import os
     from pathlib import Path
     import subprocess
@@ -38,7 +39,7 @@ def test_extreme_decimal_validation_finishes_in_bounded_subprocess(operation, tm
 from meta_analyse.archive_db_import import parse_trade
 from meta_analyse.bybit_archive_audit import audit_trade_gzip
 import csv,gzip,sys
-row=dict(trdMatchID='tiny',timestamp='1e-999999999',price='1',size='1',side='Buy')
+row=dict(trdMatchID='tiny',timestamp=sys.argv[3],price='1',size='1',side='Buy')
 if sys.argv[1]=='import':
  assert parse_trade(row)[1].year==1970
 else:
@@ -46,13 +47,14 @@ else:
   w=csv.DictWriter(f,fieldnames=list(row));w.writeheader();w.writerow(row)
  result=audit_trade_gzip(sys.argv[2]);assert result.valid and result.first_ms==0
 '''
-    result = subprocess.run([sys.executable, '-c', code, operation, str(tmp_path/'tiny.gz')],
+    result = subprocess.run([sys.executable, '-c', code, operation, str(tmp_path/'tiny.gz'), timestamp],
         env=dict(os.environ, PYTHONPATH=str(Path('src').resolve())), capture_output=True, text=True, timeout=5)
     assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.asyncio
-async def test_orderbook_transport_reconnect_requires_fresh_snapshot(monkeypatch):
+@pytest.mark.parametrize('first_delta', [(1, 1), (15, 26)])
+async def test_orderbook_transport_reconnect_requires_fresh_snapshot(monkeypatch, first_delta):
     import json
     from decimal import Decimal
     from types import SimpleNamespace
@@ -62,7 +64,7 @@ async def test_orderbook_transport_reconnect_requires_fresh_snapshot(monkeypatch
                     data=dict(s='BTCUSDT',u=uid,seq=seq,b=[[str(bid),'2']],a=[[str(ask),'2']]))
     frames = [
         [frame('snapshot',10,20,100,102),frame('delta',14,25,101,102),ConnectionError('audit disconnect')],
-        [frame('delta',1,1,10,12),frame('snapshot',20,100,10,12),frame('delta',23,105,11,12)],
+        [frame('delta',*first_delta,10,12),frame('snapshot',20,100,10,12),frame('delta',23,105,11,12)],
     ]
     connections=[]
     class Socket:

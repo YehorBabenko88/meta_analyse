@@ -121,7 +121,9 @@
   "independent_fixes": [
     "Drain monitor schema initialization before service.close returns",
     "Use actual NUL separator in PostgreSQL advisory contention regression",
-    "Require all ten PostgreSQL regressions in JUnit gate"
+    "Require all ten PostgreSQL regressions in JUnit gate",
+    "Short-circuit zero coefficients before positive archive timestamp exponentiation",
+    "Preserve concurrent archive serialization with bounded server-side advisory lock wait"
   ],
   "scope": "Isolated audit branch only; no merge, deployment, production DB, orders or insecure TLS"
 }

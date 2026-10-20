@@ -15,14 +15,6 @@ if (-not $PgBin) {
 if (-not $PgBin) {
     throw 'PostgreSQL 18 binaries are required for Windows CI; install PG18 on runner or provide -PgBin. Refusing legacy 17.6 fallback.'
 }
-if ($false) {
-    $archive = Join-Path $WorkRoot 'postgresql.zip'
-    Invoke-WebRequest 'https://get.enterprisedb.com/postgresql/postgresql-17.6-1-windows-x64-binaries.zip' -OutFile $archive
-    $expected = 'D378882ABD001A186735ACD6F6BA716BCA6CCD192E800412D4FD15ED25376B3E'
-    if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne $expected) { throw 'PostgreSQL archive checksum mismatch' }
-    Expand-Archive -LiteralPath $archive -DestinationPath $WorkRoot
-    $PgBin = Join-Path $WorkRoot 'pgsql\bin'
-}
 $version = (& (Join-Path $PgBin 'postgres.exe') --version) -join ' '
 Write-Host "Selected Windows PostgreSQL: $version"
 if ($LASTEXITCODE -ne 0 -or $version -notmatch 'PostgreSQL\) 18\.') { throw "PostgreSQL 18 required; found: $version" }

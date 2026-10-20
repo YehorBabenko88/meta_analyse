@@ -38,6 +38,7 @@ async def test_invalid_delta_forces_new_connection_and_snapshot(monkeypatch):
                     packet("delta", 3, 3)]),
         FakeSocket([packet("snapshot", 10, 10)])
     ]
+    created = list(sockets)
     stop = asyncio.Event()
     events, gaps = [], []
     async def on_book(symbol, book, ts):
@@ -53,7 +54,7 @@ async def test_invalid_delta_forces_new_connection_and_snapshot(monkeypatch):
     assert events == [("BTCUSDT", True, 1), ("BTCUSDT", True, 10)]
     assert stream.connection_epoch == 2
     assert any("invalid" in g for g in gaps)
-    assert all(s.closed for s in sockets)  # exhausted; context managers exited
+    assert all(s.closed for s in created)
 
 
 @pytest.mark.asyncio
@@ -85,8 +86,12 @@ async def test_shutdown_interrupts_reconnect_backoff(monkeypatch):
             await failed_connect()
         async def __aexit__(self, *_):
             pass
+    calls = 0
     async def on_gap(*_):
-        stop.set()
+        nonlocal calls
+        calls += 1
+        if calls >= 2:
+            stop.set()
     monkeypatch.setattr("meta_analyse.orderbook_stream.websockets.connect",
                         lambda *a, **kw: BrokenSocket())
     stream = OrderBookStream(lambda *_: None, on_gap)

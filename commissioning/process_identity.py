@@ -112,7 +112,10 @@ def classify_missing(row,evidence,roots):
                 valid=before.get('name')=='System' and row.get('name')=='System' and same_creation(row.get('created'),before.get('created'))
             return dict(status='VERIFIED_KERNEL',reason_code='KERNEL_SNAPSHOT_IDENTITY') if valid else blocked('KERNEL_IDENTITY_CONFLICT')
         before=evidence.get('native_before');after=evidence.get('native_after')
-        if any(not isinstance(n,dict) or not n or n.get('error_stage','') not in ('','QUERY_IMAGE') for n in (before,after)):
+        if any(not isinstance(n,dict) or not n or n.get('error_stage') not in ('','QUERY_IMAGE')
+               or type(n.get('pid')) is not int or type(n.get('win32_error')) is not int
+               or n['win32_error']<0 or type(n.get('path')) is not str
+               or type(n.get('image_query_succeeded')) is not bool for n in (before,after)):
             return blocked('NATIVE_PROCESS_API_UNAVAILABLE')
         if any(n.get('pid')!=pid for n in (before,after)):return blocked('PROCESS_ID_CONFLICT')
         if any(n.get('alive') is not True for n in (before,after)):return blocked('PROCESS_NOT_ALIVE')

@@ -125,6 +125,9 @@ def classify_missing(row,evidence,roots):
         if any(not same_creation(row['created'],n['created']) for n in (before,after)):
             return blocked('CIM_CREATION_MISMATCH')
         if any(n.get('image_query_succeeded') is not True or not n.get('path') for n in (before,after)):
+            if before!=after:return blocked('NATIVE_PROCESS_EVIDENCE_CHANGED')
+            refusal=snapshot_refusal(row,evidence,before)
+            if refusal:return blocked(refusal)
             return blocked('IMAGE_PATH_UNAVAILABLE')
         path=canonical(before.get('path'))
         if not path or not canonical(after.get('path')):return blocked('IMAGE_PATH_INVALID')

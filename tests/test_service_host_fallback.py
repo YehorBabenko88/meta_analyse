@@ -15,7 +15,7 @@ def synthetic_host(name='svchost.exe', directory=ROOTS['system32']):
     path = directory + '\\' + name
     row = dict(pid=123, name=name, created=123456789012345670, cim_path='')
     native = dict(pid=123, path=path, created=row['created'], alive=True,
-                  image_query_succeeded=True, error_stage='')
+                  image_query_succeeded=True, error_stage='', win32_error=0)
     proof = dict(native_before=native, native_after=copy.deepcopy(native),
                  signature=dict(path=path, status='Valid', subject='CN=Microsoft Windows',
                                 sha256='a'*64, sha256_after='a'*64, reparse_point=False),
@@ -61,3 +61,45 @@ def test_service_host_boundary_rejects_conflicts(fault, reason):
         if fault == 'configuration-changed': proof['services_after'][0]['binary_path'] += ' --changed'
     if fault == 'native-image-changed': proof['native_after']['path'] = r'C:\Other\svchost.exe'
     assert p.classify_missing(row, proof, ROOTS) == dict(status='UNRESOLVED', reason_code=reason)
+
+
+def test_scm_duplicate_names_case_insensitive_are_rejected():
+    row, proof = synthetic_host()
+    service = dict(name='UnreviewedSyntheticService', pid=row['pid'], state=4,
+                   binary_path=proof['native_before']['path'])
+    proof['services_before'] = [service, dict(service, name='unreviewedsyntheticservice')]
+    proof['services_after'] = copy.deepcopy(proof['services_before'])
+    assert p.classify_missing(row, proof, ROOTS) == dict(
+        status='UNRESOLVED', reason_code='SERVICE_IDENTITY_UNAVAILABLE')
+
+
+def test_scm_case_only_membership_change_is_not_a_new_service():
+    row, proof = synthetic_host()
+    service = dict(name='UnreviewedSyntheticService', pid=row['pid'], state=4,
+                   binary_path=proof['native_before']['path'])
+    proof['services_before'] = [service]
+    proof['services_after'] = [dict(service, name='unreviewedsyntheticservice')]
+    result = p.classify_missing(row, proof, ROOTS)
+    assert result['status'] == 'UNRESOLVED'
+    assert result['reason_code'] != 'SERVICE_MEMBERSHIP_CHANGED'
+
+
+@pytest.mark.parametrize('malformed', [None, False, 7, '', [], {}])
+def test_malformed_scm_name_fails_closed(malformed):
+    row, proof = synthetic_host()
+    service = dict(name=malformed, pid=row['pid'], state=4,
+                   binary_path=proof['native_before']['path'])
+    proof['services_before'] = [service]
+    proof['services_after'] = [copy.deepcopy(service)]
+    assert p.classify_missing(row, proof, ROOTS) == dict(
+        status='UNRESOLVED', reason_code='SERVICE_IDENTITY_UNAVAILABLE')
+
+
+def test_scm_case_only_change_remains_unresolved_without_trusting_new_identity():
+    row, proof = synthetic_host()
+    service = dict(name='UnreviewedSyntheticService', pid=row['pid'], state=4,
+                   binary_path=proof['native_before']['path'])
+    proof['services_before'] = [service]
+    proof['services_after'] = [dict(service, name='unreviewedsyntheticservice')]
+    assert p.classify_missing(row, proof, ROOTS) == dict(
+        status='UNRESOLVED', reason_code='SERVICE_EVIDENCE_CHANGED')

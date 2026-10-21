@@ -101,6 +101,8 @@ def classify_missing(row,evidence,roots):
         pid=row['pid']
         if type(pid) is not int or pid<0:return blocked('PROCESS_ID_CONFLICT')
         if pid in (0,4):
+            refusal=snapshot_refusal(row,evidence)
+            if refusal:return blocked(refusal)
             before=evidence.get('kernel_before',{});after=evidence.get('kernel_after',{})
             if not before or before!=after or before.get('pid')!=pid or before.get('parent_pid')!=0 or before.get('session_id')!=0 or row.get('parent_pid')!=0 or row.get('session_id')!=0:
                 return blocked('KERNEL_IDENTITY_UNAVAILABLE')
@@ -110,7 +112,10 @@ def classify_missing(row,evidence,roots):
                 valid=before.get('name')=='System' and row.get('name')=='System' and same_creation(row.get('created'),before.get('created'))
             return dict(status='VERIFIED_KERNEL',reason_code='KERNEL_SNAPSHOT_IDENTITY') if valid else blocked('KERNEL_IDENTITY_CONFLICT')
         before=evidence.get('native_before');after=evidence.get('native_after')
-        if any(not isinstance(n,dict) or not n or n.get('error_stage','') not in ('','QUERY_IMAGE') for n in (before,after)):
+        if any(not isinstance(n,dict) or not n or n.get('error_stage') not in ('','QUERY_IMAGE')
+               or type(n.get('pid')) is not int or type(n.get('win32_error')) is not int
+               or n['win32_error']<0 or type(n.get('path')) is not str
+               or type(n.get('image_query_succeeded')) is not bool for n in (before,after)):
             return blocked('NATIVE_PROCESS_API_UNAVAILABLE')
         if any(n.get('pid')!=pid for n in (before,after)):return blocked('PROCESS_ID_CONFLICT')
         if any(n.get('alive') is not True for n in (before,after)):return blocked('PROCESS_NOT_ALIVE')
@@ -120,6 +125,9 @@ def classify_missing(row,evidence,roots):
         if any(not same_creation(row['created'],n['created']) for n in (before,after)):
             return blocked('CIM_CREATION_MISMATCH')
         if any(n.get('image_query_succeeded') is not True or not n.get('path') for n in (before,after)):
+            if before!=after:return blocked('NATIVE_PROCESS_EVIDENCE_CHANGED')
+            refusal=snapshot_refusal(row,evidence,before)
+            if refusal:return blocked(refusal)
             return blocked('IMAGE_PATH_UNAVAILABLE')
         path=canonical(before.get('path'))
         if not path or not canonical(after.get('path')):return blocked('IMAGE_PATH_INVALID')
@@ -150,8 +158,8 @@ def classify_missing(row,evidence,roots):
         known_service_image=known_service_image or any(path==canonical(ntpath.join(roots['system32'],host)) for host,_,_,_,_ in WINDOWS_SERVICE_CONTRACTS.values())
         if known_service_image and not services:return blocked('SERVICE_IDENTITY_UNAVAILABLE')
         if services or after_services:
-            if sorted(s['name'] for s in services)!=sorted(s['name'] for s in after_services):return blocked('SERVICE_MEMBERSHIP_CHANGED')
-            for first,last in zip(sorted(services,key=lambda s:s['name']),sorted(after_services,key=lambda s:s['name'])):
+            if sorted(s['name'].casefold() for s in services)!=sorted(s['name'].casefold() for s in after_services):return blocked('SERVICE_MEMBERSHIP_CHANGED')
+            for first,last in zip(sorted(services,key=lambda s:s['name'].casefold()),sorted(after_services,key=lambda s:s['name'].casefold())):
                 if first.get('pid')!=last.get('pid'):return blocked('SERVICE_PID_CHANGED')
                 if first.get('state')!=last.get('state'):return blocked('SERVICE_STATE_CHANGED')
                 if first.get('binary_path')!=last.get('binary_path'):return blocked('SERVICE_CONFIGURATION_CHANGED')
@@ -199,3 +207,27 @@ def assess_processes(rows,roots,expected_missing_pids):
     mismatch=len(rows)!=len(expected) or len(expected)!=len(set(expected)) or seen!=set(expected)
     if mismatch:reasons['PROCESS_INVENTORY_COVERAGE_MISMATCH']=1
     return dict(results=results,missing_process_paths=len(expected),verified_missing_process_paths=len(results)-len(unresolved),unknown_process_paths=len(unresolved)+int(mismatch),reason_counts=reasons)
+
+def snapshot_refusal(row,evidence,native=None):
+    """Check lifetime/topology only; no general kernel identity is established.
+
+    Names and additional characteristics are never admission predicates. Require
+    their stability, but do not infer identity from a label or an API failure.
+    """
+    snapshots=[evidence.get(key) for key in ('kernel_before','kernel_after')]
+    for item in (row,*snapshots):
+        if not isinstance(item,dict):return 'KERNEL_IDENTITY_UNAVAILABLE'
+        if any(type(item.get(k)) is not int or not 0<=item[k]<=0x7fffffff
+               for k in ('pid','parent_pid','session_id')):
+            return 'KERNEL_IDENTITY_UNAVAILABLE'
+        if type(item.get('created')) is not int or not 0<=item['created']<=0x7fffffffffffffff:
+            return 'KERNEL_IDENTITY_UNAVAILABLE'
+        if type(item.get('name')) is not str:return 'KERNEL_IDENTITY_UNAVAILABLE'
+    first,last=snapshots
+    if first!=last:return 'KERNEL_IDENTITY_CONFLICT'
+    if any(first[k]!=row[k] for k in ('pid','parent_pid','session_id')):
+        return 'KERNEL_IDENTITY_CONFLICT'
+    if native is not None and (first['pid']!=native['pid'] or first['created']!=native['created']
+                               or not same_creation(row['created'],first['created'])):
+        return 'KERNEL_IDENTITY_CONFLICT'
+    return None

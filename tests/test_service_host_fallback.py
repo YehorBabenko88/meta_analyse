@@ -82,3 +82,24 @@ def test_scm_case_only_membership_change_is_not_a_new_service():
     result = p.classify_missing(row, proof, ROOTS)
     assert result['status'] == 'UNRESOLVED'
     assert result['reason_code'] != 'SERVICE_MEMBERSHIP_CHANGED'
+
+
+@pytest.mark.parametrize('malformed', [None, False, 7, '', [], {}])
+def test_malformed_scm_name_fails_closed(malformed):
+    row, proof = synthetic_host()
+    service = dict(name=malformed, pid=row['pid'], state=4,
+                   binary_path=proof['native_before']['path'])
+    proof['services_before'] = [service]
+    proof['services_after'] = [copy.deepcopy(service)]
+    assert p.classify_missing(row, proof, ROOTS) == dict(
+        status='UNRESOLVED', reason_code='SERVICE_IDENTITY_UNAVAILABLE')
+
+
+def test_scm_case_only_change_remains_unresolved_without_trusting_new_identity():
+    row, proof = synthetic_host()
+    service = dict(name='UnreviewedSyntheticService', pid=row['pid'], state=4,
+                   binary_path=proof['native_before']['path'])
+    proof['services_before'] = [service]
+    proof['services_after'] = [dict(service, name='unreviewedsyntheticservice')]
+    assert p.classify_missing(row, proof, ROOTS) == dict(
+        status='UNRESOLVED', reason_code='SERVICE_EVIDENCE_CHANGED')

@@ -214,7 +214,10 @@ def test_ci_records_pull_request_head_instead_of_synthetic_merge(tmp_path):
     ('{"native_before":{"path":"SYNTHETIC_PRIVATE_PATH"}}',False),
     ('{"machine_guid":"SYNTHETIC_PRIVATE_GUID"}',False),
     ('PRIVATE_SENTINEL_must_never_be_uploaded',False),
-], ids=['safe','native-evidence','identity','sentinel'])
+    ('{"implementation_before":{"synthetic":"private"}}',False),
+    ('{"modules_before":{"paths":["synthetic"]}}',False),
+    ('{"native_format_path":"synthetic"}',False),
+], ids=['safe','native-evidence','identity','sentinel','implementation','modules','native-format'])
 def test_artifact_gate_rejects_raw_private_payload_without_echo(tmp_path,content,accepted):
     file=tmp_path/'public.json';file.write_text(content)
     script=Path(__file__).resolve().parents[1]/'scripts/check_public_diagnostic_artifacts.py'

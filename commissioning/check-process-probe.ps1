@@ -12,12 +12,20 @@ try {
  Assert-Probe ($cim.CreationDate -and [Math]::Abs($first.created-$cim.CreationDate.ToUniversalTime().ToFileTimeUtc()) -lt 10) 'NATIVE_CIM_CREATION_BINDING'
  $invalid=[MetaCommissionInventory.Probe]::ReadProcess(-1)
  Assert-Probe (!$invalid.alive -and !$invalid.image_query_succeeded -and $invalid.error_stage -eq 'OPEN_PROCESS' -and $invalid.win32_error -ne 0) 'INVALID_PROCESS_NOT_REJECTED'
+ $modules=[MetaCommissionInventory.Probe]::ReadModules($PID)
+ Assert-Probe ($modules.complete -and $modules.alive -and $modules.pid -eq $PID -and $modules.created -eq $first.created -and $modules.paths.Count -gt 0 -and $modules.error_stage -eq '') 'SELF_MODULE_BOUNDARY'
+ $invalidModules=[MetaCommissionInventory.Probe]::ReadModules(-1)
+ Assert-Probe (!$invalidModules.complete -and $invalidModules.error_stage -eq 'OPEN_PROCESS_MODULES' -and $invalidModules.win32_error -ne 0) 'INVALID_MODULE_PROCESS_NOT_REJECTED'
+ $missingRegistry=Get-ServiceImplementationConfig -Name '__meta_commission_inventory_missing_service__'
+ Assert-Probe (!$missingRegistry.complete) 'UNKNOWN_SERVICE_REGISTRY_NOT_REJECTED'
  $unknown=[MetaCommissionInventory.Probe]::ReadService('__meta_commission_inventory_missing_service__')
  Assert-Probe ($unknown.error_stage -eq 'OPEN_SERVICE_CONFIG' -and $unknown.win32_error -eq 1060) 'UNKNOWN_SERVICE_NOT_REJECTED'
  $membership=[MetaCommissionInventory.Probe]::ReadBindings($PID)
  Assert-Probe ($membership.services.Count -eq 0 -and ($membership.complete -or $membership.reason_code -in @('SERVICE_COVERAGE_UNAVAILABLE','SERVICE_STATUS_UNAVAILABLE'))) 'NATIVE_EMPTY_OR_FAIL_CLOSED_SERVICE_MEMBERSHIP'
  $service=Get-CimInstance Win32_Service -Filter "Name='EventLog'"
  $scm=[MetaCommissionInventory.Probe]::ReadService('EventLog')
+ $registry=Get-ServiceImplementationConfig -Name 'EventLog'
+ Assert-Probe ($registry.complete -and $registry.expanded_image_path -eq $scm.binary_path -and $registry.service_type -eq $scm.service_type -and $registry.account -eq $scm.start_name) 'REGISTRY_SCM_CONFIG_BOUNDARY'
  $members=[MetaCommissionInventory.Probe]::ReadBindings($service.ProcessId)
  Assert-Probe ($scm -and $scm.state -eq 4 -and $scm.pid -eq $service.ProcessId -and $scm.binary_path -eq $service.PathName) 'SCM_STATUS_CONFIG_BOUNDARY'
  Assert-Probe (($members.complete -and @($members.services | Where-Object { $_.name -eq 'EventLog' -and $_.pid -eq $service.ProcessId }).Count -eq 1) -or (!$members.complete -and $members.services.Count -eq 0)) 'SCM_COMPLETE_OR_FAIL_CLOSED_MEMBERSHIP_BOUNDARY'
@@ -26,7 +34,7 @@ try {
   $after=[MetaCommissionInventory.Probe]::ReadKernel($kernelIdValue)
   Assert-Probe ($before -and $after -and $before.pid -eq $kernelIdValue -and $before.parent_pid -eq 0 -and $before.session_id -eq 0 -and (($before | ConvertTo-Json -Compress) -eq ($after | ConvertTo-Json -Compress))) 'NATIVE_KERNEL_SNAPSHOT_BOUNDARY'
  }
- [ordered]@{status='PASS';native_process='PASS';creation_binding='PASS';unknown_process_service='REJECTED';scm_native_status_config='PASS';scm_membership=if($membership.complete -and $members.complete){'COMPLETE'}else{'FAIL_CLOSED_UNAVAILABLE'};scm_coverage_reason=$membership.reason_code;kernel_snapshot='PASS';access='READ_ONLY_QUERY';services_changed=$false;private_values_published=$false;host_admission='NOT_TESTED'} | ConvertTo-Json | Set-Content -LiteralPath $Output -Encoding UTF8
+ [ordered]@{status='PASS';native_process='PASS';creation_binding='PASS';unknown_process_service='REJECTED';scm_native_status_config='PASS';scm_membership=if($membership.complete -and $members.complete){'COMPLETE'}else{'FAIL_CLOSED_UNAVAILABLE'};scm_coverage_reason=$membership.reason_code;kernel_snapshot='PASS';module_boundary='PASS';registry_scm_boundary='PASS';native_format='DIAGNOSTIC_ONLY';access='READ_ONLY_QUERY_AND_MODULE_ENUMERATION';services_changed=$false;private_values_published=$false;host_admission='NOT_TESTED'} | ConvertTo-Json | Set-Content -LiteralPath $Output -Encoding UTF8
 } catch {
  [ordered]@{status='FAIL_CLOSED';stage=$script:probeStage;error_type=$_.Exception.GetType().Name;detail='Native read-only identity boundary failed; private values suppressed'} | ConvertTo-Json | Set-Content -LiteralPath $Output -Encoding UTF8
  exit 1

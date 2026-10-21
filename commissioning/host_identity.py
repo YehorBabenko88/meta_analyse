@@ -22,7 +22,7 @@ TARGET_HOST = 'ADMINIT-JQ1IQSV'
 TARGET_USER = r'ADMINIT-JQ1IQSV\Administrator'
 TARGET_EXE = r'C:\Users\Administrator\AppData\Local\MetaScalp\current\MetaScalp.exe'
 TARGET_EXE_SHA256 = '9f55837fafbf42b713ebe9206a23afb39ff5ff6de4911d676e7840ae657088df'
-COLLECTOR_VERSION = 'adminit-process-evidence-v2'
+COLLECTOR_VERSION = 'adminit-process-evidence-v3-service-contracts'
 
 
 class DiagnosticError(ValueError):

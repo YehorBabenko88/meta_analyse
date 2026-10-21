@@ -14,6 +14,15 @@ SERVICE_RULES={
     'NortonWscReporter':('program_files',r'Norton\Suite\wsc_proxy.exe',{'NortonLifeLock Inc.','Gen Digital Inc.'}),
     'SecurityHealthService':('system32','SecurityHealthService.exe',WINDOWS_PUBLISHERS),
 }
+# Standard OS-relative contracts, never learned from a private observation.
+# These require independent registry, loaded-module and signed-DLL evidence.
+WINDOWS_SERVICE_CONTRACTS={
+    'KeyIso':('lsass.exe','keyiso.dll',(),'localsystem','parameters'),
+    'SamSs':('lsass.exe','samsrv.dll',(),'localsystem','integrated'),
+    'VaultSvc':('lsass.exe','vaultsvc.dll',(),'localsystem','parameters'),
+    'DoSvc':('svchost.exe','dosvc.dll',('-k','networkservice','-p'),r'nt authority\networkservice','root'),
+    'wscsvc':('svchost.exe','wscsvc.dll',('-k','localservicenetworkrestricted','-p'),r'nt authority\localservice','parameters'),
+}
 GRID=re.compile(r'grid|^(?:coordinator|worker|collector)(?:\.exe)?$',re.I)
 
 def canonical(path):
@@ -31,6 +40,57 @@ def command_executable(command):
 def same_creation(left,right):
     # CIM DMTF has microsecond resolution; native FILETIME has 100ns resolution.
     return type(left) is int and type(right) is int and left>0 and left//10==right//10
+
+
+def command_arguments(command):
+    if not command_executable(command):return None
+    match=re.fullmatch(r'(?:"[^"\r\n]+\.exe"|[^\s"\r\n]+\.exe)(.*)',command,re.I)
+    return tuple(match[1].casefold().split()) if match else None
+
+
+def service_implementation_refusal(svc,evidence,roots,native):
+    name=svc['name'];host,dll,args,account,source=WINDOWS_SERVICE_CONTRACTS[name]
+    host_path=canonical(ntpath.join(roots['system32'],host))
+    dll_path=canonical(ntpath.join(roots['system32'],dll))
+    if canonical(native['path'])!=host_path:return 'SERVICE_IMAGE_NOT_REVIEWED'
+    before=evidence.get('implementation_before',{}).get(name)
+    after=evidence.get('implementation_after',{}).get(name)
+    if not isinstance(before,dict) or not isinstance(after,dict) or any(c.get('complete') is not True or c.get('error_stage') for c in (before,after)):
+        return 'SERVICE_IMPLEMENTATION_UNVERIFIED'
+    if before!=after:return 'SERVICE_IMPLEMENTATION_CHANGED'
+    for c in (before,after):
+        if (c.get('name')!=name or c.get('service_type')!=32 or svc.get('service_type')!=32
+                or str(c.get('account','')).casefold()!=account or str(svc.get('start_name','')).casefold()!=account
+                or command_executable(c.get('expanded_image_path'))!=host_path
+                or command_arguments(c.get('expanded_image_path'))!=args or command_arguments(svc.get('binary_path'))!=args):
+            return 'SERVICE_HOST_CONFIGURATION_UNREVIEWED'
+        if c.get('dll_source')!=source:return 'SERVICE_DLL_CONFIGURATION_UNREVIEWED'
+        if source=='integrated':
+            if c.get('dll_present') is not False or c.get('expanded_dll_path'):return 'SERVICE_DLL_CONFIGURATION_UNREVIEWED'
+        elif c.get('dll_present') is not True or canonical(c.get('expanded_dll_path'))!=dll_path:
+            return 'SERVICE_DLL_CONFIGURATION_UNREVIEWED'
+    sets=[]
+    for key in ('modules_before','modules_after'):
+        modules=evidence.get(key)
+        if not isinstance(modules,dict) or modules.get('complete') is not True or modules.get('error_stage') or modules.get('win32_error')!=0:
+            return 'SERVICE_MODULES_UNAVAILABLE'
+        if modules.get('pid')!=native['pid'] or modules.get('created')!=native['created'] or modules.get('alive') is not True:
+            return 'SERVICE_MODULE_LIFETIME_MISMATCH'
+        paths=modules.get('paths')
+        if not isinstance(paths,list) or not paths or any(not canonical(v) for v in paths):return 'SERVICE_MODULES_UNAVAILABLE'
+        normalized=[canonical(v) for v in paths]
+        if len(normalized)!=len(set(normalized)):return 'SERVICE_MODULES_UNAVAILABLE'
+        sets.append(set(normalized))
+    if sets[0]!=sets[1]:return 'SERVICE_MODULES_CHANGED'
+    if not {host_path,dll_path}.issubset(sets[0]):return 'SERVICE_IMPLEMENTATION_NOT_LOADED'
+    sig=evidence.get('implementation_signatures',{}).get(name) or {}
+    subject=sig.get('subject')
+    cn=re.search(r'(?:^|,\s*)CN=([^,]+)(?:,|$)',subject) if isinstance(subject,str) else None
+    if (sig.get('status')!='Valid' or canonical(sig.get('path'))!=dll_path or not cn or cn[1] not in WINDOWS_PUBLISHERS
+            or sig.get('reparse_point') is not False or not re.fullmatch('[0-9a-f]{64}',sig.get('sha256',''))
+            or sig['sha256']!=sig.get('sha256_after')):
+        return 'SERVICE_DLL_SIGNATURE_UNVERIFIED'
+    return None
 
 def classify_missing(row,evidence,roots):
     def blocked(code):return dict(status='UNRESOLVED',reason_code=code)
@@ -92,12 +152,18 @@ def classify_missing(row,evidence,roots):
             for svc in services:
                 if svc.get('error_stage'):return blocked('SERVICE_API_UNAVAILABLE')
                 rule=SERVICE_RULES.get(svc.get('name'))
-                if not rule:return blocked('SERVICE_RULE_UNREVIEWED')
+                contract=svc.get('name') in WINDOWS_SERVICE_CONTRACTS
+                if not rule and not contract:return blocked('SERVICE_RULE_UNREVIEWED')
                 if svc.get('pid')!=pid:return blocked('SERVICE_PID_MISMATCH')
                 if svc.get('state')!=4:return blocked('SERVICE_NOT_RUNNING')
                 configured=command_executable(svc.get('binary_path'))
                 if not configured:return blocked('SERVICE_CONFIG_PATH_INVALID')
                 if configured!=path:return blocked('SERVICE_CONFIG_IMAGE_MISMATCH')
+                if contract:
+                    if cn[1] not in WINDOWS_PUBLISHERS:return blocked('SERVICE_PUBLISHER_NOT_REVIEWED')
+                    refusal=service_implementation_refusal(svc,evidence,roots,before)
+                    if refusal:return blocked(refusal)
+                    continue
                 root,relative,publishers=rule
                 if path!=canonical(ntpath.join(roots[root],relative)):return blocked('SERVICE_IMAGE_NOT_REVIEWED')
                 if cn[1] not in publishers:return blocked('SERVICE_PUBLISHER_NOT_REVIEWED')

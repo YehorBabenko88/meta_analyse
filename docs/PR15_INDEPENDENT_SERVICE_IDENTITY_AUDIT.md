@@ -150,3 +150,30 @@ No merge or deployment recommendation follows from this report.
 - [GetModuleFileNameExW rights and mutable-list limits](https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getmodulefilenameexw)
 - [EnumProcessModulesEx snapshot limits and WOW64 behavior](https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-enumprocessmodulesex)
 - [Added LSA protection](https://learn.microsoft.com/en-us/windows-server/security/credentials-protection-and-management/configuring-additional-lsa-protection)
+
+
+## Follow-up: identical standalone regression across three exact SHAs
+
+The same `tests/test_service_host_fallback.py` was copied unchanged into three
+isolated directories, each containing only its historical classifier extracted
+with `git show <SHA>:commissioning/process_identity.py`. Tests used the existing
+local audit virtualenv and `pytest --confcutdir <isolated-directory>`; no native
+probe, root conftest, host collection or registry access was involved.
+
+| Classifier source SHA | Result | Empty-membership result |
+| --- | --- | --- |
+| `3f4185fdb61ec1bab590203161cfc8face55335a` | 1 failed, 8 passed | VERIFIED_SYSTEM_IMAGE (defect) |
+| `69969c983335d784cff8930c7e95ec06d56de214` | 1 failed, 8 passed | VERIFIED_SYSTEM_IMAGE (defect) |
+| `bcd9a10a86e4e27662eb0af442bcbd1d95f25cdf` | 9 passed | UNRESOLVED / SERVICE_IDENTITY_UNAVAILABLE |
+
+The one failing test is
+`test_signed_svchost_with_empty_scm_cannot_use_system_image_fallback`.
+Eight controls pass on every source: ordinary System32 image remains trusted;
+incomplete before/after SCM flags, unknown service, spoofed host path, changed
+membership/configuration and native image snapshots reject. The standalone test
+requires no PR #15 contract constants and can be replayed against the base.
+The follow-up changes tests/report only; production correction remains the seven
+lines in `bcd9a10a86e4e27662eb0af442bcbd1d95f25cdf`. The five contracts and their
+SCM/registry/module predicates are unchanged. Combined focused suite after adding
+the standalone regression: **188 passed**. The earlier full-suite result above
+belongs to the initial correction; it is not relabeled as a new full-suite run.

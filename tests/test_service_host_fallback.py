@@ -61,3 +61,24 @@ def test_service_host_boundary_rejects_conflicts(fault, reason):
         if fault == 'configuration-changed': proof['services_after'][0]['binary_path'] += ' --changed'
     if fault == 'native-image-changed': proof['native_after']['path'] = r'C:\Other\svchost.exe'
     assert p.classify_missing(row, proof, ROOTS) == dict(status='UNRESOLVED', reason_code=reason)
+
+
+def test_scm_duplicate_names_case_insensitive_are_rejected():
+    row, proof = synthetic_host()
+    service = dict(name='UnreviewedSyntheticService', pid=row['pid'], state=4,
+                   binary_path=proof['native_before']['path'])
+    proof['services_before'] = [service, dict(service, name='unreviewedsyntheticservice')]
+    proof['services_after'] = copy.deepcopy(proof['services_before'])
+    assert p.classify_missing(row, proof, ROOTS) == dict(
+        status='UNRESOLVED', reason_code='SERVICE_IDENTITY_UNAVAILABLE')
+
+
+def test_scm_case_only_membership_change_is_not_a_new_service():
+    row, proof = synthetic_host()
+    service = dict(name='UnreviewedSyntheticService', pid=row['pid'], state=4,
+                   binary_path=proof['native_before']['path'])
+    proof['services_before'] = [service]
+    proof['services_after'] = [dict(service, name='unreviewedsyntheticservice')]
+    result = p.classify_missing(row, proof, ROOTS)
+    assert result['status'] == 'UNRESOLVED'
+    assert result['reason_code'] != 'SERVICE_MEMBERSHIP_CHANGED'

@@ -1,6 +1,9 @@
 # Read-only internal collector. stdout contains private identity inputs for the
 # capturing Python process; never redirect/publish this raw stream to GitHub.
 $ErrorActionPreference = 'Stop'
+$tokenIdentity=[Security.Principal.WindowsIdentity]::GetCurrent()
+$collectorElevated=([Security.Principal.WindowsPrincipal]::new($tokenIdentity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $collectorElevated) { throw 'ELEVATED_TOKEN_REQUIRED' }
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $errorsFound = [System.Collections.Generic.List[string]]::new()
 $findings = [System.Collections.Generic.List[string]]::new()
@@ -98,6 +101,7 @@ $terminalProcesses = @($processes | Where-Object { $_.Name -ieq 'MetaScalp.exe' 
     else { [ordered]@{pid=[int]$_.ProcessId;process_started=$_.CreationDate.ToUniversalTime().ToString('o');exe_path=$_.ExecutablePath;exe_sha256=(Get-FileHash -LiteralPath $_.ExecutablePath -Algorithm SHA256).Hash.ToLowerInvariant()} }
 })
 [ordered]@{
+    collector_elevated=$collectorElevated
     process_evidence=@($processEvidence)
     process_roots=[ordered]@{system32=[Environment]::SystemDirectory;program_files=[Environment]::GetFolderPath('ProgramFiles')}
     private_inventory=[ordered]@{

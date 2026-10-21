@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'commissioning'))
 import host_identity as h
 
 def target():
-    return dict(identity=dict(hostname='ADMINIT-JQ1IQSV', username=r'ADMINIT-JQ1IQSV\Administrator', sid='S-test', machine_guid='new-install', install_id='new', hardware_uuid='hardware'),
+    return dict(collector_elevated=True,identity=dict(hostname='ADMINIT-JQ1IQSV', username=r'ADMINIT-JQ1IQSV\Administrator', sid='S-test', machine_guid='new-install', install_id='new', hardware_uuid='hardware'),
         os=dict(system='Windows', edition='Professional', build=26100),
         grid=dict(findings=[], errors=[], coverage_complete=True),
         metascalp=[dict(path=h.TARGET_EXE, sha256=h.TARGET_EXE_SHA256, signature='Valid', publisher='CN=Grigoryan Construct LLC', file_version='1.0.291')],

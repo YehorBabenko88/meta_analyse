@@ -13,6 +13,8 @@ jobs:
       PYTHONASYNCIODEBUG: '1'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify exact Actions source SHA
         run: python scripts/record_ci_source.py
       - uses: actions/setup-python@v5
@@ -22,6 +24,10 @@ jobs:
           cache-dependency-path: requirements.lock
       - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
+      - name: Mandatory diagnostic hardening regressions (synthetic evidence only)
+        run: python -m pytest -q tests/test_diagnostic_hardening.py tests/test_process_inventory_identity.py tests/test_host_identity_authorization.py --junitxml=diagnostic-tests.xml
+      - name: Reject missing or skipped diagnostic cases
+        run: python scripts/check_integration_junit.py diagnostic-tests.xml --minimum 123 --require-exact test_exact_refusal_predicate_remains_unresolved --require-exact test_dpapi_input_retains_evidence_for_replay_without_public_leak --require-exact test_no_elevation_blocks_before_powershell --require-exact test_candidate_binding_rejects_wrong_sha_dirty_and_untracked_collector --require-exact test_nonelevated_diagnose_emits_single_safe_failure --require-exact test_observation_contains_collector_binding_only_privately --require-exact test_collector_change_during_collection_blocks_observation --require-exact test_artifact_gate_rejects_raw_private_payload_without_echo --require-exact test_child_missing_elevation_is_not_trusted --require-exact test_private_evidence_real_dpapi_roundtrip_or_platform_refusal
       - name: Real Windows read-only native process and SCM boundary
         shell: powershell
         run: ./commissioning/check-process-probe.ps1 -Output process-probe.json
@@ -48,13 +54,25 @@ jobs:
         run: |
           ./install.ps1 -Python (Get-Command python).Source -InstallRoot "$env:RUNNER_TEMP\installer target"
           ./install.ps1 -Python (Get-Command python).Source -InstallRoot "$env:RUNNER_TEMP\installer target"
-      - uses: actions/upload-artifact@v4
+      - name: Verify public-only Windows artifacts
+        id: privacy_gate
         if: always()
+        shell: pwsh
+        run: |
+          $files = @('source-sha.json', 'diagnostic-tests.xml', 'process-probe.json')
+          $files += @('tests.log','tests.xml','postgresql.log','ui-performance.json') | ForEach-Object { Join-Path "$env:RUNNER_TEMP/meta-analyse-ci" $_ }
+          $files += @(Get-ChildItem "$env:RUNNER_TEMP/meta-analyse-ci/repeat-lifecycle" -File -Recurse -Filter 'tests.*' | ForEach-Object { $_.FullName })
+          $files += "$env:RUNNER_TEMP/meta-analyse-pg18/provenance.json"
+          python scripts/check_public_diagnostic_artifacts.py @files
+          if ($LASTEXITCODE -ne 0) { throw 'Public artifact privacy gate rejected output' }
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy_gate.outcome == 'success'
         with:
           name: windows-test-evidence
           path: |
             ${{ runner.temp }}/meta-analyse-ci/repeat-lifecycle/**/tests.*
             source-sha.json
+            diagnostic-tests.xml
             process-probe.json
             ${{ runner.temp }}/meta-analyse-ci/tests.log
             ${{ runner.temp }}/meta-analyse-ci/tests.xml
@@ -81,6 +99,8 @@ jobs:
       META_ANALYSE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify exact Actions source SHA
         run: python scripts/record_ci_source.py
       - uses: actions/setup-python@v5
@@ -91,6 +111,10 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
       - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
+      - name: Mandatory diagnostic hardening regressions (synthetic evidence only)
+        run: python -m pytest -q tests/test_diagnostic_hardening.py tests/test_process_inventory_identity.py tests/test_host_identity_authorization.py --junitxml=diagnostic-tests.xml
+      - name: Reject missing or skipped diagnostic cases
+        run: python scripts/check_integration_junit.py diagnostic-tests.xml --minimum 123 --require-exact test_exact_refusal_predicate_remains_unresolved --require-exact test_dpapi_input_retains_evidence_for_replay_without_public_leak --require-exact test_no_elevation_blocks_before_powershell --require-exact test_candidate_binding_rejects_wrong_sha_dirty_and_untracked_collector --require-exact test_nonelevated_diagnose_emits_single_safe_failure --require-exact test_observation_contains_collector_binding_only_privately --require-exact test_collector_change_during_collection_blocks_observation --require-exact test_artifact_gate_rejects_raw_private_payload_without_echo --require-exact test_child_missing_elevation_is_not_trusted --require-exact test_private_evidence_real_dpapi_roundtrip_or_platform_refusal
       - name: Confirm PostgreSQL18 server
         run: python -c "import os,psycopg,json; c=psycopg.connect(os.environ['META_ANALYSE_TEST_ADMIN_DSN']); v=c.info.server_version; assert v==180001; open('postgres-version.json','w').write(json.dumps({'server_version':v})); c.close()"
       - run: python -m compileall -q src
@@ -109,13 +133,18 @@ jobs:
       - name: Verify eleven PostgreSQL and five shutdown integration cases executed without skips
         run: python scripts/check_integration_postgres.py tests.xml --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
       - run: python scripts/benchmark_flow_ui.py --seconds 3 --output ui-performance.json
-      - uses: actions/upload-artifact@v4
+      - name: Verify public-only Linux artifacts
+        id: privacy_gate
         if: always()
+        run: python scripts/check_public_diagnostic_artifacts.py source-sha.json diagnostic-tests.xml tests.xml tests.log ui-performance.json postgres-version.json repeat-lifecycle/*/tests.*
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy_gate.outcome == 'success'
         with:
           name: linux-test-evidence
           path: |
             repeat-lifecycle/**/tests.*
             source-sha.json
+            diagnostic-tests.xml
             tests.xml
             tests.log
             ui-performance.json
@@ -126,6 +155,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - name: Verify exact archive source SHA

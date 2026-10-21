@@ -17,7 +17,8 @@ SERVICE_RULES={
 GRID=re.compile(r'grid|^(?:coordinator|worker|collector)(?:\.exe)?$',re.I)
 
 def canonical(path):
-    if not isinstance(path,str) or not ntpath.isabs(path) or path.startswith(('\\\\','\\??\\')):
+    if (not isinstance(path,str) or not re.match(r'^[a-zA-Z]:[\\/]',path)
+            or any(c in path for c in ('\x00','\r','\n','"')) or ':' in path[2:]):
         return ''
     return ntpath.normcase(ntpath.normpath(path))
 
@@ -35,7 +36,7 @@ def classify_missing(row,evidence,roots):
     def blocked(code):return dict(status='UNRESOLVED',reason_code=code)
     try:
         if evidence.get('collection_error'):return blocked('PROCESS_EVIDENCE_UNAVAILABLE')
-        if GRID.search(str(row.get('name',''))) or any(GRID.search(str(n.get('path',''))) for n in (evidence.get('native_before',{}),evidence.get('native_after',{}))):
+        if GRID.search(str(row.get('name',''))) or any(GRID.search(str((n or {}).get('path',''))) for n in (evidence.get('native_before'),evidence.get('native_after'))):
             return blocked('GRID_PROCESS_INDICATOR')
         pid=row['pid']
         if type(pid) is not int or pid<0:return blocked('PROCESS_ID_CONFLICT')
@@ -48,17 +49,31 @@ def classify_missing(row,evidence,roots):
             else:
                 valid=before.get('name')=='System' and row.get('name')=='System' and same_creation(row.get('created'),before.get('created'))
             return dict(status='VERIFIED_KERNEL',reason_code='KERNEL_SNAPSHOT_IDENTITY') if valid else blocked('KERNEL_IDENTITY_CONFLICT')
-        before=evidence.get('native_before',{});after=evidence.get('native_after',{})
-        if any(n.get('pid')!=pid or n.get('alive') is not True or not same_creation(row.get('created'),n.get('created')) for n in (before,after)):
-            return blocked('PROCESS_LIFETIME_UNAVAILABLE_OR_CHANGED')
-        if before['created']!=after['created']:return blocked('PROCESS_LIFETIME_UNAVAILABLE_OR_CHANGED')
+        before=evidence.get('native_before');after=evidence.get('native_after')
+        if any(not isinstance(n,dict) or not n or n.get('error_stage','') not in ('','QUERY_IMAGE') for n in (before,after)):
+            return blocked('NATIVE_PROCESS_API_UNAVAILABLE')
+        if any(n.get('pid')!=pid for n in (before,after)):return blocked('PROCESS_ID_CONFLICT')
+        if any(n.get('alive') is not True for n in (before,after)):return blocked('PROCESS_NOT_ALIVE')
+        if any(type(n.get('created')) is not int or n['created']<=0 for n in (row,before,after)):
+            return blocked('PROCESS_CREATION_UNAVAILABLE')
+        if before['created']!=after['created']:return blocked('PROCESS_CREATION_CHANGED')
+        if any(not same_creation(row['created'],n['created']) for n in (before,after)):
+            return blocked('CIM_CREATION_MISMATCH')
+        if any(n.get('image_query_succeeded') is not True or not n.get('path') for n in (before,after)):
+            return blocked('IMAGE_PATH_UNAVAILABLE')
         path=canonical(before.get('path'))
-        if not path or path!=canonical(after.get('path')) or ntpath.basename(path)!=str(row.get('name','')).casefold():
-            return blocked('PROCESS_IMAGE_CONFLICT')
+        if not path or not canonical(after.get('path')):return blocked('IMAGE_PATH_INVALID')
+        if path!=canonical(after['path']):return blocked('IMAGE_PATH_CHANGED')
+        if ntpath.basename(path)!=str(row.get('name','')).casefold():return blocked('CIM_IMAGE_NAME_MISMATCH')
+        if row.get('cim_path') and canonical(row['cim_path'])!=path:return blocked('CIM_IMAGE_PATH_MISMATCH')
         sig=evidence.get('signature',{})
         cn=re.search(r'(?:^|,\s*)CN=([^,]+)(?:,|$)',sig.get('subject',''))
-        if sig.get('status')!='Valid' or canonical(sig.get('path'))!=path or not cn or sig.get('reparse_point') is not False or not re.fullmatch('[0-9a-f]{64}',sig.get('sha256','')) or sig['sha256']!=sig.get('sha256_after'):
-            return blocked('IMAGE_SIGNATURE_OR_FILE_IDENTITY_UNVERIFIED')
+        if sig.get('status')!='Valid':return blocked('IMAGE_SIGNATURE_UNVERIFIED')
+        if canonical(sig.get('path'))!=path:return blocked('SIGNATURE_IMAGE_PATH_MISMATCH')
+        if not cn:return blocked('IMAGE_PUBLISHER_UNAVAILABLE')
+        if sig.get('reparse_point') is not False:return blocked('IMAGE_REPARSE_UNVERIFIED')
+        if not re.fullmatch('[0-9a-f]{64}',sig.get('sha256','')):return blocked('IMAGE_HASH_UNAVAILABLE')
+        if sig['sha256']!=sig.get('sha256_after'):return blocked('IMAGE_HASH_CHANGED')
         # Services must satisfy the reviewed service rule even for System32.
         if evidence.get('services_before_complete') is not True or evidence.get('services_after_complete') is not True or 'services_before' not in evidence or 'services_after' not in evidence:
             return blocked('SERVICE_MEMBERSHIP_UNAVAILABLE')
@@ -67,14 +82,24 @@ def classify_missing(row,evidence,roots):
         known_service_image=any(path==canonical(ntpath.join(roots[root],relative)) for root,relative,_ in SERVICE_RULES.values())
         if known_service_image and not services:return blocked('SERVICE_IDENTITY_UNAVAILABLE')
         if services or after_services:
-            if sorted(services,key=lambda s:s['name'])!=sorted(after_services,key=lambda s:s['name']):return blocked('SERVICE_IDENTITY_CHANGED')
+            if sorted(s['name'] for s in services)!=sorted(s['name'] for s in after_services):return blocked('SERVICE_MEMBERSHIP_CHANGED')
+            for first,last in zip(sorted(services,key=lambda s:s['name']),sorted(after_services,key=lambda s:s['name'])):
+                if first.get('pid')!=last.get('pid'):return blocked('SERVICE_PID_CHANGED')
+                if first.get('state')!=last.get('state'):return blocked('SERVICE_STATE_CHANGED')
+                if first.get('binary_path')!=last.get('binary_path'):return blocked('SERVICE_CONFIGURATION_CHANGED')
+                if first!=last:return blocked('SERVICE_EVIDENCE_CHANGED')
             for svc in services:
+                if svc.get('error_stage'):return blocked('SERVICE_API_UNAVAILABLE')
                 rule=SERVICE_RULES.get(svc.get('name'))
-                if not rule or svc.get('pid')!=pid or svc.get('state')!=4 or command_executable(svc.get('binary_path'))!=path:
-                    return blocked('SERVICE_IDENTITY_CONFLICT')
+                if not rule:return blocked('SERVICE_RULE_UNREVIEWED')
+                if svc.get('pid')!=pid:return blocked('SERVICE_PID_MISMATCH')
+                if svc.get('state')!=4:return blocked('SERVICE_NOT_RUNNING')
+                configured=command_executable(svc.get('binary_path'))
+                if not configured:return blocked('SERVICE_CONFIG_PATH_INVALID')
+                if configured!=path:return blocked('SERVICE_CONFIG_IMAGE_MISMATCH')
                 root,relative,publishers=rule
-                if path!=canonical(ntpath.join(roots[root],relative)) or cn[1] not in publishers:
-                    return blocked('SERVICE_IMAGE_NOT_REVIEWED')
+                if path!=canonical(ntpath.join(roots[root],relative)):return blocked('SERVICE_IMAGE_NOT_REVIEWED')
+                if cn[1] not in publishers:return blocked('SERVICE_PUBLISHER_NOT_REVIEWED')
             return dict(status='VERIFIED_SERVICE',reason_code='NATIVE_SCM_SIGNED_IMAGE',resolved_path=before['path'])
         if ntpath.dirname(path)==canonical(roots['system32']) and cn[1] in WINDOWS_PUBLISHERS:
             return dict(status='VERIFIED_SYSTEM_IMAGE',reason_code='NATIVE_SIGNED_SYSTEM_IMAGE',resolved_path=before['path'])

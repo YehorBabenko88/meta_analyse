@@ -11,7 +11,7 @@ ROOTS=dict(system32=r'C:\Windows\System32',program_files=r'C:\Program Files')
 def sample(service=False):
     path=r'C:\Program Files\Norton\Suite\NortonSvc.exe' if service else r'C:\Windows\System32\lsass.exe'
     row=dict(pid=123,name='NortonSvc.exe' if service else 'lsass.exe',created=123456789012345670,parent_pid=4,session_id=0,cim_path='')
-    native=dict(pid=123,path=path,created=row['created'],alive=True)
+    native=dict(pid=123,path=path,created=row['created'],alive=True,image_query_succeeded=True,error_stage='',win32_error=0)
     sig=dict(path=path,status='Valid',subject='CN=Gen Digital Inc., O=Gen Digital Inc.' if service else 'CN=Microsoft Windows, O=Microsoft Corporation',sha256='a'*64,sha256_after='a'*64,reparse_point=False)
     svc=[dict(name='Norton Antivirus',pid=123,state=4,binary_path='"'+path+'" /runassvc')]
     e=dict(native_before=native,native_after=copy.deepcopy(native),signature=sig,services_before=svc if service else [],services_after=copy.deepcopy(svc) if service else [],services_before_complete=True,services_after_complete=True)
@@ -95,7 +95,7 @@ def test_partial_native_probe_exception_is_not_ignored():
 
 def test_unresolved_counts_cannot_be_hidden_by_coverage_flag():
     import host_identity as h
-    with pytest.raises(ValueError):h.safe_inventory(dict(grid=dict(coverage_complete=True,errors=[],findings=[],unknown_process_paths=1)))
+    with pytest.raises(ValueError):h.safe_inventory(dict(collector_elevated=True,grid=dict(coverage_complete=True,errors=[],findings=[],unknown_process_paths=1)))
 
 @pytest.mark.parametrize('key',['services_before','services_after','services_before_complete','services_after_complete'])
 def test_missing_scm_membership_evidence_is_not_empty_membership(key):
@@ -116,11 +116,13 @@ def test_every_missing_cim_pid_requires_evidence_exactly_once():
 
 def test_diagnose_has_single_sanitized_report_for_inventory_rejection(monkeypatch,tmp_path,capsys):
     import host_identity as h
-    facts=dict(identity=dict(hostname='PRIVATE_HOST',username='PRIVATE_USER',sid='PRIVATE_SID',machine_guid='PRIVATE_GUID',install_id='PRIVATE_INSTALL',hardware_uuid='PRIVATE_HARDWARE'),
+    facts=dict(collector_elevated=True,identity=dict(hostname='PRIVATE_HOST',username='PRIVATE_USER',sid='PRIVATE_SID',machine_guid='PRIVATE_GUID',install_id='PRIVATE_INSTALL',hardware_uuid='PRIVATE_HARDWARE'),
         os=dict(system='Windows',edition='Professional',build=26300),grid=dict(findings=[],errors=['Some process identities unresolved'],coverage_complete=False,unknown_process_paths=1),credential_names=[],production_dsn_names=[],api_listeners=[{}])
     monkeypatch.setattr(h,'collect_facts',lambda:facts)
+    monkeypatch.setattr(h,'is_elevated',lambda:True)
+    monkeypatch.setattr(h,'collector_identity',lambda *a,**kw:dict(version='synthetic',candidate_sha='1'*40,source_hashes={}))
     monkeypatch.setattr(h,'save_private',lambda *a:None)
-    monkeypatch.setattr(sys,'argv',['guard','diagnose','--output',str(tmp_path/'public.json'),'--private-observation',str(tmp_path/'private.dpapi')])
+    monkeypatch.setattr(sys,'argv',['guard','diagnose','--expected-sha','1'*40,'--output',str(tmp_path/'public.json'),'--private-observation',str(tmp_path/'private.dpapi')])
     assert h.main()==1
     output=capsys.readouterr().out
     result=json.loads(output)

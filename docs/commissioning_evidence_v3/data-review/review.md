@@ -1,0 +1,11 @@
+# Archive/PostgreSQL review
+
+Reviewed PR8 813ac6a02d23554d18d6343480c03c84ae662825 and commits 77ee153,81ac392,ea83c0d,1568993,813ac6a since206f02c against audited baseline13901274dac527f0aacfaf48481414b0971d6012.
+
+Runtime importer differs from baseline only by removal of two advisory lock comments. Bounded session serialization uses pg_advisory_lock with SET lock_timeout=15000 and statement_timeout=120000, translating LockNotAvailable to TimeoutError. Lock key matches baseline (actual NUL separator). Rows and checkpoint update remain in same explicit transaction with autocommit enabled; completed previous batches survive later rollback. Cancellation enters BaseException handler and attempts independent failed status update, then unlock; ordinary cleanup errors preserve original failure/cancellation.
+
+No new runtime fix necessary on baseline. Avoid replaying ef8deed (fail-fast regression) and avoid duplicating77ee153 (restores baseline). Optional test update ea83c0d needs1568993 when applied as a pair, but baseline already contains correct key so port only serialization test semantics. Documentation81ac392/813ac6a is evidence, not runtime prerequisite.
+
+Focused no-DB fake connection probes (archive source extracted at exact PR head) pass original ValueError preservation across failed-status RuntimeError and unlock RuntimeError; cancellation BaseException also preserved across those ordinary cleanup errors. Secondary BaseException raised during failed-status update replaces original because nested handler catches Exception, while unlock catches BaseException. This is pre-existing in baseline, not introduced by reviewed commits. If strict preservation across a second cancellation is required, nested failed-status cleanup should also catch BaseException. No live PostgreSQL or network used.
+
+Test caveat: new serialization test sets started before preflight/DB acquisition, then sleeps150ms; this does not actually synchronize with server lock-wait state despite comment. It can pass if worker has not reached lock call. It also no longer covers15-second timeout path. Existing concurrency tests still test successful parallel runs. This is coverage weakness, not a demonstrated runtime defect.

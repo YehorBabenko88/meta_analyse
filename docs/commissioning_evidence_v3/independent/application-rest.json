@@ -1,0 +1,12 @@
+{
+  "candidate_sha": "d3856c7db6171707455df735e2aa9e657be10840",
+  "utc": "2026-10-20T15:10:52.456726+00:00",
+  "status": 200,
+  "retCode": 0,
+  "tls": "TLSv1.3",
+  "cipher": "TLS_AES_128_GCM_SHA256",
+  "python": "3.12.15 (main, Oct 14 2026, 01:08:45) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "verify": "application default certificate and hostname verification",
+  "scope": "audit host; separate commissioning PC NOT RUN"
+}

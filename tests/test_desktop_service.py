@@ -1,0 +1,829 @@
+import asyncio
+from decimal import Decimal as D
+import pytest
+from meta_analyse.desktop_service import DesktopService
+from meta_analyse.runtime import Runtime
+
+class Exchange:
+    async def top_volatile(self, *args):
+        raise OSError('offline secret=password')
+    async def close(self):
+        self.closed = True
+
+class Api:
+    async def close(self):
+        self.closed = True
+
+@pytest.mark.asyncio
+async def test_offline_error_is_visible_and_credentials_are_not_exposed():
+    api, exchange = Api(), Exchange()
+    service = DesktopService(None, lambda snapshot: None)
+    service.api, service.exchange = api, exchange
+    service.runtime = Runtime(api, exchange)
+    await service.refresh()
+    snapshot = service.snapshot()
+    assert 'OSError' in snapshot.status
+    assert 'password' not in snapshot.status
+    await service.close()
+    assert api.closed and exchange.closed
+
+@pytest.mark.asyncio
+async def test_disconnect_during_metadata_prevents_late_session(monkeypatch):
+    from meta_analyse import instruments
+    entered = asyncio.Event()
+    async def stalled(exchange):
+        entered.set()
+        await asyncio.Event().wait()
+    monkeypatch.setattr(instruments, 'instruments', stalled)
+    service = DesktopService(object(), lambda snapshot: None)
+    service.exchange = Exchange()
+    service.connect_flow(['BTCUSDT'], D('100'))
+    service.connect_flow(['BTCUSDT'], D('100'))
+    await entered.wait()
+    await service.disconnect_flow()
+    assert service.snapshot().flow_state == 'disconnected'
+    assert service.session is None
+    assert service.flow_task is None
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_monitor_double_start_and_close_cancel_tasks():
+    service = DesktopService(None, lambda snapshot: None)
+    entered = asyncio.Event()
+    class Monitor:
+        running = False
+        async def run(self):
+            entered.set()
+            await asyncio.Event().wait()
+        def stop(self):
+            self.running = False
+    service.runtime = Monitor()
+    await service.start_monitor()
+    await service.start_monitor()
+    await entered.wait()
+    task = service.monitor_task
+    await service.close()
+    assert task.done()
+@pytest.mark.asyncio
+async def test_failed_collector_is_reported_and_other_tasks_are_drained():
+    service = DesktopService(None, lambda snapshot: None)
+    from meta_analyse.analysis_session import AnalysisSession
+    s = AnalysisSession(None, None, {'BTCUSDT': D('.5')})
+    async def fail():
+        raise OSError('secret=hidden')
+    task = asyncio.create_task(fail())
+    sibling = asyncio.create_task(asyncio.Event().wait())
+    s.raw.tasks.append(task)
+    s.market.tasks.append(sibling)
+    service.session, service.flow_state = s, 'connected'
+    await asyncio.sleep(0)
+    await service.check_health()
+    assert service.snapshot().flow_state == 'failed'
+    assert 'OSError' in service.snapshot().flow_status
+    assert 'hidden' not in service.snapshot().flow_status
+    assert sibling.done()
+    await service.close()
+@pytest.mark.asyncio
+async def test_monitor_reports_offline_retries_without_exposing_error_text():
+    from meta_analyse.runtime import Runtime
+    statuses = []
+    class Offline:
+        async def discover(self):
+            raise ConnectionError('password=hidden')
+    runtime = Runtime(Offline(), None, on_status=statuses.append)
+    task = asyncio.create_task(runtime.run())
+    try:
+        for _ in range(20):
+            if statuses:
+                break
+            await asyncio.sleep(.01)
+        assert statuses and 'ConnectionError' in statuses[-1]
+        assert 'hidden' not in statuses[-1]
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    assert not runtime.running
+@pytest.mark.asyncio
+async def test_duplicate_disconnect_keeps_stopping_until_cleanup_finishes():
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        async def stop(self):
+            entered.set()
+            await release.wait()
+    service.session = Session()
+    service.flow_state = 'connected'
+    first = asyncio.create_task(service.disconnect_flow())
+    await entered.wait()
+    second = asyncio.create_task(service.disconnect_flow())
+    await asyncio.sleep(0)
+    try:
+        assert service.flow_state == 'stopping'
+        assert not second.done()
+        service.connect_flow(['BTCUSDT'], D('100'))
+        assert service.flow_task is None
+    finally:
+        release.set()
+        await asyncio.gather(first, second)
+    assert service.flow_state == 'disconnected'
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_collector_crash_invalidates_telemetry_and_allows_reconnect():
+    """A dead sibling must never leave old persisted counters visible."""
+    from meta_analyse.analysis_session import AnalysisSession
+    from meta_analyse.market_telemetry import MarketTelemetry
+    from types import SimpleNamespace
+    service = DesktopService(None, lambda snapshot: None)
+    service.runtime = SimpleNamespace(
+        symbols=[], paper=SimpleNamespace(fills=[], positions={}), stop=lambda: None)
+    session = AnalysisSession(None, None, {'BTCUSDT': D('.5')})
+    session.market.telemetry.observe("orderbook", "BTCUSDT")
+    session.market.telemetry.gap("orderbook", "BTCUSDT")
+    async def fail():
+        raise OSError("password=should-never-leak")
+    crashed = asyncio.create_task(fail())
+    sibling = asyncio.create_task(asyncio.Event().wait())
+    session.raw.tasks.append(crashed)
+    session.market.tasks.append(sibling)
+    service.session, service.flow_state = session, "connected"
+    await asyncio.sleep(0)
+    assert service.snapshot().market_events == (("orderbook:BTCUSDT", 1),)
+    await service.check_health()
+    snapshot = service.snapshot()
+    assert snapshot.flow_state == "failed"
+    assert "OSError" in snapshot.flow_status
+    assert "password" not in snapshot.flow_status
+    assert snapshot.market_events == ()
+    assert snapshot.market_gaps == ()
+    assert snapshot.market_ages == ()
+    assert sibling.done()
+    assert service.session is None
+    # A new session's diagnostics are independent of the failed collector.
+    replacement = MarketTelemetry()
+    replacement.observe("orderbook", "ETHUSDT")
+    service.session = SimpleNamespace(market=SimpleNamespace(telemetry=replacement))
+    service.flow_state = "connected"
+    assert service.snapshot().market_events == (("orderbook:ETHUSDT", 1),)
+    service.session = None
+    service.flow_state = "disconnected"
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_reconnect_rejected_while_disconnect_task_is_pending_even_if_state_failed():
+    """An old cleanup must never erase a newly created session."""
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        async def stop(self):
+            entered.set()
+            await release.wait()
+    old_session = Session()
+    service.session = old_session
+    service.flow_state = "connected"
+    disconnect = asyncio.create_task(service.disconnect_flow())
+    await entered.wait()
+    try:
+        # A competing health callback can change the visible state while
+        # the disconnect task is still draining the previous session.
+        service.flow_state = "failed"
+        service.connect_flow(["BTCUSDT"], D("100"))
+        assert service.flow_task is None
+        assert service.session is old_session
+    finally:
+        release.set()
+        await disconnect
+    assert service.session is None
+    assert service.flow_state == "disconnected"
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_idle_disconnect_is_idempotent_and_does_not_replace_cleanup_task():
+    service = DesktopService(None, lambda snapshot: None)
+    assert service.flow_state == "disconnected"
+    assert service.disconnect_task is None
+    await service.disconnect_flow()
+    await service.disconnect_flow()
+    assert service.disconnect_task is None
+    assert service.flow_state == "disconnected"
+    # An idle disconnect must not interfere with a later startup.
+    service.flow_state = "connecting"
+    async def pending():
+        await asyncio.Event().wait()
+    service.flow_task = asyncio.create_task(pending())
+    await asyncio.sleep(0)
+    await service.disconnect_flow()
+    assert service.flow_task is None
+    assert service.flow_state == "disconnected"
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_close_drains_monitor_and_clients_if_runtime_stop_raises():
+    """Shutdown failures must not skip unrelated resource cleanup."""
+    service = DesktopService(None, lambda snapshot: None)
+    events = []
+    class BadRuntime:
+        def stop(self):
+            events.append("runtime-stop")
+            raise RuntimeError("password=do-not-show")
+    class Client:
+        def __init__(self, name):
+            self.name = name
+        async def close(self):
+            events.append(self.name)
+    async def monitor():
+        try:
+            await asyncio.Event().wait()
+        finally:
+            events.append("monitor-drained")
+    service.runtime = BadRuntime()
+    service.api, service.exchange = Client("api-closed"), Client("exchange-closed")
+    service.monitor_task = asyncio.create_task(monitor())
+    await asyncio.sleep(0)
+    await service.close()
+    assert events == ["runtime-stop", "monitor-drained", "api-closed", "exchange-closed"]
+    assert service.monitor_task.done()
+    assert "RuntimeError" in service.status
+    assert "password" not in service.status
+
+@pytest.mark.asyncio
+async def test_close_releases_clients_when_session_stop_fails():
+    """A collector teardown exception must not prevent API client closure."""
+    service = DesktopService(None, lambda snapshot: None)
+    events = []
+    class Session:
+        async def stop(self):
+            events.append("session-stop")
+            raise RuntimeError("token=private")
+    class Client:
+        def __init__(self, name):
+            self.name = name
+        async def close(self):
+            events.append(self.name)
+    service.session = Session()
+    service.flow_state = "connected"
+    service.api, service.exchange = Client("api-close"), Client("exchange-close")
+    await service.close()
+    assert events == ["session-stop", "api-close", "exchange-close"]
+    assert service.flow_state == "disconnected"
+    assert service.session is None
+    assert "token=private" not in service.status
+    assert "RuntimeError" in service.status
+
+@pytest.mark.asyncio
+async def test_multiple_collector_failures_report_one_and_drain_all_tasks():
+    """Simultaneous worker crashes should yield one failed state, no leaked tasks."""
+    from meta_analyse.analysis_session import AnalysisSession
+    service = DesktopService(None, lambda snapshot: None)
+    session = AnalysisSession(None, None, {'BTCUSDT': D('.5')})
+    async def fail(message):
+        raise OSError(message)
+    first = asyncio.create_task(fail("password=first"))
+    second = asyncio.create_task(fail("token=second"))
+    pending = asyncio.create_task(asyncio.Event().wait())
+    session.raw.tasks.extend([first, pending])
+    session.market.tasks.append(second)
+    service.session, service.flow_state = session, "connected"
+    await asyncio.sleep(0)
+    await service.check_health()
+    assert service.flow_state == "failed"
+    assert "OSError" in service.flow_status
+    assert "password" not in service.flow_status
+    assert "token" not in service.flow_status
+    assert service.session is None
+    assert first.done() and second.done() and pending.done()
+    await service.check_health()
+    assert service.flow_state == "failed"
+    await service.close()
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode,expected", [
+    ("normal", "NoneType"),
+    ("cancelled", "CancelledError"),
+])
+async def test_collector_normal_exit_or_cancellation_marks_feed_failed(mode, expected):
+    """A collector ending without an exception is not a healthy running feed."""
+    from meta_analyse.analysis_session import AnalysisSession
+    service = DesktopService(None, lambda snapshot: None)
+    session = AnalysisSession(None, None, {'BTCUSDT': D('.5')})
+    async def normal():
+        return None
+    async def waiting():
+        await asyncio.Event().wait()
+    ended = asyncio.create_task(normal() if mode == "normal" else waiting())
+    sibling = asyncio.create_task(waiting())
+    session.raw.tasks.append(ended)
+    session.market.tasks.append(sibling)
+    service.session, service.flow_state = session, "connected"
+    await asyncio.sleep(0)
+    if mode == "cancelled":
+        ended.cancel()
+        await asyncio.gather(ended, return_exceptions=True)
+    await service.check_health()
+    assert service.flow_state == "failed"
+    assert expected in service.flow_status
+    assert service.session is None
+    assert sibling.done()
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_close_during_collector_failure_does_not_restore_failed_state():
+    """An in-flight health check must not override final shutdown status."""
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        def __init__(self):
+            async def failed():
+                raise RuntimeError("collector failed")
+            self.raw = type("Raw", (), {"tasks": [asyncio.create_task(failed())]})()
+            self.market = type("Market", (), {"tasks": []})()
+        async def stop(self):
+            entered.set()
+            await release.wait()
+    service.session = Session()
+    service.flow_state = "connected"
+    await asyncio.sleep(0)
+    health = asyncio.create_task(service.check_health())
+    await entered.wait()
+    closing = asyncio.create_task(service.close())
+    await asyncio.sleep(0)
+    assert service.closing
+    release.set()
+    await asyncio.gather(health, closing)
+    assert service.flow_state == "disconnected"
+    assert service.flow_status.startswith("Disconnected")
+    assert service.session is None
+
+@pytest.mark.asyncio
+async def test_manual_disconnect_owns_cleanup_before_health_failure_reporting():
+    """A completed worker must not override an already-started manual stop."""
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        def __init__(self):
+            async def failed():
+                raise RuntimeError("collector crashed")
+            self.raw = type("Raw", (), {"tasks": [asyncio.create_task(failed())]})()
+            self.market = type("Market", (), {"tasks": []})()
+        async def stop(self):
+            entered.set()
+            await release.wait()
+    service.session = Session()
+    service.flow_state = "connected"
+    await asyncio.sleep(0)
+    manual = asyncio.create_task(service.disconnect_flow())
+    await entered.wait()
+    await service.check_health()
+    release.set()
+    await manual
+    assert service.flow_state == "disconnected"
+    assert service.flow_status.startswith("Disconnected")
+    assert service.session is None
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_health_failure_does_not_overwrite_new_connection_after_cleanup():
+    """A reconnect between cleanup completion and health reporting wins."""
+    service = DesktopService(None, lambda snapshot: None)
+    async def failed():
+        raise RuntimeError("collector stopped")
+    ended = asyncio.create_task(failed())
+    session = type("Session", (), {})()
+    session.raw = type("Raw", (), {"tasks": [ended]})()
+    session.market = type("Market", (), {"tasks": []})()
+    service.session, service.flow_state = session, "connected"
+    await asyncio.sleep(0)
+    async def cleanup_then_reconnect():
+        service.session = None
+        service.flow_state = "connecting"
+    service.disconnect_flow = cleanup_then_reconnect
+    await service.check_health()
+    assert service.flow_state == "connecting"
+    assert service.flow_status != "Collector stopped (RuntimeError); data UNVERIFIED"
+
+@pytest.mark.asyncio
+async def test_partial_start_failure_stops_session_before_allowing_reconnect(monkeypatch):
+    from meta_analyse import instruments
+    from meta_analyse import desktop_service as desktop_module
+    from types import SimpleNamespace
+    entered, release = asyncio.Event(), asyncio.Event()
+    events = []
+    async def metadata(exchange):
+        return {"BTCUSDT": SimpleNamespace(tick_size=D(".5"))}
+    class PartialSession:
+        def __init__(self, *args, **kwargs):
+            events.append("created")
+        async def start(self):
+            events.append("start")
+            raise RuntimeError("password=hidden")
+        async def stop(self):
+            events.append("stop")
+            entered.set()
+            await release.wait()
+    monkeypatch.setattr(instruments, "instruments", metadata)
+    monkeypatch.setattr(desktop_module, "AnalysisSession", PartialSession)
+    service = DesktopService(None, lambda snapshot: None)
+    service.connect_flow(["BTCUSDT"], D("0"))
+    await entered.wait()
+    assert service.flow_state == "failed"
+    first_task = service.flow_task
+    service.connect_flow(["BTCUSDT"], D("100"))
+    assert service.flow_task is first_task
+    assert events == ["created", "start", "stop"]
+    release.set()
+    await first_task
+    assert service.session is None
+    assert service.flow_state == "failed"
+    assert "password" not in service.flow_status
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_failed_partial_start_cleanup_error_is_sanitized(monkeypatch):
+    from meta_analyse import instruments
+    from meta_analyse import desktop_service as desktop_module
+    from types import SimpleNamespace
+    async def metadata(exchange):
+        return {"BTCUSDT": SimpleNamespace(tick_size=D(".5"))}
+    class BrokenSession:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def start(self):
+            raise OSError("token=private")
+        async def stop(self):
+            raise RuntimeError("password=private")
+    monkeypatch.setattr(instruments, "instruments", metadata)
+    monkeypatch.setattr(desktop_module, "AnalysisSession", BrokenSession)
+    service = DesktopService(None, lambda snapshot: None)
+    service.connect_flow(["BTCUSDT"], D("100"))
+    await service.flow_task
+    assert service.flow_state == "failed"
+    assert service.session is None
+    assert "Flow startup cleanup failed (RuntimeError)" in service.status
+    assert "password" not in service.status
+    assert "token" not in service.status
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_disconnect_during_partial_session_start_cleans_allocated_session(monkeypatch):
+    """Cancellation after session construction must invoke session.stop()."""
+    from meta_analyse import instruments
+    from meta_analyse import desktop_service as desktop_module
+    from types import SimpleNamespace
+    entered, stopped = asyncio.Event(), asyncio.Event()
+    async def metadata(exchange):
+        return {"BTCUSDT": SimpleNamespace(tick_size=D(".5"))}
+    class PartialSession:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def start(self):
+            entered.set()
+            await asyncio.Event().wait()
+        async def stop(self):
+            stopped.set()
+    monkeypatch.setattr(instruments, "instruments", metadata)
+    monkeypatch.setattr(desktop_module, "AnalysisSession", PartialSession)
+    service = DesktopService(None, lambda snapshot: None)
+    service.connect_flow(["BTCUSDT"], D("0"))
+    await entered.wait()
+    await service.disconnect_flow()
+    assert stopped.is_set()
+    assert service.session is None
+    assert service.flow_state == "disconnected"
+    assert service.flow_task is None
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_cancelled_startup_cleanup_error_still_finishes_disconnect(monkeypatch):
+    """Cleanup exceptions on cancellation must not strand the disconnect owner."""
+    from meta_analyse import instruments
+    from meta_analyse import desktop_service as desktop_module
+    from types import SimpleNamespace
+    entered = asyncio.Event()
+    async def metadata(exchange):
+        return {"BTCUSDT": SimpleNamespace(tick_size=D(".5"))}
+    class BrokenSession:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def start(self):
+            entered.set()
+            await asyncio.Event().wait()
+        async def stop(self):
+            raise OSError("password=hidden")
+    monkeypatch.setattr(instruments, "instruments", metadata)
+    monkeypatch.setattr(desktop_module, "AnalysisSession", BrokenSession)
+    service = DesktopService(None, lambda snapshot: None)
+    service.connect_flow(["BTCUSDT"], D("0"))
+    await entered.wait()
+    await service.disconnect_flow()
+    assert service.flow_state == "disconnected"
+    assert service.session is None
+    assert service.flow_task is None
+    assert "Cancelled flow cleanup failed (OSError)" in service.status
+    assert "password" not in service.status
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_reconnect_after_failed_startup_creates_fresh_session(monkeypatch):
+    """A failed startup must not leave stale state blocking the next attempt."""
+    from meta_analyse import instruments
+    from meta_analyse import desktop_service as desktop_module
+    from types import SimpleNamespace
+    async def metadata(exchange):
+        return {"BTCUSDT": SimpleNamespace(tick_size=D(".5"))}
+    sessions = []
+    class Session:
+        def __init__(self, *args, **kwargs):
+            self.index = len(sessions)
+            self.stopped = False
+            sessions.append(self)
+        async def start(self):
+            if self.index == 0:
+                raise OSError("initial failure")
+        async def stop(self):
+            self.stopped = True
+    monkeypatch.setattr(instruments, "instruments", metadata)
+    monkeypatch.setattr(desktop_module, "AnalysisSession", Session)
+    service = DesktopService(None, lambda snapshot: None)
+    service.connect_flow(["BTCUSDT"], D("0"))
+    await service.flow_task
+    assert service.flow_state == "failed"
+    assert sessions[0].stopped
+    assert service.session is None
+    service.connect_flow(["BTCUSDT"], D("0"))
+    await service.flow_task
+    assert service.flow_state == "connected"
+    assert service.session is sessions[1]
+    assert sessions[1] is not sessions[0]
+    await service.disconnect_flow()
+    assert sessions[1].stopped
+    assert service.flow_state == "disconnected"
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_concurrent_disconnect_requests_share_single_cleanup():
+    """Concurrent callers must await one shutdown, not stop the session twice."""
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        calls = 0
+        async def stop(self):
+            self.calls += 1
+            entered.set()
+            await release.wait()
+    session = Session()
+    service.session = session
+    service.flow_state = "connected"
+    first = asyncio.create_task(service.disconnect_flow())
+    await entered.wait()
+    second = asyncio.create_task(service.disconnect_flow())
+    await asyncio.sleep(0)
+    assert session.calls == 1
+    release.set()
+    await asyncio.gather(first, second)
+    assert session.calls == 1
+    assert service.flow_state == "disconnected"
+    assert service.session is None
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_cancelled_disconnect_waiter_does_not_cancel_shared_cleanup():
+    """Shielded cleanup survives cancellation of one waiting caller."""
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        calls = 0
+        async def stop(self):
+            self.calls += 1
+            entered.set()
+            await release.wait()
+    session = Session()
+    service.session = session
+    service.flow_state = "connected"
+    first = asyncio.create_task(service.disconnect_flow())
+    await entered.wait()
+    second = asyncio.create_task(service.disconnect_flow())
+    await asyncio.sleep(0)
+    first.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await first
+    assert service.disconnect_task is not None
+    assert not service.disconnect_task.done()
+    assert session.calls == 1
+    release.set()
+    await second
+    assert session.calls == 1
+    assert service.flow_state == "disconnected"
+    assert service.session is None
+    await service.close()
+
+@pytest.mark.asyncio
+async def test_close_joins_in_progress_disconnect_without_second_stop():
+    """Application close must await an existing manual disconnect."""
+    service = DesktopService(None, lambda snapshot: None)
+    entered, release = asyncio.Event(), asyncio.Event()
+    class Session:
+        calls = 0
+        async def stop(self):
+            self.calls += 1
+            entered.set()
+            await release.wait()
+    session = Session()
+    service.session = session
+    service.flow_state = "connected"
+    manual = asyncio.create_task(service.disconnect_flow())
+    await entered.wait()
+    closing = asyncio.create_task(service.close())
+    await asyncio.sleep(0)
+    assert service.closing
+    assert not closing.done()
+    assert session.calls == 1
+    release.set()
+    await asyncio.gather(manual, closing)
+    assert session.calls == 1
+    assert service.session is None
+    assert service.flow_state == "disconnected"
+
+@pytest.mark.asyncio
+async def test_connect_is_rejected_once_close_begins(monkeypatch):
+    """Closing is terminal: no new flow task or session may be created."""
+    from meta_analyse import instruments
+    calls = []
+    async def metadata(exchange):
+        calls.append("metadata")
+        return {}
+    monkeypatch.setattr(instruments, "instruments", metadata)
+    service = DesktopService(None, lambda snapshot: None)
+    await service.close()
+    assert service.closing
+    service.connect_flow(["BTCUSDT"], D("0"))
+    await asyncio.sleep(0)
+    assert not calls
+    assert service.flow_task is None
+    assert service.session is None
+    assert service.flow_state == "disconnected"
+
+@pytest.mark.asyncio
+async def test_close_continues_after_first_client_shutdown_failure():
+    """A broken API client must not prevent the exchange client from closing."""
+    service = DesktopService(None, lambda snapshot: None)
+    class FailingApi:
+        calls = 0
+        async def close(self):
+            self.calls += 1
+            raise OSError("token=secret")
+    class ExchangeClient:
+        closed = False
+        async def close(self):
+            self.closed = True
+    api, exchange = FailingApi(), ExchangeClient()
+    service.api, service.exchange = api, exchange
+    await service.close()
+    assert service.closing
+    assert api.calls == 1
+    assert exchange.closed
+    assert "Client shutdown failed (OSError)" in service.status
+    assert "secret" not in service.status
+
+@pytest.mark.asyncio
+async def test_close_records_second_client_shutdown_failure():
+    """An exchange shutdown error is sanitized after API cleanup succeeds."""
+    service = DesktopService(None, lambda snapshot: None)
+    class ApiClient:
+        closed = False
+        async def close(self):
+            self.closed = True
+    class FailingExchange:
+        calls = 0
+        async def close(self):
+            self.calls += 1
+            raise RuntimeError("api_key=private")
+    api, exchange = ApiClient(), FailingExchange()
+    service.api, service.exchange = api, exchange
+    await service.close()
+    assert service.closing
+    assert api.closed
+    assert exchange.calls == 1
+    assert "Client shutdown failed (RuntimeError)" in service.status
+    assert "api_key" not in service.status
+    assert "private" not in service.status
+
+@pytest.mark.asyncio
+async def test_both_client_shutdown_failures_are_attempted_and_sanitized():
+    """Failure of both client closes must not abort the service shutdown."""
+    service = DesktopService(None, lambda snapshot: None)
+    calls = []
+    class FailingClient:
+        def __init__(self, name):
+            self.name = name
+        async def close(self):
+            calls.append(self.name)
+            raise RuntimeError(f"{self.name} secret=private")
+    service.api = FailingClient("api")
+    service.exchange = FailingClient("exchange")
+    await service.close()
+    assert calls == ["api", "exchange"]
+    assert service.closing
+    assert "Client shutdown failed (RuntimeError)" in service.status
+    assert "secret" not in service.status
+    assert "private" not in service.status
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('operation', ['refresh', 'refresh_overview', 'locate_metascalp', 'open_selected'])
+async def test_close_drains_requests_before_closing_clients(operation):
+    from types import SimpleNamespace
+    entered = asyncio.Event()
+    events = []
+    async def request(*args):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            events.append('request-drained')
+    class Client:
+        discover = open_combos = market_overview = request
+        async def close(self):
+            events.append('client-closed')
+    service = DesktopService(None, lambda snapshot: None)
+    service.api = service.exchange = Client()
+    service.runtime = SimpleNamespace(symbols=['BTCUSDT'], refresh_watchlist=request, stop=lambda: None)
+    args = (['BTCUSDT'],) if operation == 'open_selected' else ()
+    task = asyncio.create_task(getattr(service, operation)(*args))
+    await entered.wait()
+    try:
+        await service.close()
+        assert task.done(), 'client closed with a request still running'
+        assert events[0] == 'request-drained'
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+@pytest.mark.asyncio
+async def test_concurrent_close_waiter_cancellation_does_not_abandon_clients():
+    entered, release = asyncio.Event(), asyncio.Event()
+    events = []
+    class Client:
+        async def close(self):
+            entered.set()
+            await release.wait()
+            events.append('closed')
+    service = DesktopService(None, lambda snapshot: None)
+    service.api = Client()
+    first = asyncio.create_task(service.close())
+    await entered.wait()
+    second = asyncio.create_task(service.close())
+    first.cancel()
+    await asyncio.gather(first, return_exceptions=True)
+    release.set()
+    await asyncio.wait_for(second, 1)
+    await service.close()
+    assert events == ['closed']
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scheme", ["http", "https"])
+async def test_close_drains_real_loopback_http_and_refuses_late_requests(scheme):
+    from meta_analyse.http_client import ManagedAsyncClient
+    from types import SimpleNamespace
+    accepted, disconnected = asyncio.Event(), asyncio.Event()
+    writers = set()
+    async def peer(reader, writer):
+        writers.add(writer)
+        try:
+            if scheme == 'https':
+                await reader.read(1)  # ClientHello; keep TLS handshake pending.
+            else:
+                await reader.readuntil(b'\r\n\r\n')
+            accepted.set()
+            while await reader.read(65536):
+                pass
+        finally:
+            writer.close()
+            await writer.wait_closed()
+            disconnected.set()
+            writers.discard(writer)
+    async with await asyncio.start_server(peer, '127.0.0.1', 0) as server:
+        port = server.sockets[0].getsockname()[1]
+        client = ManagedAsyncClient(base_url=f'{scheme}://127.0.0.1:{port}', trust_env=False, verify=False)
+        class ExchangeClient:
+            async def top_volatile(self):
+                await client.get('/')
+                return []
+            async def close(self):
+                assert not service._client_tasks
+                await client.aclose()
+        service = DesktopService(None, lambda snapshot: None)
+        service.exchange = ExchangeClient()
+        service.runtime = SimpleNamespace(refresh_watchlist=service.exchange.top_volatile, stop=lambda: None)
+        requesting = asyncio.create_task(service.refresh())
+        try:
+            await asyncio.wait_for(accepted.wait(), 2)
+            await service.close()
+            await asyncio.wait_for(disconnected.wait(), 2)
+            assert requesting.cancelled() and client.is_closed
+            await service.refresh()  # Must not reopen the closed pool.
+        finally:
+            requesting.cancel()
+            await asyncio.gather(requesting, return_exceptions=True)
+            await client.aclose()
+            for writer in tuple(writers):
+                writer.close()
+                await writer.wait_closed()

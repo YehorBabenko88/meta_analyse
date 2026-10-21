@@ -1,0 +1,34 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+_____________ test_collector_stop_retains_pending_database_write ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001DBDBD02060>
+
+    @pytest.mark.asyncio
+    async def test_collector_stop_retains_pending_database_write(monkeypatch):
+        entered, release = threading.Event(), threading.Event()
+        writes = []
+        collector = MarketCollector(None, None)
+        def write(*args):
+            entered.set()
+            if not release.wait(5):
+                raise TimeoutError('audit failed to release write')
+            writes.append('committed')
+        monkeypatch.setattr(collector.db, 'book', write)
+        writing = asyncio.create_task(collector._book('BTCUSDT', object(), 1))
+        assert await asyncio.to_thread(entered.wait, 2)
+        collector.tasks = [writing]
+        stopping = asyncio.create_task(collector.stop())
+        try:
+            for _ in range(20):
+                await asyncio.sleep(0)
+>           assert not stopping.done(), 'stop acknowledged while a synchronous DB write remained active'
+E           AssertionError: stop acknowledged while a synchronous DB write remained active
+E           assert not True
+E            +  where True = <built-in method done of _asyncio.Task object at 0x000001DBDBC2D900>()
+E            +    where <built-in method done of _asyncio.Task object at 0x000001DBDBC2D900> = <Task finished name='Task-3' coro=<MarketCollector.stop() done, defined at C:\Users\LS-5\Documents\Codex\2026-10-15\gi...s-github-com-yehorbabenko88-meta\work\windows-commissioning-audit\src\meta_analyse\market_collector.py:67> result=None>.done
+
+commissioning\test_shutdown_probe.py:24: AssertionError
+=========================== short test summary info ===========================
+FAILED commissioning/test_shutdown_probe.py::test_collector_stop_retains_pending_database_write
+1 failed in 0.40s

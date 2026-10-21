@@ -1,0 +1,47 @@
+{
+  "candidate_sha": "13901274dac527f0aacfaf48481414b0971d6012",
+  "overall_verdict": "NO-GO",
+  "target_30m_2h_24h": "NOT_RUN",
+  "runs": {
+    "windows_local": {
+      "passed": 625,
+      "skipped": [],
+      "postgres_required_passed": 10,
+      "lifecycle": "10 x 67 passed"
+    },
+    "windows_ci": {
+      "passed": 625,
+      "skipped": [],
+      "postgres_required_passed": 10,
+      "lifecycle": "10 x 67 passed"
+    },
+    "linux17_ci": {
+      "passed": 624,
+      "skipped": [
+        "test_failed_pip_install_never_reports_success_or_creates_launcher"
+      ],
+      "postgres_required_passed": 10,
+      "lifecycle": "10 x 67 passed"
+    },
+    "linux18_ci": {
+      "passed": 624,
+      "skipped": [
+        "test_failed_pip_install_never_reports_success_or_creates_launcher"
+      ],
+      "postgres_required_passed": 10,
+      "lifecycle": "10 x 67 passed"
+    }
+  },
+  "postgres_versions": {
+    "windows_local": "17.6",
+    "windows_ci": "17.11",
+    "linux_ci": "17 (workflow pinned major)",
+    "linux18_ci": "18.6"
+  },
+  "remaining_blockers": [
+    "autonomous orderbook recovery on invalid/silent live connection",
+    "historical TLS root cause unknown and target preflight absent",
+    "target Windows11 Pro/PostgreSQL18/MetaScalp runtime not executed",
+    "queue/drop reconciliation UNVERIFIED"
+  ]
+}

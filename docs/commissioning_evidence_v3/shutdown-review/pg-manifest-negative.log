@@ -1,0 +1,5 @@
+command: check_integration_postgres.py unrelated-nine.xml
+exit=0
+stdout=collected=9 skipped=0 failed=0
+
+stderr=

@@ -1,0 +1,18 @@
+{
+  "sha": "446c72bd97cacc31f9937c9ab941d11539733be4",
+  "utc": "2026-10-20T15:20:06.854064+00:00",
+  "status": 200,
+  "retCode": 0,
+  "tls": "TLSv1.3",
+  "cipher": "TLS_AES_128_GCM_SHA256",
+  "openssl": "OpenSSL 3.5.9 29 Sep 2026",
+  "python": "3.12.15 (main, Oct 14 2026, 01:08:45) [MSC v.1944 64 bit (AMD64)]",
+  "scope": "current audit host only, NOT separate target",
+  "verification": "application default certificate and hostname checks",
+  "override_presence": {
+    "HTTPS_PROXY": false,
+    "HTTP_PROXY": false,
+    "SSL_CERT_FILE": false,
+    "SSL_CERT_DIR": false
+  }
+}

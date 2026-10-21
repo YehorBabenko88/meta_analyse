@@ -1,0 +1,44 @@
+{
+  "linux17": {
+    "total": 625,
+    "passed": 624,
+    "skipped": [
+      "test_failed_pip_install_never_reports_success_or_creates_launcher"
+    ],
+    "mandatory_postgres": {
+      "test_resume_and_deduplication": 1,
+      "test_concurrent_sources_same_symbol": 1,
+      "test_conflicting_archive_rolls_back_batch_and_checkpoint": 1,
+      "test_partial_batch_failure_keeps_previous_committed_checkpoint": 1,
+      "test_resume_after_failed_batch_and_repaired_archive_conflict": 1,
+      "test_concurrent_identical_archive_is_idempotent": 1,
+      "test_failed_import_status_preserves_committed_checkpoint": 1,
+      "test_orderflow_reader_returns_exact_aliases": 1,
+      "test_unlock_failure_does_not_mask_original_import_error": 1,
+      "test_contended_advisory_lock_fails_without_partial_import": 1
+    },
+    "repeat_runs": 10,
+    "passed_per_repeat": 67
+  },
+  "linux18": {
+    "total": 625,
+    "passed": 624,
+    "skipped": [
+      "test_failed_pip_install_never_reports_success_or_creates_launcher"
+    ],
+    "mandatory_postgres": {
+      "test_resume_and_deduplication": 1,
+      "test_concurrent_sources_same_symbol": 1,
+      "test_conflicting_archive_rolls_back_batch_and_checkpoint": 1,
+      "test_partial_batch_failure_keeps_previous_committed_checkpoint": 1,
+      "test_resume_after_failed_batch_and_repaired_archive_conflict": 1,
+      "test_concurrent_identical_archive_is_idempotent": 1,
+      "test_failed_import_status_preserves_committed_checkpoint": 1,
+      "test_orderflow_reader_returns_exact_aliases": 1,
+      "test_unlock_failure_does_not_mask_original_import_error": 1,
+      "test_contended_advisory_lock_fails_without_partial_import": 1
+    },
+    "repeat_runs": 10,
+    "passed_per_repeat": 67
+  }
+}

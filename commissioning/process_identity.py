@@ -158,8 +158,8 @@ def classify_missing(row,evidence,roots):
         known_service_image=known_service_image or any(path==canonical(ntpath.join(roots['system32'],host)) for host,_,_,_,_ in WINDOWS_SERVICE_CONTRACTS.values())
         if known_service_image and not services:return blocked('SERVICE_IDENTITY_UNAVAILABLE')
         if services or after_services:
-            if sorted(s['name'] for s in services)!=sorted(s['name'] for s in after_services):return blocked('SERVICE_MEMBERSHIP_CHANGED')
-            for first,last in zip(sorted(services,key=lambda s:s['name']),sorted(after_services,key=lambda s:s['name'])):
+            if sorted(s['name'].casefold() for s in services)!=sorted(s['name'].casefold() for s in after_services):return blocked('SERVICE_MEMBERSHIP_CHANGED')
+            for first,last in zip(sorted(services,key=lambda s:s['name'].casefold()),sorted(after_services,key=lambda s:s['name'].casefold())):
                 if first.get('pid')!=last.get('pid'):return blocked('SERVICE_PID_CHANGED')
                 if first.get('state')!=last.get('state'):return blocked('SERVICE_STATE_CHANGED')
                 if first.get('binary_path')!=last.get('binary_path'):return blocked('SERVICE_CONFIGURATION_CHANGED')

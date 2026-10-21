@@ -6,7 +6,7 @@ import host_identity as h
 
 @pytest.fixture
 def facts():
-    return dict(identity=dict(hostname='ADMINIT-JQ1IQSV',username='ADMINIT-JQ1IQSV\\Administrator',sid='S-1-test',machine_guid='installation-a',install_id='2026-install',hardware_uuid='hardware-a'),
+    return dict(collector_elevated=True,identity=dict(hostname='ADMINIT-JQ1IQSV',username='ADMINIT-JQ1IQSV\\Administrator',sid='S-1-test',machine_guid='installation-a',install_id='2026-install',hardware_uuid='hardware-a'),
         os=dict(system='Windows',edition='Professional',build=26300),
         grid=dict(findings=[],errors=[],coverage_complete=True),credential_names=[],production_dsn_names=[],
         postgres_listeners=[dict(port=55480,address='127.0.0.1',data_directory='C:/private/commission/pgdata')],

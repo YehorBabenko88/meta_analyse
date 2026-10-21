@@ -22,6 +22,73 @@ TARGET_HOST = 'ADMINIT-JQ1IQSV'
 TARGET_USER = r'ADMINIT-JQ1IQSV\Administrator'
 TARGET_EXE = r'C:\Users\Administrator\AppData\Local\MetaScalp\current\MetaScalp.exe'
 TARGET_EXE_SHA256 = '9f55837fafbf42b713ebe9206a23afb39ff5ff6de4911d676e7840ae657088df'
+COLLECTOR_VERSION = 'adminit-process-evidence-v2'
+
+
+class DiagnosticError(ValueError):
+    """Only fixed safe reason codes cross the public error boundary."""
+    def __init__(self, code):
+        self.code = code
+        super().__init__(code)
+
+
+def is_elevated():
+    if platform.system() != 'Windows':
+        return False
+    from ctypes import wintypes
+    try:
+        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+        security = ctypes.WinDLL('advapi32', use_last_error=True)
+        kernel.GetCurrentProcess.restype = wintypes.HANDLE
+        security.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+        security.GetTokenInformation.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        token = wintypes.HANDLE()
+        if not security.OpenProcessToken(kernel.GetCurrentProcess(), 8, ctypes.byref(token)):
+            return False
+        try:
+            elevated = wintypes.DWORD()
+            size = wintypes.DWORD()
+            return bool(security.GetTokenInformation(token, 20, ctypes.byref(elevated), ctypes.sizeof(elevated), ctypes.byref(size)) and size.value == ctypes.sizeof(elevated) and elevated.value == 1)
+        finally:
+            kernel.CloseHandle(token)
+    except (OSError, AttributeError):
+        return False
+
+
+def system_directory():
+    directory = ctypes.create_unicode_buffer(32768)
+    if not ctypes.windll.kernel32.GetSystemDirectoryW(directory, len(directory)):
+        raise DiagnosticError('WINDOWS_SYSTEM_DIRECTORY_UNAVAILABLE')
+    return Path(directory.value)
+
+
+def collector_identity(expected_sha, *, root=None, manifest=None, manifest_sha256=None):
+    """Bind source before/after collection; never trust an operator SHA alone."""
+    root = Path(root) if root is not None else Path(__file__).resolve().parent.parent
+    if not re.fullmatch('[0-9a-f]{40}', expected_sha or ''):
+        raise DiagnosticError('COLLECTOR_SOURCE_UNVERIFIED')
+    if manifest or manifest_sha256:
+        from preflight import verify_manifest
+        if not manifest or not manifest_sha256 or verify_manifest(manifest, expected_sha, manifest_sha256) != root.resolve():
+            raise DiagnosticError('COLLECTOR_SOURCE_UNVERIFIED')
+    else:
+        try:
+            def git(*args):
+                return subprocess.check_output(['git', '-C', str(root), *args], stderr=subprocess.DEVNULL).decode().strip()
+            if git('rev-parse', 'HEAD') != expected_sha or git('status', '--porcelain', '--untracked-files=all'):
+                raise DiagnosticError('COLLECTOR_SOURCE_UNVERIFIED')
+        except (OSError, subprocess.SubprocessError, UnicodeError):
+            raise DiagnosticError('COLLECTOR_SOURCE_UNVERIFIED') from None
+    hashes = {}
+    for path in sorted((root/'commissioning').rglob('*')):
+        if path.is_file() and path.suffix in ('.py', '.ps1'):
+            if any(p.is_symlink() or (hasattr(p,'is_junction') and p.is_junction()) for p in (path, *path.parents)):
+                raise DiagnosticError('COLLECTOR_SOURCE_UNVERIFIED')
+            hashes[path.relative_to(root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    if not {'commissioning/'+name for name in ('host_identity.py','process_identity.py','host-facts.ps1','process-evidence.ps1')}.issubset(hashes):
+        raise DiagnosticError('COLLECTOR_SOURCE_UNVERIFIED')
+    return dict(version=COLLECTOR_VERSION, candidate_sha=expected_sha, source_hashes=hashes)
 
 
 def http_sys_owner(text, port):
@@ -60,6 +127,8 @@ def fingerprint(facts, salt):
 
 
 def safe_inventory(facts):
+    if facts.get('collector_elevated') is not True:
+        raise DiagnosticError('ELEVATED_TOKEN_REQUIRED')
     grid = facts['grid']
     if grid.get('coverage_complete') is not True or grid.get('errors') or grid.get('findings'):
         raise ValueError('Grid/conflict inventory is not clear and complete')
@@ -135,7 +204,8 @@ def public_report(facts, salt):
                 coverage_complete=facts['grid']['coverage_complete'],
                 credential_variable_count=len(facts.get('credential_names', [])),
                 production_dsn_variable_count=len(facts.get('production_dsn_names', [])),
-                inventory={k:v for k,v in facts['grid'].items() if k not in ('findings',)},
+                inventory={k:facts['grid'][k] for k in ('coverage_complete','visible_services','visible_tasks','visible_processes',
+                    'missing_process_paths','verified_missing_process_paths','unknown_process_paths','reason_counts') if k in facts['grid']},
                 postgres_listeners=[{k:p[k] for k in ('port','address')} for p in facts.get('postgres_listeners',[])],
                 api_identity_established=bool(facts.get('api_listeners')),
                 status='OBSERVATION_ONLY_NOT_AUTHORIZATION')
@@ -144,26 +214,31 @@ def public_report(facts, salt):
 def collect_facts():
     if platform.system() != 'Windows':
         raise ValueError('Windows host collection required')
-    directory = ctypes.create_unicode_buffer(32768)
-    if not ctypes.windll.kernel32.GetSystemDirectoryW(directory, len(directory)):
-        raise ValueError('Windows system directory unavailable')
-    shell = str(Path(directory.value) / 'WindowsPowerShell/v1.0/powershell.exe')
+    if not is_elevated():
+        raise DiagnosticError('ELEVATED_TOKEN_REQUIRED')
+    directory = system_directory()
+    shell = str(directory / 'WindowsPowerShell/v1.0/powershell.exe')
     environment=dict(os.environ)
     # Do not inherit PowerShell7 module paths into the Windows PowerShell child.
-    environment['PSModulePath']=str(Path(directory.value)/'WindowsPowerShell/v1.0/Modules')
+    environment['PSModulePath']=str(directory/'WindowsPowerShell/v1.0/Modules')
     result = subprocess.run([shell, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
                              str(Path(__file__).with_name('host-facts.ps1'))],
                             capture_output=True, timeout=90,env=environment)
     if result.returncode:
         raise ValueError('host facts unavailable; no private output published')
     facts = json.loads(result.stdout.decode('utf-8-sig'))
+    if facts.get('collector_elevated') is not True:
+        raise DiagnosticError('ELEVATED_TOKEN_REQUIRED')
     from process_identity import assess_processes
     original_processes=facts['private_inventory']['processes']
     if not original_processes or len(original_processes)!=facts['grid']['visible_processes'] or len({p['ProcessId'] for p in original_processes})!=len(original_processes):
         facts['grid']['errors'].append('Process snapshot incomplete')
         facts['grid']['coverage_complete']=False
     expected_missing=[p['ProcessId'] for p in original_processes if not p.get('ExecutablePath')]
-    assessment=assess_processes(facts.pop('process_evidence'),facts.pop('process_roots'),expected_missing)
+    private = facts['private_inventory']
+    private['process_evidence'] = facts.pop('process_evidence')
+    private['process_roots'] = facts.pop('process_roots')
+    assessment=assess_processes(private['process_evidence'],private['process_roots'],expected_missing)
     facts['process_inventory']=assessment
     facts['grid'].update({k:v for k,v in assessment.items() if k!='results'})
     if assessment['unknown_process_paths']:
@@ -298,6 +373,9 @@ def main():
     diagnostic = sub.add_parser('diagnose')
     diagnostic.add_argument('--output', required=True)
     diagnostic.add_argument('--private-observation', required=True)
+    diagnostic.add_argument('--expected-sha', required=True)
+    diagnostic.add_argument('--manifest')
+    diagnostic.add_argument('--manifest-sha256')
     enrollment = sub.add_parser('enroll')
     for key in ('private-observation', 'enrollment', 'manifest', 'expected-sha', 'manifest-sha256',
                 'database', 'role', 'port', 'data-directory','metascalp-exe','metascalp-sha256'):
@@ -313,7 +391,12 @@ def main():
             authorize(args)
             print('Specific Windows installation/user/source authorization PASS')
             return 0
+        if not is_elevated():
+            raise DiagnosticError('ELEVATED_TOKEN_REQUIRED')
+        collector = collector_identity(args.expected_sha, manifest=args.manifest, manifest_sha256=args.manifest_sha256)
         facts = collect_facts()
+        if collector != collector_identity(args.expected_sha, manifest=args.manifest, manifest_sha256=args.manifest_sha256):
+            raise DiagnosticError('COLLECTOR_SOURCE_CHANGED')
         if args.command == 'diagnose':
             salt = secrets.token_hex(32)
             report = public_report(facts, salt)
@@ -327,7 +410,7 @@ def main():
             except ValueError:
                 if not reasons:reasons.append('INVENTORY_POLICY_REJECTED')
             report.update(diagnostic_status='FAIL_CLOSED' if reasons else 'PASS_OBSERVATION_ONLY',reason_codes=reasons)
-            save_private(args.private_observation, dict(schema=1, salt=salt,
+            save_private(args.private_observation, dict(schema=2, collector=dict(**collector,elevated=True), salt=salt,
                          fingerprint=fingerprint(facts, salt), observed_at=time.time(), facts=facts))
             Path(args.output).write_text(json.dumps(report, indent=2), encoding='utf-8')
             print(json.dumps(report, indent=2))
@@ -336,6 +419,8 @@ def main():
         root=verify_manifest(args.manifest, args.expected_sha, args.manifest_sha256)
         if root!=Path(__file__).resolve().parent.parent: raise ValueError('executing guard differs from packet')
         observed = load_private(args.private_observation)
+        if observed.get('schema') != 2 or observed.get('collector') != dict(**collector,elevated=True):
+            raise DiagnosticError('OBSERVATION_COLLECTOR_MISMATCH')
         if not 0 <= time.time() - observed['observed_at'] <= 3600:
             raise ValueError('fresh private host observation required')
         if not hmac.compare_digest(fingerprint(facts, observed['salt']), observed['fingerprint']):
@@ -349,8 +434,13 @@ def main():
         print('Private specific-host authorization created; this does not authorize automatic testing')
         return 0
     except Exception as exc:
-        print(json.dumps(dict(status='FAIL_CLOSED', error_type=type(exc).__name__,
-                              detail='private identity/configuration values are not published')))
+        failure = dict(status='FAIL_CLOSED', diagnostic_status='FAIL_CLOSED',
+                       reason_codes=[exc.code if isinstance(exc,DiagnosticError) else 'DIAGNOSTIC_UNAVAILABLE'],
+                       detail='private identity/configuration values are not published')
+        if args.command == 'diagnose':
+            try: Path(args.output).write_text(json.dumps(failure,indent=2),encoding='utf-8')
+            except OSError: pass
+        print(json.dumps(failure))
         return 1
 
 

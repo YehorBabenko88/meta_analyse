@@ -1,5 +1,10 @@
 # ADMINIT missing process-path inventory fix
 
+Follow-up: see [diagnostic hardening](ADMINIT_DIAGNOSTIC_HARDENING.md) for schema2,
+retained evidence, exact refusal codes, required elevation/source binding and
+the unresolved Norton/compiler interaction. The original snapshot did not retain
+the raw evidence promised below; D1 corrects that defect for new observations.
+
 Base: `86181d2d110688c13250a8be26b8743bcd1eb8e9`. Scope is read-only inventory and diagnostic reporting. Existing PostgreSQL, application runtime, smoke30, merge and deployment are excluded.
 
 ## Root cause
@@ -45,7 +50,7 @@ The operator's elevated 16/17-process snapshot is not reproducible from the agen
 Run from a new checkout of the final PR HEAD under elevated ADMINIT-JQ1IQSV\Administrator, using NEW private output paths outside the checkout:
 
 ```powershell
-py -3.12 <checkout>\commissioning\host_identity.py diagnose --output <private-new-dir>\public.json --private-observation <private-new-dir>\observation.dpapi
+py -3.12 <checkout>\commissioning\host_identity.py diagnose --expected-sha <full-final-candidate-sha> --output <private-new-dir>\public.json --private-observation <private-new-dir>\observation.dpapi
 # Check exit code and diagnostic_status/reason_codes. On refusal, stop.
 # Do not use old86181d2 source manifests/enrollment to authorize changed code.
 ```

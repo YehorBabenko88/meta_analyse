@@ -10,8 +10,10 @@ try {
  $last=[MetaCommissionInventory.Probe]::ReadProcess($PID)
  Assert-Probe ($first -and $last -and $first.alive -and $last.alive -and $first.pid -eq $PID -and $first.created -eq $last.created -and $first.path -eq $last.path -and [IO.Path]::IsPathRooted($first.path)) 'NATIVE_PROCESS_BOUNDARY'
  Assert-Probe ($cim.CreationDate -and [Math]::Abs($first.created-$cim.CreationDate.ToUniversalTime().ToFileTimeUtc()) -lt 10) 'NATIVE_CIM_CREATION_BINDING'
- Assert-Probe ($null -eq [MetaCommissionInventory.Probe]::ReadProcess(-1)) 'INVALID_PROCESS_NOT_REJECTED'
- Assert-Probe ($null -eq [MetaCommissionInventory.Probe]::ReadService('__meta_commission_inventory_missing_service__')) 'UNKNOWN_SERVICE_NOT_REJECTED'
+ $invalid=[MetaCommissionInventory.Probe]::ReadProcess(-1)
+ Assert-Probe (!$invalid.alive -and !$invalid.image_query_succeeded -and $invalid.error_stage -eq 'OPEN_PROCESS' -and $invalid.win32_error -ne 0) 'INVALID_PROCESS_NOT_REJECTED'
+ $unknown=[MetaCommissionInventory.Probe]::ReadService('__meta_commission_inventory_missing_service__')
+ Assert-Probe ($unknown.error_stage -eq 'OPEN_SERVICE_CONFIG' -and $unknown.win32_error -eq 1060) 'UNKNOWN_SERVICE_NOT_REJECTED'
  $membership=[MetaCommissionInventory.Probe]::ReadBindings($PID)
  Assert-Probe ($membership.services.Count -eq 0 -and ($membership.complete -or $membership.reason_code -in @('SERVICE_COVERAGE_UNAVAILABLE','SERVICE_STATUS_UNAVAILABLE'))) 'NATIVE_EMPTY_OR_FAIL_CLOSED_SERVICE_MEMBERSHIP'
  $service=Get-CimInstance Win32_Service -Filter "Name='EventLog'"

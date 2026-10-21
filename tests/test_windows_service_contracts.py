@@ -44,6 +44,7 @@ def test_complete_named_service_implementation_proof_can_verify(name):
     row,e=evidence(name)
     assert p.classify_missing(row,e,ROOTS)['status']=='VERIFIED_SERVICE'
 
+@pytest.mark.parametrize('name', list(CONTRACTS))
 @pytest.mark.parametrize('fault',[
     'missing-proof','registry-denied','registry-changed','wrong-dll-source','wrong-dll','wrong-host-command',
     'wrong-account','wrong-type','scm-registry-disagree','missing-modules','module-access-denied',
@@ -51,9 +52,8 @@ def test_complete_named_service_implementation_proof_can_verify(name):
     'dll-signature-missing','dll-unsigned','dll-publisher','dll-hash','dll-reparse','dll-signed-other-path',
     'scm-incomplete','scm-config-change','native-pid-reuse','native-image-change','extra-service',
 ])
-def test_unproved_or_spoofed_service_implementation_stays_unresolved(fault):
-    row,e=evidence()
-    name='DoSvc'
+def test_unproved_or_spoofed_service_implementation_stays_unresolved(fault, name):
+    row,e=evidence(name)
     if fault=='missing-proof':e.pop('implementation_before')
     if fault=='registry-denied':e['implementation_before'][name]['complete']=False
     if fault=='registry-changed':e['implementation_after'][name]['image_path']+=' changed'
@@ -156,3 +156,45 @@ def test_native_format_and_kernel_label_never_authorize_error31(name):
     kernel=dict(pid=row['pid'],name=name,created=row['created'],parent_pid=4,session_id=0)
     e.update(kernel_before=kernel,kernel_after=copy.deepcopy(kernel))
     assert p.classify_missing(row,e,ROOTS)==dict(status='UNRESOLVED',reason_code='IMAGE_PATH_UNAVAILABLE')
+
+@pytest.mark.parametrize('name', list(CONTRACTS))
+@pytest.mark.parametrize('key', ['native_before', 'native_after', 'services_before', 'services_after',
+    'implementation_before', 'implementation_after', 'implementation_signatures', 'modules_before', 'modules_after'])
+def test_every_contract_requires_each_evidence_source(name, key):
+    row, e = evidence(name)
+    e.pop(key)
+    assert p.classify_missing(row, e, ROOTS)['status'] == 'UNRESOLVED'
+
+
+@pytest.mark.parametrize('name', list(CONTRACTS))
+@pytest.mark.parametrize('source,field,value', [
+    ('modules', 'pid', 123.0), ('modules', 'created', 123456789012345670.0),
+    ('modules', 'win32_error', False), ('services', 'pid', 123.0),
+    ('services', 'state', 4.0), ('services', 'service_type', 32.0),
+    ('implementation', 'service_type', 32.0),
+])
+def test_contract_numeric_identity_types_fail_closed(name, source, field, value):
+    row, e = evidence(name)
+    for suffix in ('before', 'after'):
+        item = e[source + '_' + suffix]
+        if source == 'services': item = item[0]
+        if source == 'implementation': item = item[name]
+        item[field] = value
+    assert p.classify_missing(row, e, ROOTS)['status'] == 'UNRESOLVED'
+
+
+@pytest.mark.parametrize('name', list(CONTRACTS))
+@pytest.mark.parametrize('value', [None, False, 0.0, 5, '0'])
+def test_scm_requires_explicit_success_error_code(name, value):
+    row, e = evidence(name)
+    for key in ('services_before', 'services_after'):
+        if value is None: e[key][0].pop('win32_error')
+        else: e[key][0]['win32_error'] = value
+    assert p.classify_missing(row, e, ROOTS)['status'] == 'UNRESOLVED'
+
+
+@pytest.mark.parametrize('field,value', [('win32_error', 5), ('error_stage', 'QUERY_IMAGE')])
+def test_successful_native_image_requires_consistent_success_status(field, value):
+    row, e = evidence()
+    for key in ('native_before', 'native_after'): e[key][field] = value
+    assert p.classify_missing(row, e, ROOTS)['status'] == 'UNRESOLVED'

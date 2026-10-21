@@ -15,7 +15,7 @@ def synthetic_host(name='svchost.exe', directory=ROOTS['system32']):
     path = directory + '\\' + name
     row = dict(pid=123, name=name, created=123456789012345670, cim_path='')
     native = dict(pid=123, path=path, created=row['created'], alive=True,
-                  image_query_succeeded=True, error_stage='')
+                  image_query_succeeded=True, error_stage='', win32_error=0)
     proof = dict(native_before=native, native_after=copy.deepcopy(native),
                  signature=dict(path=path, status='Valid', subject='CN=Microsoft Windows',
                                 sha256='a'*64, sha256_after='a'*64, reparse_point=False),
@@ -54,7 +54,7 @@ def test_service_host_boundary_rejects_conflicts(fault, reason):
     row, proof = synthetic_host(directory=r'C:\Other' if fault == 'spoofed-host' else ROOTS['system32'])
     if fault in ('unknown-service', 'membership-changed', 'configuration-changed'):
         service = dict(name='UnreviewedSyntheticService', pid=row['pid'], state=4,
-                       binary_path=proof['native_before']['path'])
+                       binary_path=proof['native_before']['path'], win32_error=0)
         proof['services_before'] = [service]
         proof['services_after'] = [copy.deepcopy(service)]
         if fault == 'membership-changed': proof['services_after'] = []

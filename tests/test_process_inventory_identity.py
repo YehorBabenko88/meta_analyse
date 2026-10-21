@@ -13,7 +13,7 @@ def sample(service=False):
     row=dict(pid=123,name='NortonSvc.exe' if service else 'winlogon.exe',created=123456789012345670,parent_pid=4,session_id=0,cim_path='')
     native=dict(pid=123,path=path,created=row['created'],alive=True,image_query_succeeded=True,error_stage='',win32_error=0)
     sig=dict(path=path,status='Valid',subject='CN=Gen Digital Inc., O=Gen Digital Inc.' if service else 'CN=Microsoft Windows, O=Microsoft Corporation',sha256='a'*64,sha256_after='a'*64,reparse_point=False)
-    svc=[dict(name='Norton Antivirus',pid=123,state=4,binary_path='"'+path+'" /runassvc')]
+    svc=[dict(name='Norton Antivirus',pid=123,state=4,binary_path='"'+path+'" /runassvc',win32_error=0)]
     e=dict(native_before=native,native_after=copy.deepcopy(native),signature=sig,services_before=svc if service else [],services_after=copy.deepcopy(svc) if service else [],services_before_complete=True,services_after_complete=True)
     return row,e
 

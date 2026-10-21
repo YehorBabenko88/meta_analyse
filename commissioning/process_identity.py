@@ -59,7 +59,8 @@ def service_implementation_refusal(svc,evidence,roots,native):
         return 'SERVICE_IMPLEMENTATION_UNVERIFIED'
     if before!=after:return 'SERVICE_IMPLEMENTATION_CHANGED'
     for c in (before,after):
-        if (c.get('name')!=name or c.get('service_type')!=32 or svc.get('service_type')!=32
+        if (c.get('name')!=name or type(c.get('service_type')) is not int or c.get('service_type')!=32
+                or type(svc.get('service_type')) is not int or svc.get('service_type')!=32
                 or str(c.get('account','')).casefold()!=account or str(svc.get('start_name','')).casefold()!=account
                 or command_executable(c.get('expanded_image_path'))!=host_path
                 or command_arguments(c.get('expanded_image_path'))!=args or command_arguments(svc.get('binary_path'))!=args):
@@ -72,9 +73,11 @@ def service_implementation_refusal(svc,evidence,roots,native):
     sets=[]
     for key in ('modules_before','modules_after'):
         modules=evidence.get(key)
-        if not isinstance(modules,dict) or modules.get('complete') is not True or modules.get('error_stage') or modules.get('win32_error')!=0:
+        if (not isinstance(modules,dict) or modules.get('complete') is not True or modules.get('error_stage')
+                or type(modules.get('win32_error')) is not int or modules.get('win32_error')!=0):
             return 'SERVICE_MODULES_UNAVAILABLE'
-        if modules.get('pid')!=native['pid'] or modules.get('created')!=native['created'] or modules.get('alive') is not True:
+        if (type(modules.get('pid')) is not int or type(modules.get('created')) is not int
+                or modules.get('pid')!=native['pid'] or modules.get('created')!=native['created'] or modules.get('alive') is not True):
             return 'SERVICE_MODULE_LIFETIME_MISMATCH'
         paths=modules.get('paths')
         if not isinstance(paths,list) or not paths or any(not canonical(v) for v in paths):return 'SERVICE_MODULES_UNAVAILABLE'
@@ -132,6 +135,8 @@ def classify_missing(row,evidence,roots):
             # its kernel role. No arbitrary-PID exception is supported.
             return blocked('IMAGE_PATH_UNAVAILABLE')
         path=canonical(before.get('path'))
+        if any(n['win32_error']!=0 or n['error_stage']!='' for n in (before,after)):
+            return blocked('NATIVE_PROCESS_API_UNAVAILABLE')
         if not path or not canonical(after.get('path')):return blocked('IMAGE_PATH_INVALID')
         if path!=canonical(after['path']):return blocked('IMAGE_PATH_CHANGED')
         if ntpath.basename(path)!=str(row.get('name','')).casefold():return blocked('CIM_IMAGE_NAME_MISMATCH')
@@ -167,7 +172,10 @@ def classify_missing(row,evidence,roots):
                 if first.get('binary_path')!=last.get('binary_path'):return blocked('SERVICE_CONFIGURATION_CHANGED')
                 if first!=last:return blocked('SERVICE_EVIDENCE_CHANGED')
             for svc in services:
-                if svc.get('error_stage'):return blocked('SERVICE_API_UNAVAILABLE')
+                if svc.get('error_stage') or type(svc.get('win32_error')) is not int or svc['win32_error']!=0:
+                    return blocked('SERVICE_API_UNAVAILABLE')
+                if type(svc.get('pid')) is not int or type(svc.get('state')) is not int:
+                    return blocked('SERVICE_IDENTITY_UNAVAILABLE')
                 rule=SERVICE_RULES.get(svc.get('name'))
                 contract=svc.get('name') in WINDOWS_SERVICE_CONTRACTS
                 if not rule and not contract:return blocked('SERVICE_RULE_UNREVIEWED')

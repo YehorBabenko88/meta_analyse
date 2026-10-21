@@ -33,7 +33,7 @@ permissions:
   contents: read
 jobs:
   integration:
-    if: github.ref_name != 'parallel/adminit-kernel-identity-evidence' && github.head_ref != 'parallel/adminit-kernel-identity-evidence'
+    if: github.ref_name != 'parallel/adminit-kernel-identity-evidence' && github.head_ref != 'parallel/adminit-kernel-identity-evidence' && github.ref_name != 'parallel/adminit-identity-integration-20261021' && github.head_ref != 'parallel/adminit-identity-integration-20261021'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:

@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import sys
 
-PRIVATE_KEYS = re.compile(r'["\'](?:native_before|native_after|native_format_path|implementation_before|implementation_after|implementation_signatures|modules_before|modules_after|process_evidence|private_inventory|machine_guid|hardware_uuid|sid|binary_path|source_hashes)["\']\s*:', re.I)
+PRIVATE_KEYS = re.compile(r'["\'](?:kernel_before|kernel_after|native_before|native_after|native_format_path|implementation_before|implementation_after|implementation_signatures|modules_before|modules_after|process_evidence|private_inventory|machine_guid|hardware_uuid|sid|binary_path|source_hashes)["\']\s*:', re.I)
 
 
 def main():

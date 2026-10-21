@@ -101,6 +101,8 @@ def classify_missing(row,evidence,roots):
         pid=row['pid']
         if type(pid) is not int or pid<0:return blocked('PROCESS_ID_CONFLICT')
         if pid in (0,4):
+            refusal=snapshot_refusal(row,evidence)
+            if refusal:return blocked(refusal)
             before=evidence.get('kernel_before',{});after=evidence.get('kernel_after',{})
             if not before or before!=after or before.get('pid')!=pid or before.get('parent_pid')!=0 or before.get('session_id')!=0 or row.get('parent_pid')!=0 or row.get('session_id')!=0:
                 return blocked('KERNEL_IDENTITY_UNAVAILABLE')
@@ -199,3 +201,27 @@ def assess_processes(rows,roots,expected_missing_pids):
     mismatch=len(rows)!=len(expected) or len(expected)!=len(set(expected)) or seen!=set(expected)
     if mismatch:reasons['PROCESS_INVENTORY_COVERAGE_MISMATCH']=1
     return dict(results=results,missing_process_paths=len(expected),verified_missing_process_paths=len(results)-len(unresolved),unknown_process_paths=len(unresolved)+int(mismatch),reason_counts=reasons)
+
+def snapshot_refusal(row,evidence,native=None):
+    """Check lifetime/topology only; no general kernel identity is established.
+
+    Names and additional characteristics are never admission predicates. Require
+    their stability, but do not infer identity from a label or an API failure.
+    """
+    snapshots=[evidence.get(key) for key in ('kernel_before','kernel_after')]
+    for item in (row,*snapshots):
+        if not isinstance(item,dict):return 'KERNEL_IDENTITY_UNAVAILABLE'
+        if any(type(item.get(k)) is not int or not 0<=item[k]<=0x7fffffff
+               for k in ('pid','parent_pid','session_id')):
+            return 'KERNEL_IDENTITY_UNAVAILABLE'
+        if type(item.get('created')) is not int or not 0<=item['created']<=0x7fffffffffffffff:
+            return 'KERNEL_IDENTITY_UNAVAILABLE'
+        if type(item.get('name')) is not str:return 'KERNEL_IDENTITY_UNAVAILABLE'
+    first,last=snapshots
+    if first!=last:return 'KERNEL_IDENTITY_CONFLICT'
+    if any(first[k]!=row[k] for k in ('pid','parent_pid','session_id')):
+        return 'KERNEL_IDENTITY_CONFLICT'
+    if native is not None and (first['pid']!=native['pid'] or first['created']!=native['created']
+                               or not same_creation(row['created'],first['created'])):
+        return 'KERNEL_IDENTITY_CONFLICT'
+    return None

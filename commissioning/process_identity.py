@@ -140,7 +140,14 @@ def classify_missing(row,evidence,roots):
             return blocked('SERVICE_MEMBERSHIP_UNAVAILABLE')
         services=evidence['services_before'];after_services=evidence['services_after']
         if not isinstance(services,list) or not isinstance(after_services,list):return blocked('SERVICE_IDENTITY_UNAVAILABLE')
+        for snapshot in (services,after_services):
+            names=[s.get('name') for s in snapshot]
+            if any(not isinstance(name,str) or not name for name in names):return blocked('SERVICE_IDENTITY_UNAVAILABLE')
+            if len(names)!=len({name.casefold() for name in names}):return blocked('SERVICE_IDENTITY_UNAVAILABLE')
         known_service_image=any(path==canonical(ntpath.join(roots[root],relative)) for root,relative,_ in SERVICE_RULES.values())
+        # Hosts covered by implementation contracts cannot bypass those contracts
+        # through the generic signed-System32 fallback when SCM reports no service.
+        known_service_image=known_service_image or any(path==canonical(ntpath.join(roots['system32'],host)) for host,_,_,_,_ in WINDOWS_SERVICE_CONTRACTS.values())
         if known_service_image and not services:return blocked('SERVICE_IDENTITY_UNAVAILABLE')
         if services or after_services:
             if sorted(s['name'] for s in services)!=sorted(s['name'] for s in after_services):return blocked('SERVICE_MEMBERSHIP_CHANGED')

@@ -92,7 +92,7 @@ def test_dpapi_input_retains_evidence_for_replay_without_public_leak(monkeypatch
     replay = p.assess_processes(private['process_evidence'], private['process_roots'], [123])
     assert replay == facts['process_inventory']
     public = json.dumps(h.public_report(facts, 'a'*64))
-    for secret in ('PRIVATE_SENTINEL_', 'native_before', 'services_before', 'lsass.exe', 'program_files'):
+    for secret in ('PRIVATE_SENTINEL_', 'native_before', 'services_before', 'winlogon.exe', 'program_files'):
         assert secret not in public
     # Exercise the real serialization boundary, substituting only the platform encryption.
     encrypted_inputs = []

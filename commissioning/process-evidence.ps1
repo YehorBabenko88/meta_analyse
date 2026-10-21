@@ -159,6 +159,8 @@ function Get-MissingProcessEvidence {
    $proof.kernel_before=[MetaCommissionInventory.Probe]::ReadKernel($idValue)
    $proof.kernel_after=[MetaCommissionInventory.Probe]::ReadKernel($idValue)
   } else {
+   # Lifetime/topology evidence only; never an arbitrary-PID admission rule.
+   $proof.kernel_before=[MetaCommissionInventory.Probe]::ReadKernel($idValue)
    $proof.native_before=[MetaCommissionInventory.Probe]::ReadProcess($idValue)
    $beforeSet=[MetaCommissionInventory.Probe]::ReadBindings($idValue)
    $proof.services_before_complete=$beforeSet.complete
@@ -178,6 +180,7 @@ function Get-MissingProcessEvidence {
    $proof.services_after_reason=$afterSet.reason_code
    $proof.services_after_diagnostics=[ordered]@{stage=$afterSet.error_stage;win32_error=$afterSet.win32_error;failed_service=$afterSet.failed_service}
    $proof.services_after=@($afterSet.services)
+   $proof.kernel_after=[MetaCommissionInventory.Probe]::ReadKernel($idValue)
    $proof.native_after=[MetaCommissionInventory.Probe]::ReadProcess($idValue)
   }
  } catch { $proof.collection_error='PROCESS_EVIDENCE_UNAVAILABLE' }

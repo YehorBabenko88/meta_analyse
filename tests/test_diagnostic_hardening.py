@@ -18,8 +18,8 @@ from test_process_inventory_identity import sample, ROOTS
 @pytest.mark.parametrize('fault,code', [
     ('missing-native', 'NATIVE_PROCESS_API_UNAVAILABLE'),
     ('api-denied', 'NATIVE_PROCESS_API_UNAVAILABLE'),
-    ('image-denied', 'IMAGE_PATH_UNAVAILABLE'),
-    ('image-empty', 'IMAGE_PATH_UNAVAILABLE'),
+    ('image-denied', 'NATIVE_PROCESS_EVIDENCE_CHANGED'),
+    ('image-empty', 'NATIVE_PROCESS_EVIDENCE_CHANGED'),
     ('image-invalid', 'IMAGE_PATH_INVALID'),
     ('image-change', 'IMAGE_PATH_CHANGED'),
     ('cim-name', 'CIM_IMAGE_NAME_MISMATCH'),

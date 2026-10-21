@@ -38,6 +38,7 @@ the service/publisher allowlist was not widened.
 | SCM snapshot changes | `SERVICE_PID_CHANGED`, `SERVICE_STATE_CHANGED`, `SERVICE_CONFIGURATION_CHANGED`, `SERVICE_EVIDENCE_CHANGED` |
 | SCM stable predicate | `SERVICE_API_UNAVAILABLE`, `SERVICE_RULE_UNREVIEWED`, `SERVICE_PID_MISMATCH`, `SERVICE_NOT_RUNNING`, `SERVICE_CONFIG_PATH_INVALID`, `SERVICE_CONFIG_IMAGE_MISMATCH` |
 | Reviewed service image/publisher | `SERVICE_IMAGE_NOT_REVIEWED`, `SERVICE_PUBLISHER_NOT_REVIEWED` |
+| System32 image publisher | `SYSTEM_IMAGE_PUBLISHER_NOT_REVIEWED` |
 
 The first failed predicate is returned; downstream checks must not be described
 as passed when they were not reached. All raw rows remain privately available

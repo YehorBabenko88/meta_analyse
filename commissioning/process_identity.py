@@ -67,9 +67,10 @@ def classify_missing(row,evidence,roots):
         if ntpath.basename(path)!=str(row.get('name','')).casefold():return blocked('CIM_IMAGE_NAME_MISMATCH')
         if row.get('cim_path') and canonical(row['cim_path'])!=path:return blocked('CIM_IMAGE_PATH_MISMATCH')
         sig=evidence.get('signature',{})
-        cn=re.search(r'(?:^|,\s*)CN=([^,]+)(?:,|$)',sig.get('subject',''))
         if sig.get('status')!='Valid':return blocked('IMAGE_SIGNATURE_UNVERIFIED')
         if canonical(sig.get('path'))!=path:return blocked('SIGNATURE_IMAGE_PATH_MISMATCH')
+        subject=sig.get('subject')
+        cn=re.search(r'(?:^|,\s*)CN=([^,]+)(?:,|$)',subject) if isinstance(subject,str) else None
         if not cn:return blocked('IMAGE_PUBLISHER_UNAVAILABLE')
         if sig.get('reparse_point') is not False:return blocked('IMAGE_REPARSE_UNVERIFIED')
         if not re.fullmatch('[0-9a-f]{64}',sig.get('sha256','')):return blocked('IMAGE_HASH_UNAVAILABLE')
@@ -101,7 +102,8 @@ def classify_missing(row,evidence,roots):
                 if path!=canonical(ntpath.join(roots[root],relative)):return blocked('SERVICE_IMAGE_NOT_REVIEWED')
                 if cn[1] not in publishers:return blocked('SERVICE_PUBLISHER_NOT_REVIEWED')
             return dict(status='VERIFIED_SERVICE',reason_code='NATIVE_SCM_SIGNED_IMAGE',resolved_path=before['path'])
-        if ntpath.dirname(path)==canonical(roots['system32']) and cn[1] in WINDOWS_PUBLISHERS:
+        if ntpath.dirname(path)==canonical(roots['system32']):
+            if cn[1] not in WINDOWS_PUBLISHERS:return blocked('SYSTEM_IMAGE_PUBLISHER_NOT_REVIEWED')
             return dict(status='VERIFIED_SYSTEM_IMAGE',reason_code='NATIVE_SIGNED_SYSTEM_IMAGE',resolved_path=before['path'])
         return blocked('UNREVIEWED_PROCESS_IMAGE')
     except (KeyError,TypeError,ValueError,AttributeError):

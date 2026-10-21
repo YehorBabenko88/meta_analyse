@@ -27,6 +27,9 @@ from test_process_inventory_identity import sample, ROOTS
     ('pid-reuse', 'PROCESS_CREATION_CHANGED'),
     ('pid-conflict', 'PROCESS_ID_CONFLICT'),
     ('hash-change', 'IMAGE_HASH_CHANGED'),
+    ('unsigned-no-subject', 'IMAGE_SIGNATURE_UNVERIFIED'),
+    ('publisher-missing', 'IMAGE_PUBLISHER_UNAVAILABLE'),
+    ('publisher-unreviewed', 'SYSTEM_IMAGE_PUBLISHER_NOT_REVIEWED'),
     ('scm-incomplete', 'SERVICE_MEMBERSHIP_UNAVAILABLE'),
     ('scm-change', 'SERVICE_CONFIGURATION_CHANGED'),
     ('scm-pid-change', 'SERVICE_PID_CHANGED'),
@@ -50,6 +53,9 @@ def test_exact_refusal_predicate_remains_unresolved(fault, code):
     if fault == 'pid-reuse': e['native_after']['created'] += 10
     if fault == 'pid-conflict': e['native_after']['pid'] += 1
     if fault == 'hash-change': e['signature']['sha256_after'] = 'b' * 64
+    if fault == 'unsigned-no-subject': e['signature'].update(status='NotSigned',subject=None)
+    if fault == 'publisher-missing': e['signature']['subject']=None
+    if fault == 'publisher-unreviewed': e['signature']['subject']='CN=Synthetic Unreviewed Publisher'
     if fault == 'scm-incomplete': e['services_after_complete'] = False
     if fault == 'scm-change': e['services_after'][0]['binary_path'] += ' --changed'
     if fault == 'scm-pid-change': e['services_after'][0]['pid'] += 1

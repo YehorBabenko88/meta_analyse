@@ -100,6 +100,32 @@ def test_new_service_name_alone_does_not_extend_trust():
     row,e=evidence();e.pop('implementation_before')
     assert p.classify_missing(row,e,ROOTS)['reason_code']=='SERVICE_IMPLEMENTATION_UNVERIFIED'
 
+
+@pytest.mark.parametrize('name', list(CONTRACTS))
+def test_service_host_cannot_fall_back_to_system_image_with_empty_membership(name):
+    row,e=evidence(name)
+    for key in ('services_before','services_after'):e[key]=[]
+    for key in ('implementation_before','implementation_after','implementation_signatures','modules_before','modules_after'):
+        e.pop(key)
+    assert p.classify_missing(row,e,ROOTS)==dict(status='UNRESOLVED',reason_code='SERVICE_IDENTITY_UNAVAILABLE')
+
+
+@pytest.mark.parametrize('snapshot', ['services_before','services_after','both'])
+def test_duplicate_service_membership_is_not_complete_evidence(snapshot):
+    row,e=evidence()
+    for key in ('services_before','services_after'):
+        if snapshot in (key,'both'):e[key].append(copy.deepcopy(e[key][0]))
+    assert p.classify_missing(row,e,ROOTS)==dict(status='UNRESOLVED',reason_code='SERVICE_IDENTITY_UNAVAILABLE')
+
+
+@pytest.mark.parametrize('first', [True,False])
+def test_mixed_membership_cannot_verify_in_either_order(first):
+    row,e=evidence()
+    for key in ('services_before','services_after'):
+        unreviewed=dict(e[key][0],name='UnreviewedSyntheticService')
+        e[key].insert(0,unreviewed) if first else e[key].append(unreviewed)
+    assert p.classify_missing(row,e,ROOTS)==dict(status='UNRESOLVED',reason_code='SERVICE_RULE_UNREVIEWED')
+
 def test_integrated_service_cannot_ignore_configured_dll():
     row,e=evidence('SamSs')
     for key in ('implementation_before','implementation_after'):

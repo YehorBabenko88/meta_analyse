@@ -229,7 +229,7 @@ function Get-MissingProcessEvidence {
  param([Parameter(Mandatory=$true)]$ProcessRecord)
  $idValue=[int]$ProcessRecord.ProcessId
  $row=[ordered]@{pid=$idValue;name=$ProcessRecord.Name;parent_pid=$ProcessRecord.ParentProcessId;session_id=$ProcessRecord.SessionId;created=$null;cim_path=$ProcessRecord.ExecutablePath}
- if ($ProcessRecord.CreationDate) { $row.created=$ProcessRecord.CreationDate.ToUniversalTime().ToFileTimeUtc() }
+ if ($ProcessRecord.CreationDate) { $row.created=$ProcessRecord.CreationDate.ToUniversalTime().ToFileTimeUtc() } elseif ($idValue -eq 0) { $row.created=0 }
  $proof=[ordered]@{}
  try {
   if ($idValue -in @(0,4)) {

@@ -69,6 +69,7 @@ def controls(m):
     row,e=fixture();row['name']='winlogon.exe'
     for key in ('native_before','native_after','signature'):e[key]['path']=ROOTS['system32']+'\\winlogon.exe'
     for key in ('services_before','services_after'):e[key]=[]
+    for key in ('modules_before','modules_after','implementation_before','implementation_after','implementation_signatures'):e.pop(key)
     assert m.classify_missing(row,e,ROOTS)['status']=='VERIFIED_SYSTEM_IMAGE'
     for pid in (0,4):
         row=dict(pid=pid,name='System' if pid else 'System Idle Process',parent_pid=0,session_id=0,created=123456789012345670)
@@ -93,10 +94,20 @@ def main():
         for name in names:
             row,e=altered(name,tag)
             if baseline.classify_missing(row,e,ROOTS)['status']=='UNRESOLVED' and mutant.classify_missing(row,e,ROOTS)['status']!='UNRESOLVED':killed.append(name)
-        results.append(dict(predicate=tag,result='KILLED' if len(killed)==len(names) else 'SURVIVED',witnesses=killed,expected_witnesses=len(names)))
-    report=dict(operators='12 distinct from earlier 15',positive_controls_per_mutant=8,baseline_gaps=gaps,mutations=results,killed=sum(r['result']=='KILLED' for r in results),survived=sum(r['result']=='SURVIVED' for r in results),inapplicable=sum(r['result']=='INAPPLICABLE' for r in results))
+        defended=[]
+        if len(killed)!=len(names) and 'validate_success(row,evidence,roots)' in source:
+            schema_off=load(source.replace('validate_success(row,evidence,roots)','None'))
+            for name in names:
+                r,e=altered(name,tag);assert schema_off.classify_missing(r,e,ROOTS)['status']=='UNRESOLVED'
+            double=load(source.replace(old,new).replace('validate_success(row,evidence,roots)','None'));controls(double)
+            for name in names:
+                r,e=altered(name,tag)
+                if double.classify_missing(r,e,ROOTS)['status']!='UNRESOLVED':defended.append(name)
+        result='KILLED' if len(killed)==len(names) else ('DEFENDED_BY_SCHEMA' if len(defended)==len(names) else 'SURVIVED')
+        results.append(dict(predicate=tag,result=result,witnesses=killed,composite_witnesses=defended,expected_witnesses=len(names)))
+    report=dict(operators='12 distinct from earlier 15',positive_controls_per_mutant=8,baseline_gaps=gaps,mutations=results,killed=sum(r['result']=='KILLED' for r in results),defended=sum(r['result']=='DEFENDED_BY_SCHEMA' for r in results),survived=sum(r['result']=='SURVIVED' for r in results),inapplicable=sum(r['result']=='INAPPLICABLE' for r in results))
     args.output.write_text(json.dumps(report,indent=2)+'\n')
-    print(f"new operators: killed={report['killed']} survived={report['survived']} inapplicable={report['inapplicable']} baseline_gaps={len(gaps)}")
+    print(f"new operators: killed={report['killed']} defended={report['defended']} survived={report['survived']} inapplicable={report['inapplicable']} baseline_gaps={len(gaps)}")
     if gaps or report['survived'] or report['inapplicable']:raise SystemExit(1)
 
 

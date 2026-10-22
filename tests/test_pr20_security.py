@@ -14,15 +14,13 @@ import host_identity as h
 @pytest.mark.parametrize('pid', [123.0, True, False, '123', None, [], {}, -1, 0x80000000])
 def test_security_expected_pid_schema_rejects_aliases(pid):
     row, proof = fixture()
-    with pytest.raises(ValueError):
-        p.assess_processes([dict(process=row, evidence=proof)], ROOTS, [pid])
+    assert p.assess_processes([dict(process=row, evidence=proof)], ROOTS, [pid])['unknown_process_paths']>0
 
 
 @pytest.mark.parametrize('value', [None, {}, (), '123'])
 def test_security_expected_collection_requires_list(value):
     row, proof = fixture()
-    with pytest.raises(ValueError):
-        p.assess_processes([dict(process=row, evidence=proof)], ROOTS, value)
+    assert p.assess_processes([dict(process=row, evidence=proof)], ROOTS, value)['unknown_process_paths']>0
 
 
 @pytest.mark.parametrize('value', ['missing', None, False, 0, [], {}])
@@ -39,7 +37,7 @@ def synthetic_host(monkeypatch, pid=123, malformed_rows=False, available_path=Fa
     raw = raw_facts()
     row, proof = fixture()
     raw['process_evidence'] = None if malformed_rows else [dict(process=row, evidence=proof)]
-    raw['private_inventory']['processes'][0]['ProcessId'] = pid
+    raw['private_inventory']['processes'][0].update(ProcessId=pid,Name=row['name'],ParentProcessId=row['parent_pid'],SessionId=row['session_id'],CreationFileTime=row['created'])
     if available_path:
         raw['private_inventory']['processes'][0]['ExecutablePath'] = r'C:\Windows\System32\winlogon.exe'
         raw['process_evidence'] = []

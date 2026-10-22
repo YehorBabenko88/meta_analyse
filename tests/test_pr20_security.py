@@ -34,12 +34,15 @@ def test_security_integrated_dll_absence_is_explicit_string(value):
     assert p.classify_missing(row, proof, ROOTS)['status'] == 'UNRESOLVED'
 
 
-def synthetic_host(monkeypatch, pid=123, malformed_rows=False):
+def synthetic_host(monkeypatch, pid=123, malformed_rows=False, available_path=False):
     from test_diagnostic_hardening import raw_facts
     raw = raw_facts()
     row, proof = fixture()
     raw['process_evidence'] = None if malformed_rows else [dict(process=row, evidence=proof)]
     raw['private_inventory']['processes'][0]['ProcessId'] = pid
+    if available_path:
+        raw['private_inventory']['processes'][0]['ExecutablePath'] = r'C:\Windows\System32\winlogon.exe'
+        raw['process_evidence'] = []
     raw['terminal_processes'] = [dict(pid=777)]
     monkeypatch.setattr(h, 'is_elevated', lambda: True)
     monkeypatch.setattr(h.platform, 'system', lambda: 'Windows')
@@ -54,6 +57,13 @@ def test_security_host_snapshot_rejects_malformed_pid(monkeypatch, pid):
     with pytest.raises((h.DiagnosticError, ValueError, TypeError)):
         facts = h.collect_facts()
         h.safe_inventory(facts)
+
+
+@pytest.mark.parametrize('pid', [123.0, True, False, '123', None, [], {}])
+def test_security_available_path_does_not_bypass_snapshot_pid_schema(monkeypatch, pid):
+    synthetic_host(monkeypatch, pid, available_path=True)
+    with pytest.raises((h.DiagnosticError, ValueError, TypeError)):
+        h.safe_inventory(h.collect_facts())
 
 
 @pytest.mark.parametrize('bad', [None, {}, {'process': None}, {'process': {'pid': []}}, {'process': {'pid': {}}}])

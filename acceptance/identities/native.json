@@ -1,0 +1,4 @@
+[
+  "tests.test_diagnostic_hardening.test_private_evidence_real_dpapi_roundtrip_or_platform_refusal",
+  "tests.test_host_identity_authorization.test_windows_dpapi_tamper_or_other_platform_fails_closed"
+]

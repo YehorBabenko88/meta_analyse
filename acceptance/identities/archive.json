@@ -1,0 +1,10 @@
+[
+  "tests.test_archive_http_server.test_local_http_disconnect_then_resume",
+  "tests.test_archive_resumable_faults.test_cancellation_checkpoints_without_suppressing_cancel",
+  "tests.test_archive_resumable_faults.test_connection_error_checkpoints_and_resumes",
+  "tests.test_archive_resumable_faults.test_fsync_failure_preserves_cancellation_without_checkpoint",
+  "tests.test_archive_resumable_faults.test_fsync_failure_without_transport_error_propagates",
+  "tests.test_archive_resumable_faults.test_initial_response_requires_explicit_content_length",
+  "tests.test_archive_resumable_faults.test_sidecar_cleanup_failure_does_not_hide_published_archive",
+  "tests.test_archive_resumable_faults.test_wrong_range_does_not_append_partial"
+]

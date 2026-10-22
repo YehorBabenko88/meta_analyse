@@ -1,0 +1,375 @@
+name: Independent PR18 exact-SHA acceptance
+on:
+  push:
+    branches: ['audit/pr18-exact-289c414-20261022']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: acceptance-harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 289c414011afdd52eb7b8dab6dbfd3166c8fdbcb
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: candidate/requirements.lock
+      - name: Verify exact candidate commit and tree before installation
+        working-directory: candidate
+        run: python -c "import sys; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; run.verify()"
+      - name: Install constrained candidate dependencies
+        working-directory: candidate
+        run: python -m pip install -c requirements.lock -e '.[test,archive]'
+      - working-directory: candidate
+        run: python -m pip check
+      - name: Exact-source synthetic suite with runtime platform tripwires
+        working-directory: candidate
+        run: python ../acceptance-harness/acceptance/run.py synthetic
+      - name: Verify explicit projected public artifacts
+        if: always()
+        id: privacy
+        working-directory: candidate
+        run: python -c "import sys; from pathlib import Path; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; [run.safe(Path(p)) for p in ['acceptance-public/junit.xml','acceptance-public/provenance.json']]"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: pr18-synthetic-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            candidate/acceptance-public/junit.xml
+            candidate/acceptance-public/provenance.json
+  independent-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: acceptance-harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 289c414011afdd52eb7b8dab6dbfd3166c8fdbcb
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: candidate/requirements.lock
+      - name: Verify exact candidate commit and tree before installation
+        working-directory: candidate
+        run: python -c "import sys; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; run.verify()"
+      - name: Install constrained candidate dependencies
+        working-directory: candidate
+        run: python -m pip install -c requirements.lock -e '.[test,archive]'
+      - working-directory: candidate
+        run: python -m pip check
+      - name: Adversarial evidence validator self-tests
+        run: python -m pytest -q acceptance-harness/acceptance/test_harness.py
+      - name: Independent mutation sensitivity and negative acceptance probes
+        working-directory: candidate
+        run: python ../acceptance-harness/acceptance/controls.py
+      - name: Verify explicit projected public artifacts
+        if: always()
+        id: privacy
+        working-directory: candidate
+        run: python -c "import sys; from pathlib import Path; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; [run.safe(Path(p)) for p in ['controls-public/junit.xml','controls-public/controls.json']]"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: pr18-independent-controls
+          if-no-files-found: error
+          path: |
+            candidate/controls-public/junit.xml
+            candidate/controls-public/controls.json
+  full-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18.1
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONASYNCIODEBUG: '1'
+      META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+      META_ANALYSE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: acceptance-harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 289c414011afdd52eb7b8dab6dbfd3166c8fdbcb
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: candidate/requirements.lock
+      - name: Verify exact candidate commit and tree before installation
+        working-directory: candidate
+        run: python -c "import sys; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; run.verify()"
+      - name: Install constrained candidate dependencies
+        working-directory: candidate
+        run: python -m pip install -c requirements.lock -e '.[test,archive]'
+      - working-directory: candidate
+        run: python -m pip check
+      - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
+      - name: Confirm pinned disposable PostgreSQL18.1
+        working-directory: candidate
+        run: python -c "import os,psycopg; c=psycopg.connect(os.environ['META_ANALYSE_TEST_ADMIN_DSN']); assert c.info.server_version==180001; c.close()"
+      - name: Compile exact candidate
+        working-directory: candidate
+        run: python -m compileall -q src commissioning scripts tests
+      - name: Ten fresh-process lifecycle repetitions
+        working-directory: candidate
+        run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir lifecycle-private
+      - name: Full suite with disposable database - native tests routed separately
+        working-directory: candidate
+        run: python ../acceptance-harness/acceptance/run.py full
+      - name: Required PostgreSQL and shutdown identities
+        working-directory: candidate
+        run: python scripts/check_integration_postgres.py acceptance-raw.xml --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
+      - name: Synthetic UI benchmark
+        working-directory: candidate
+        run: python scripts/benchmark_flow_ui.py --seconds 3 --output ui-private.json
+      - name: Verify explicit projected public artifacts
+        if: always()
+        id: privacy
+        working-directory: candidate
+        run: python -c "import sys; from pathlib import Path; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; [run.safe(Path(p)) for p in ['acceptance-public/junit.xml','acceptance-public/provenance.json']]"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: pr18-full-linux
+          if-no-files-found: error
+          path: |
+            candidate/acceptance-public/junit.xml
+            candidate/acceptance-public/provenance.json
+  full-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONASYNCIODEBUG: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: acceptance-harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 289c414011afdd52eb7b8dab6dbfd3166c8fdbcb
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: candidate/requirements.lock
+      - name: Verify exact candidate commit and tree before installation
+        working-directory: candidate
+        run: python -c "import sys; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; run.verify()"
+      - name: Install constrained candidate dependencies
+        working-directory: candidate
+        run: python -m pip install -c requirements.lock -e '.[test,archive]'
+      - working-directory: candidate
+        run: python -m pip check
+      - name: Provision pinned PostgreSQL18.6 binaries on disposable runner
+        id: pg
+        working-directory: candidate
+        shell: pwsh
+        run: ./scripts/prepare-ci-postgres18.ps1
+      - name: Full Windows suite, ten lifecycle repetitions and repeated installer
+        working-directory: candidate
+        shell: pwsh
+        run: ../acceptance-harness/acceptance/windows_full.ps1 -PgBin "${{ steps.pg.outputs.pgbin }}"
+      - name: Verify explicit projected public artifacts
+        if: always()
+        id: privacy
+        working-directory: candidate
+        run: python -c "import sys; from pathlib import Path; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; [run.safe(Path(p)) for p in ['acceptance-public/junit.xml','acceptance-public/provenance.json']]"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: pr18-full-windows
+          if-no-files-found: error
+          path: |
+            candidate/acceptance-public/junit.xml
+            candidate/acceptance-public/provenance.json
+  storage-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.1
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONASYNCIODEBUG: '1'
+      META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+      META_ANALYSE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: acceptance-harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 289c414011afdd52eb7b8dab6dbfd3166c8fdbcb
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: candidate/requirements.lock
+      - name: Verify exact candidate commit and tree before installation
+        working-directory: candidate
+        run: python -c "import sys; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; run.verify()"
+      - name: Install constrained candidate dependencies
+        working-directory: candidate
+        run: python -m pip install -c requirements.lock -e '.[test,archive]'
+      - working-directory: candidate
+        run: python -m pip check
+      - name: Confirm pinned disposable PostgreSQL18.1
+        working-directory: candidate
+        run: python -c "import os,psycopg; c=psycopg.connect(os.environ['META_ANALYSE_TEST_ADMIN_DSN']); assert c.info.server_version==180001; c.close()"
+      - name: Storage and shutdown identities - zero skips accepted
+        working-directory: candidate
+        run: python ../acceptance-harness/acceptance/run.py storage
+      - name: Mandatory eleven PostgreSQL and five shutdown identities
+        working-directory: candidate
+        run: python scripts/check_integration_postgres.py acceptance-raw.xml
+      - name: Verify explicit projected public artifacts
+        if: always()
+        id: privacy
+        working-directory: candidate
+        run: python -c "import sys; from pathlib import Path; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; [run.safe(Path(p)) for p in ['acceptance-public/junit.xml','acceptance-public/provenance.json']]"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: pr18-storage-postgres
+          if-no-files-found: error
+          path: |
+            candidate/acceptance-public/junit.xml
+            candidate/acceptance-public/provenance.json
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: acceptance-harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 289c414011afdd52eb7b8dab6dbfd3166c8fdbcb
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: candidate/requirements.lock
+      - name: Verify exact candidate commit and tree before installation
+        working-directory: candidate
+        run: python -c "import sys; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; run.verify()"
+      - name: Install constrained candidate dependencies
+        working-directory: candidate
+        run: python -m pip install -c requirements.lock -e '.[test,archive]'
+      - working-directory: candidate
+        run: python -m pip check
+      - name: Pinned archive fault contract - local loopback only
+        working-directory: candidate
+        run: python ../acceptance-harness/acceptance/run.py archive
+      - name: Verify explicit projected public artifacts
+        if: always()
+        id: privacy
+        working-directory: candidate
+        run: python -c "import sys; from pathlib import Path; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; [run.safe(Path(p)) for p in ['acceptance-public/junit.xml','acceptance-public/provenance.json']]"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: pr18-archive
+          if-no-files-found: error
+          path: |
+            candidate/acceptance-public/junit.xml
+            candidate/acceptance-public/provenance.json
+  native-boundary:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: acceptance-harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 289c414011afdd52eb7b8dab6dbfd3166c8fdbcb
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: candidate/requirements.lock
+      - name: Verify exact candidate commit and tree before installation
+        working-directory: candidate
+        run: python -c "import sys; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; run.verify()"
+      - name: Install constrained candidate dependencies
+        working-directory: candidate
+        run: python -m pip install -c requirements.lock -e '.[test,archive]'
+      - working-directory: candidate
+        run: python -m pip check
+      - name: Native tests on hosted disposable runner only
+        working-directory: candidate
+        run: python ../acceptance-harness/acceptance/run.py native
+      - name: Read-only native ABI and SCM boundary on hosted disposable runner only
+        working-directory: candidate
+        shell: powershell
+        run: |
+          if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Hosted disposable runner required' }
+          ./commissioning/check-process-probe.ps1 -Output native-probe.json
+      - name: Verify explicit projected public artifacts
+        if: always()
+        id: privacy
+        working-directory: candidate
+        run: python -c "import sys; from pathlib import Path; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; [run.safe(Path(p)) for p in ['acceptance-public/junit.xml','acceptance-public/provenance.json']]"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: pr18-native-boundary
+          if-no-files-found: error
+          path: |
+            candidate/acceptance-public/junit.xml
+            candidate/acceptance-public/provenance.json

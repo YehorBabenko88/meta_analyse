@@ -360,11 +360,15 @@ jobs:
         run: |
           if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Hosted disposable runner required' }
           ./commissioning/check-process-probe.ps1 -Output native-probe.json
+      - name: Project and bind native ABI probe result
+        if: always()
+        working-directory: candidate
+        run: python ../acceptance-harness/acceptance/native_summary.py
       - name: Verify explicit projected public artifacts
         if: always()
         id: privacy
         working-directory: candidate
-        run: python -c "import sys; from pathlib import Path; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; [run.safe(Path(p)) for p in ['acceptance-public/junit.xml','acceptance-public/provenance.json']]"
+        run: python -c "import sys; from pathlib import Path; sys.path.insert(0,'../acceptance-harness/acceptance'); import run; [run.safe(Path(p)) for p in ['acceptance-public/junit.xml','acceptance-public/provenance.json','acceptance-public/native-summary.json']]"
       - uses: actions/upload-artifact@v4
         if: always() && steps.privacy.outcome == 'success'
         with:
@@ -373,3 +377,4 @@ jobs:
           path: |
             candidate/acceptance-public/junit.xml
             candidate/acceptance-public/provenance.json
+            candidate/acceptance-public/native-summary.json

@@ -55,7 +55,7 @@ def service_implementation_refusal(svc,evidence,roots,native):
     if canonical(native['path'])!=host_path:return 'SERVICE_IMAGE_NOT_REVIEWED'
     before=evidence.get('implementation_before',{}).get(name)
     after=evidence.get('implementation_after',{}).get(name)
-    if not isinstance(before,dict) or not isinstance(after,dict) or any(c.get('complete') is not True or c.get('error_stage') for c in (before,after)):
+    if not isinstance(before,dict) or not isinstance(after,dict) or any(c.get('complete') is not True or c.get('error_stage')!='' for c in (before,after)):
         return 'SERVICE_IMPLEMENTATION_UNVERIFIED'
     if before!=after:return 'SERVICE_IMPLEMENTATION_CHANGED'
     for c in (before,after):
@@ -73,7 +73,7 @@ def service_implementation_refusal(svc,evidence,roots,native):
     sets=[]
     for key in ('modules_before','modules_after'):
         modules=evidence.get(key)
-        if (not isinstance(modules,dict) or modules.get('complete') is not True or modules.get('error_stage')
+        if (not isinstance(modules,dict) or modules.get('complete') is not True or modules.get('error_stage')!=''
                 or type(modules.get('win32_error')) is not int or modules.get('win32_error')!=0):
             return 'SERVICE_MODULES_UNAVAILABLE'
         if (type(modules.get('pid')) is not int or type(modules.get('created')) is not int
@@ -104,6 +104,10 @@ def classify_missing(row,evidence,roots):
         pid=row['pid']
         if type(pid) is not int or pid<0:return blocked('PROCESS_ID_CONFLICT')
         if pid in (0,4):
+            # The collector emits topology only for these PIDs. Contradictory
+            # file/service proof cannot be silently bypassed by this shortcut.
+            if set(evidence)-{'kernel_before','kernel_after','collection_error'}:
+                return blocked('KERNEL_EVIDENCE_CONFLICT')
             refusal=snapshot_refusal(row,evidence)
             if refusal:return blocked(refusal)
             before=evidence.get('kernel_before',{});after=evidence.get('kernel_after',{})
@@ -137,6 +141,11 @@ def classify_missing(row,evidence,roots):
         path=canonical(before.get('path'))
         if any(n['win32_error']!=0 or n['error_stage']!='' for n in (before,after)):
             return blocked('NATIVE_PROCESS_API_UNAVAILABLE')
+        # File-backed identity needs no kernel-role exception, but any topology
+        # supplied by the collector must still be complete and consistent.
+        if 'kernel_before' in evidence or 'kernel_after' in evidence:
+            refusal=snapshot_refusal(row,evidence,before)
+            if refusal:return blocked(refusal)
         if not path or not canonical(after.get('path')):return blocked('IMAGE_PATH_INVALID')
         if path!=canonical(after['path']):return blocked('IMAGE_PATH_CHANGED')
         if ntpath.basename(path)!=str(row.get('name','')).casefold():return blocked('CIM_IMAGE_NAME_MISMATCH')
@@ -159,6 +168,15 @@ def classify_missing(row,evidence,roots):
             names=[s.get('name') for s in snapshot]
             if any(not isinstance(name,str) or not name for name in names):return blocked('SERVICE_IDENTITY_UNAVAILABLE')
             if len(names)!=len({name.casefold() for name in names}):return blocked('SERVICE_IDENTITY_UNAVAILABLE')
+            # Validate both endpoints before equality: bool/float substitutions
+            # can compare equal to genuine integer identity/status fields.
+            for svc in snapshot:
+                if svc.get('error_stage')!='' or type(svc.get('win32_error')) is not int or svc['win32_error']!=0:
+                    return blocked('SERVICE_API_UNAVAILABLE')
+                if type(svc.get('pid')) is not int or type(svc.get('state')) is not int:
+                    return blocked('SERVICE_IDENTITY_UNAVAILABLE')
+                if svc['name'] in WINDOWS_SERVICE_CONTRACTS and type(svc.get('service_type')) is not int:
+                    return blocked('SERVICE_IDENTITY_UNAVAILABLE')
         known_service_image=any(path==canonical(ntpath.join(roots[root],relative)) for root,relative,_ in SERVICE_RULES.values())
         # Hosts covered by implementation contracts cannot bypass those contracts
         # through the generic signed-System32 fallback when SCM reports no service.
@@ -172,10 +190,6 @@ def classify_missing(row,evidence,roots):
                 if first.get('binary_path')!=last.get('binary_path'):return blocked('SERVICE_CONFIGURATION_CHANGED')
                 if first!=last:return blocked('SERVICE_EVIDENCE_CHANGED')
             for svc in services:
-                if svc.get('error_stage') or type(svc.get('win32_error')) is not int or svc['win32_error']!=0:
-                    return blocked('SERVICE_API_UNAVAILABLE')
-                if type(svc.get('pid')) is not int or type(svc.get('state')) is not int:
-                    return blocked('SERVICE_IDENTITY_UNAVAILABLE')
                 rule=SERVICE_RULES.get(svc.get('name'))
                 contract=svc.get('name') in WINDOWS_SERVICE_CONTRACTS
                 if not rule and not contract:return blocked('SERVICE_RULE_UNREVIEWED')
@@ -238,6 +252,7 @@ def snapshot_refusal(row,evidence,native=None):
     if any(first[k]!=row[k] for k in ('pid','parent_pid','session_id')):
         return 'KERNEL_IDENTITY_CONFLICT'
     if native is not None and (first['pid']!=native['pid'] or first['created']!=native['created']
-                               or not same_creation(row['created'],first['created'])):
+                               or not same_creation(row['created'],first['created'])
+                               or first['name'].casefold()!=row['name'].casefold()):
         return 'KERNEL_IDENTITY_CONFLICT'
     return None

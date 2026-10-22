@@ -54,7 +54,7 @@ def test_service_host_boundary_rejects_conflicts(fault, reason):
     row, proof = synthetic_host(directory=r'C:\Other' if fault == 'spoofed-host' else ROOTS['system32'])
     if fault in ('unknown-service', 'membership-changed', 'configuration-changed'):
         service = dict(name='UnreviewedSyntheticService', pid=row['pid'], state=4,
-                       binary_path=proof['native_before']['path'], win32_error=0)
+                       binary_path=proof['native_before']['path'], error_stage='', win32_error=0)
         proof['services_before'] = [service]
         proof['services_after'] = [copy.deepcopy(service)]
         if fault == 'membership-changed': proof['services_after'] = []

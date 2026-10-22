@@ -67,7 +67,7 @@ def service_implementation_refusal(svc,evidence,roots,native):
             return 'SERVICE_HOST_CONFIGURATION_UNREVIEWED'
         if c.get('dll_source')!=source:return 'SERVICE_DLL_CONFIGURATION_UNREVIEWED'
         if source=='integrated':
-            if c.get('dll_present') is not False or c.get('expanded_dll_path'):return 'SERVICE_DLL_CONFIGURATION_UNREVIEWED'
+            if c.get('dll_present') is not False or c.get('expanded_dll_path')!='':return 'SERVICE_DLL_CONFIGURATION_UNREVIEWED'
         elif c.get('dll_present') is not True or canonical(c.get('expanded_dll_path'))!=dll_path:
             return 'SERVICE_DLL_CONFIGURATION_UNREVIEWED'
     sets=[]
@@ -215,6 +215,10 @@ def classify_missing(row,evidence,roots):
         return blocked('PROCESS_EVIDENCE_UNAVAILABLE')
 
 def assess_processes(rows,roots,expected_missing_pids):
+    # Coverage equality must not alias JSON floats/bools to native integer PIDs.
+    if (not isinstance(expected_missing_pids,list) or
+            any(type(pid) is not int or not 0<=pid<=0x7fffffff for pid in expected_missing_pids)):
+        raise ValueError('PROCESS_INVENTORY_EXPECTED_IDS_INVALID')
     results=[]
     seen=set()
     for item in rows:

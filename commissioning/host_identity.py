@@ -231,6 +231,9 @@ def collect_facts():
         raise DiagnosticError('ELEVATED_TOKEN_REQUIRED')
     from process_identity import assess_processes
     original_processes=facts['private_inventory']['processes']
+    if (not isinstance(original_processes,list) or any(not isinstance(p,dict) or
+            type(p.get('ProcessId')) is not int or not 0<=p['ProcessId']<=0x7fffffff for p in original_processes)):
+        raise DiagnosticError('PROCESS_INVENTORY_SNAPSHOT_INVALID')
     if not original_processes or len(original_processes)!=facts['grid']['visible_processes'] or len({p['ProcessId'] for p in original_processes})!=len(original_processes):
         facts['grid']['errors'].append('Process snapshot incomplete')
         facts['grid']['coverage_complete']=False

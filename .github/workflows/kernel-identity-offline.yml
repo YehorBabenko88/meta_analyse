@@ -1,7 +1,7 @@
 name: Kernel identity offline
 on:
   push:
-    branches: ['parallel/adminit-kernel-identity-evidence', 'parallel/adminit-identity-integration-20261021', 'parallel/adminit-identity-acceptance-fix-20261022']
+    branches: ['parallel/adminit-kernel-identity-evidence', 'parallel/adminit-identity-integration-20261021', 'parallel/adminit-identity-acceptance-fix-20261022', 'parallel/adminit-pr20-security-fix-20261022']
   pull_request:
     paths:
       - 'commissioning/process_identity.py'
@@ -10,6 +10,8 @@ on:
       - 'tests/test_windows_service_contracts.py'
       - 'tests/test_service_host_fallback.py'
       - 'tests/test_process_identity_acceptance.py'
+      - 'tests/test_pr20_security.py'
+      - 'scripts/check_pr20_adversarial_mutations.py'
       - 'scripts/check_process_identity_mutations.py'
       - '.github/workflows/kernel-identity-offline.yml'
 permissions:
@@ -36,13 +38,14 @@ jobs:
           "$PY" -m pip install -c requirements.lock -e '.[test]'
           "$PY" -m pip check
           "$PY" scripts/record_ci_source.py
-          "$PY" -m pytest -q tests/test_kernel_identity_evidence.py tests/test_process_inventory_identity.py tests/test_host_identity_authorization.py tests/test_diagnostic_hardening.py tests/test_windows_service_contracts.py tests/test_service_host_fallback.py tests/test_process_identity_acceptance.py -k 'not test_private_evidence_real_dpapi_roundtrip_or_platform_refusal and not test_windows_dpapi_tamper_or_other_platform_fails_closed' --junitxml=kernel-tests.xml
-          "$PY" scripts/check_integration_junit.py kernel-tests.xml --minimum 718 --require-exact test_acceptance_after_scm_types_are_independently_validated --require-exact test_acceptance_explicit_success_stage_required --require-exact test_acceptance_successful_service_rejects_conflicting_topology --require-exact test_acceptance_special_pid_rejects_mixed_file_service_proof --require-exact test_acceptance_complete_service_controls --require-exact test_acceptance_ordinary_image_control_and_conflicting_topology --require-exact test_scm_requires_explicit_success_error_code --require-exact test_successful_native_image_requires_consistent_success_status --require-exact test_every_contract_requires_each_evidence_source --require-exact test_contract_numeric_identity_types_fail_closed --require-exact test_artifact_gate_rejects_raw_private_payload_without_echo --require-exact test_ordinary_system_image_with_empty_scm_keeps_existing_trust --require-exact test_service_host_cannot_fall_back_to_system_image_with_empty_membership --require-exact test_duplicate_service_membership_is_not_complete_evidence --require-exact test_unproved_or_spoofed_service_implementation_stays_unresolved --require-exact test_combined_lsa_membership_requires_every_implementation --require-exact test_labels_errors_and_subsystem_never_authorize_arbitrary_pid --require-exact test_missing_snapshots_are_not_kernel_evidence --require-exact test_invalid_identity_types_rejected --require-exact test_native_pid_reuse_rejected
+          "$PY" -m pytest -q tests/test_kernel_identity_evidence.py tests/test_process_inventory_identity.py tests/test_host_identity_authorization.py tests/test_diagnostic_hardening.py tests/test_windows_service_contracts.py tests/test_service_host_fallback.py tests/test_process_identity_acceptance.py tests/test_pr20_security.py -k 'not test_private_evidence_real_dpapi_roundtrip_or_platform_refusal and not test_windows_dpapi_tamper_or_other_platform_fails_closed' --junitxml=kernel-tests.xml
+          "$PY" scripts/check_integration_junit.py kernel-tests.xml --minimum 804 --require-exact test_security_available_path_does_not_bypass_snapshot_pid_schema --require-exact test_security_expected_pid_schema_rejects_aliases --require-exact test_security_integrated_dll_absence_is_explicit_string --require-exact test_security_outer_exceptions_block_at_mocked_host_boundary --require-exact test_security_host_snapshot_rejects_malformed_pid --require-exact test_security_new_adversarial_variants --require-exact test_security_positive_aggregate_and_host_control --require-exact test_acceptance_after_scm_types_are_independently_validated --require-exact test_acceptance_explicit_success_stage_required --require-exact test_acceptance_successful_service_rejects_conflicting_topology --require-exact test_acceptance_special_pid_rejects_mixed_file_service_proof --require-exact test_acceptance_complete_service_controls --require-exact test_acceptance_ordinary_image_control_and_conflicting_topology --require-exact test_scm_requires_explicit_success_error_code --require-exact test_successful_native_image_requires_consistent_success_status --require-exact test_every_contract_requires_each_evidence_source --require-exact test_contract_numeric_identity_types_fail_closed --require-exact test_artifact_gate_rejects_raw_private_payload_without_echo --require-exact test_ordinary_system_image_with_empty_scm_keeps_existing_trust --require-exact test_service_host_cannot_fall_back_to_system_image_with_empty_membership --require-exact test_duplicate_service_membership_is_not_complete_evidence --require-exact test_unproved_or_spoofed_service_implementation_stays_unresolved --require-exact test_combined_lsa_membership_requires_every_implementation --require-exact test_labels_errors_and_subsystem_never_authorize_arbitrary_pid --require-exact test_missing_snapshots_are_not_kernel_evidence --require-exact test_invalid_identity_types_rejected --require-exact test_native_pid_reuse_rejected
           "$PY" scripts/check_process_identity_mutations.py --output identity-mutations.json
+          "$PY" scripts/check_pr20_adversarial_mutations.py --output security-mutations.json
       - name: Verify explicit public artifacts before upload
         id: privacy
         if: always()
-        run: python scripts/check_public_diagnostic_artifacts.py source-sha.json kernel-tests.xml identity-mutations.json
+        run: python scripts/check_public_diagnostic_artifacts.py source-sha.json kernel-tests.xml identity-mutations.json security-mutations.json
       - uses: actions/upload-artifact@v4
         if: always() && steps.privacy.outcome == 'success'
         with:
@@ -52,3 +55,4 @@ jobs:
             source-sha.json
             kernel-tests.xml
             identity-mutations.json
+            security-mutations.json

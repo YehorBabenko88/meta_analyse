@@ -12,7 +12,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'commissioning'))
 import host_identity as h
 import process_identity as p
-from test_process_inventory_identity import sample, ROOTS
+from test_process_inventory_identity import sample, ROOTS, filetime_iso
 
 
 @pytest.mark.parametrize('fault,code', [
@@ -75,7 +75,7 @@ def raw_facts():
         collector_elevated=True, os=dict(system='Windows', edition='Professional', build=26300),
         grid=dict(findings=[], errors=[], coverage_complete=True, visible_processes=1),
         process_evidence=[dict(process=row, evidence=e)], process_roots=ROOTS,
-        private_inventory=dict(processes=[dict(ProcessId=row['pid'], ExecutablePath=None)]),
+        private_inventory=dict(processes=[dict(ProcessId=row['pid'], ExecutablePath=row['cim_path'],Name=row['name'],ParentProcessId=row['parent_pid'],SessionId=row['session_id'],CreationFileTime=row['created'],CreationDate=filetime_iso(row['created']))]),
         http_sys_state='', terminal_processes=[], credential_names=[], production_dsn_names=[])
 
 

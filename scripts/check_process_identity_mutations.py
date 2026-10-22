@@ -22,6 +22,7 @@ def ordinary_fixture():
     path = ROOTS['system32'] + r'\winlogon.exe'
     for key in ('native_before', 'native_after', 'signature'): proof[key]['path'] = path
     for key in ('services_before', 'services_after'): proof[key] = []
+    for key in ('modules_before','modules_after','implementation_before','implementation_after','implementation_signatures'):proof.pop(key)
     return row, proof
 
 
@@ -122,15 +123,24 @@ def main():
             assert mutant.classify_missing(row, proof, ROOTS)['status'] == 'VERIFIED_SERVICE', tag
         original_rejected = [name for name in CONTRACTS if probe(baseline, tag, name)]
         killed = [name for name in original_rejected if not probe(mutant, tag, name)]
-        result = 'KILLED' if killed else ('SURVIVED' if original_rejected else 'BASELINE_GAP')
+        defended=[]
+        if not killed and original_rejected and 'validate_success(row,evidence,roots)' in source:
+            schema_off=load(source.replace('validate_success(row,evidence,roots)','None'))
+            assert all(probe(schema_off,tag,n) for n in original_rejected)
+            double=load(source.replace(old,new).replace('validate_success(row,evidence,roots)','None'))
+            for n in CONTRACTS:
+                r,e=fixture(n);assert double.classify_missing(r,e,ROOTS)['status']=='VERIFIED_SERVICE'
+            defended=[n for n in original_rejected if not probe(double,tag,n)]
+        result = 'KILLED' if killed else ('DEFENDED_BY_SCHEMA' if defended else ('SURVIVED' if original_rejected else 'BASELINE_GAP'))
         results.append(dict(predicate=tag, result=result,
-                            baseline_rejected=len(original_rejected), witnesses=killed))
+                            baseline_rejected=len(original_rejected), witnesses=killed, composite_witnesses=defended))
     report = dict(positive_controls=6, baseline_negative_cases=75, baseline_admission_gaps=gaps,
                   mutations=results, killed=sum(r['result']=='KILLED' for r in results),
+                  defended=sum(r['result']=='DEFENDED_BY_SCHEMA' for r in results),
                   survived=sum(r['result']=='SURVIVED' for r in results),
                   inapplicable=sum(r['result']=='INAPPLICABLE' for r in results))
     args.output.write_text(json.dumps(report, indent=2) + '\n')
-    print(f"baseline gaps={len(gaps)} killed={report['killed']} survived={report['survived']} inapplicable={report['inapplicable']}")
+    print(f"baseline gaps={len(gaps)} killed={report['killed']} defended={report['defended']} survived={report['survived']} inapplicable={report['inapplicable']}")
     if gaps or report['survived'] or report['inapplicable']: raise SystemExit(1)
 
 

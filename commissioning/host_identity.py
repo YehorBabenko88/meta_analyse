@@ -22,7 +22,7 @@ TARGET_HOST = 'ADMINIT-JQ1IQSV'
 TARGET_USER = r'ADMINIT-JQ1IQSV\Administrator'
 TARGET_EXE = r'C:\Users\Administrator\AppData\Local\MetaScalp\current\MetaScalp.exe'
 TARGET_EXE_SHA256 = '9f55837fafbf42b713ebe9206a23afb39ff5ff6de4911d676e7840ae657088df'
-COLLECTOR_VERSION = 'adminit-process-evidence-v3-service-contracts'
+COLLECTOR_VERSION = 'adminit-process-evidence-v4-schema-bound'
 
 
 class DiagnosticError(ValueError):
@@ -117,7 +117,7 @@ def target_identity(facts):
 
 def fingerprint(facts, salt):
     identity = facts['identity']
-    if any(identity.get(k) is None or not str(identity.get(k, '')).strip() for k in IDENTITY_FIELDS):
+    if any(type(identity.get(k)) is not str or not identity[k].strip() for k in IDENTITY_FIELDS):
         raise ValueError('incomplete host identity')
     hardware = str(identity['hardware_uuid']).replace('-', '').strip().lower()
     if hardware in ('0' * 32, 'f' * 32):
@@ -127,6 +127,8 @@ def fingerprint(facts, salt):
 
 
 def safe_inventory(facts):
+    from evidence_schema import validate_public
+    validate_public(facts)
     if facts.get('collector_elevated') is not True:
         raise DiagnosticError('ELEVATED_TOKEN_REQUIRED')
     grid = facts['grid']
@@ -199,6 +201,8 @@ def validate_policy(facts, policy, *, expected_name, candidate_sha, manifest_sha
 
 
 def public_report(facts, salt):
+    from evidence_schema import validate_public
+    validate_public(facts)
     return dict(host_fingerprint=fingerprint(facts, salt), os={k:facts['os'][k] for k in ('system','edition','build')},
                 grid_findings=len(facts['grid']['findings']), inventory_errors=len(facts['grid']['errors']),
                 coverage_complete=facts['grid']['coverage_complete'],
@@ -226,7 +230,8 @@ def collect_facts():
                             capture_output=True, timeout=90,env=environment)
     if result.returncode:
         raise ValueError('host facts unavailable; no private output published')
-    facts = json.loads(result.stdout.decode('utf-8-sig'))
+    from evidence_schema import strict_loads
+    facts = strict_loads(result.stdout.decode('utf-8-sig'))
     if facts.get('collector_elevated') is not True:
         raise DiagnosticError('ELEVATED_TOKEN_REQUIRED')
     from process_identity import assess_processes
@@ -237,6 +242,11 @@ def collect_facts():
     if not original_processes or len(original_processes)!=facts['grid']['visible_processes'] or len({p['ProcessId'] for p in original_processes})!=len(original_processes):
         facts['grid']['errors'].append('Process snapshot incomplete')
         facts['grid']['coverage_complete']=False
+    from evidence_schema import validate_source_snapshot
+    try:
+        validate_source_snapshot(original_processes,facts['process_evidence'],facts['process_roots'],directory)
+    except (KeyError,TypeError,ValueError,AttributeError,OverflowError):
+        raise DiagnosticError('PROCESS_SNAPSHOT_BINDING_INVALID') from None
     expected_missing=[p['ProcessId'] for p in original_processes if not p.get('ExecutablePath')]
     private = facts['private_inventory']
     private['process_evidence'] = facts.pop('process_evidence')
@@ -286,17 +296,32 @@ def dpapi(data, *, decrypt=False):
 
 
 def save_private(filename, value):
+    from evidence_schema import json_value
+    json_value(value)
+    serialized=json.dumps(value,allow_nan=False).encode()
     path = Path(filename)
     if path.resolve().is_relative_to(Path(__file__).resolve().parent.parent):
         raise ValueError('private identity records must be outside source/repository packet')
+    payload = base64.b64encode(dpapi(serialized))
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = base64.b64encode(dpapi(json.dumps(value).encode()))
-    with path.open('xb') as stream:
-        stream.write(payload)
+    created = False
+    try:
+        with path.open('xb') as stream:
+            created = True
+            if stream.write(payload) != len(payload):
+                raise OSError('incomplete private write')
+    except Exception:
+        if created:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                raise DiagnosticError('PRIVATE_CLEANUP_FAILED') from None
+        raise
 
 
 def load_private(filename):
-    return json.loads(dpapi(base64.b64decode(Path(filename).read_bytes(), validate=True), decrypt=True))
+    from evidence_schema import strict_loads
+    return strict_loads(dpapi(base64.b64decode(Path(filename).read_bytes(), validate=True), decrypt=True))
 
 
 def validate_bound_database(dsn, policy, environment):
@@ -389,6 +414,7 @@ def main():
     for key in ('enrollment', 'manifest', 'expected-sha', 'manifest-sha256', 'expected-computer'):
         check.add_argument('--' + key, required=True)
     args = parser.parse_args()
+    created_private = None
     try:
         if args.command == 'check':
             authorize(args)
@@ -402,7 +428,6 @@ def main():
             raise DiagnosticError('COLLECTOR_SOURCE_CHANGED')
         if args.command == 'diagnose':
             salt = secrets.token_hex(32)
-            report = public_report(facts, salt)
             reasons=[]
             if facts['grid'].get('coverage_complete') is not True or facts['grid'].get('errors'):reasons.append('INCOMPLETE_INVENTORY')
             if facts['grid'].get('findings'):reasons.append('GRID_CONFLICT')
@@ -412,11 +437,15 @@ def main():
             try: safe_inventory(facts)
             except ValueError:
                 if not reasons:reasons.append('INVENTORY_POLICY_REJECTED')
-            report.update(diagnostic_status='FAIL_CLOSED' if reasons else 'PASS_OBSERVATION_ONLY',reason_codes=reasons)
+            if reasons:
+                raise DiagnosticError(reasons[0])
+            report = public_report(facts, salt)
+            report.update(diagnostic_status='PASS_OBSERVATION_ONLY',reason_codes=[])
+            Path(args.output).write_text(json.dumps(report, indent=2, allow_nan=False), encoding='utf-8')
             save_private(args.private_observation, dict(schema=2, collector=dict(**collector,elevated=True), salt=salt,
                          fingerprint=fingerprint(facts, salt), observed_at=time.time(), facts=facts))
-            Path(args.output).write_text(json.dumps(report, indent=2), encoding='utf-8')
-            print(json.dumps(report, indent=2))
+            created_private = Path(args.private_observation)
+            print(json.dumps(report, indent=2, allow_nan=False))
             return 1 if reasons else 0
         from preflight import verify_manifest
         root=verify_manifest(args.manifest, args.expected_sha, args.manifest_sha256)
@@ -434,9 +463,15 @@ def main():
                              metascalp=dict(path=args.metascalp_exe,sha256=args.metascalp_sha256),
                              operator_approved=args.operator_approved, confirm_no_grid=args.confirm_no_grid)
         save_private(args.enrollment, policy)
+        created_private = Path(args.enrollment)
         print('Private specific-host authorization created; this does not authorize automatic testing')
         return 0
     except Exception as exc:
+        if created_private is not None:
+            try:
+                created_private.unlink(missing_ok=True)
+            except OSError:
+                exc = DiagnosticError('PRIVATE_CLEANUP_FAILED')
         failure = dict(status='FAIL_CLOSED', diagnostic_status='FAIL_CLOSED',
                        reason_codes=[exc.code if isinstance(exc,DiagnosticError) else 'DIAGNOSTIC_UNAVAILABLE'],
                        detail='private identity/configuration values are not published')

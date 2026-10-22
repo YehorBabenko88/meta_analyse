@@ -107,7 +107,7 @@ $terminalProcesses = @($processes | Where-Object { $_.Name -ieq 'MetaScalp.exe' 
     private_inventory=[ordered]@{
         scope='All visible processes, services, scheduled tasks and TCP listeners; bounded known Grid directories, install metadata and environment names. No drive-wide absence claim.'
         services=@($services | Select-Object Name,DisplayName,State,PathName,StartName)
-        processes=@($processes | Select-Object Name,ProcessId,ParentProcessId,ExecutablePath,CreationDate)
+        processes=@($processes | Select-Object Name,ProcessId,ParentProcessId,SessionId,ExecutablePath,@{Name='CreationDate';Expression={if($_.CreationDate){$_.CreationDate.ToUniversalTime().ToString('o')}else{$null}}},@{Name='CreationFileTime';Expression={if($_.CreationDate){$_.CreationDate.ToUniversalTime().ToFileTimeUtc()}elseif($_.ProcessId -eq 0){0}else{$null}}})
         tasks=@($tasks | Select-Object TaskPath,TaskName,State,@{Name='Actions';Expression={@($_.Actions | Select-Object Execute,Arguments,ClassId)}})
         listeners=@($listeners | Select-Object LocalAddress,LocalPort,OwningProcess)
         checked_grid_roots=$gridRoots

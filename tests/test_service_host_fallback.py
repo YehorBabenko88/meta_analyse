@@ -13,7 +13,7 @@ ROOTS = dict(system32=r'C:\Windows\System32', program_files=r'C:\Program Files')
 
 def synthetic_host(name='svchost.exe', directory=ROOTS['system32']):
     path = directory + '\\' + name
-    row = dict(pid=123, name=name, created=123456789012345670, cim_path='')
+    row = dict(pid=123, name=name, created=123456789012345670, cim_path='',parent_pid=4,session_id=0)
     native = dict(pid=123, path=path, created=row['created'], alive=True,
                   image_query_succeeded=True, error_stage='', win32_error=0)
     proof = dict(native_before=native, native_after=copy.deepcopy(native),

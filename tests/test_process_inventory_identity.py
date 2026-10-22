@@ -6,6 +6,11 @@ import pytest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'commissioning'))
 import process_identity as p
 
+def filetime_iso(value):
+    from datetime import datetime,timedelta,timezone
+    return (datetime(1601,1,1,tzinfo=timezone.utc)+timedelta(microseconds=value//10)).isoformat()
+
+
 ROOTS=dict(system32=r'C:\Windows\System32',program_files=r'C:\Program Files')
 
 def sample(service=False):

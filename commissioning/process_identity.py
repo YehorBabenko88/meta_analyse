@@ -95,7 +95,7 @@ def service_implementation_refusal(svc,evidence,roots,native):
         return 'SERVICE_DLL_SIGNATURE_UNVERIFIED'
     return None
 
-def classify_missing(row,evidence,roots):
+def _classify_missing(row,evidence,roots):
     def blocked(code):return dict(status='UNRESOLVED',reason_code=code)
     try:
         if evidence.get('collection_error'):return blocked('PROCESS_EVIDENCE_UNAVAILABLE')
@@ -214,7 +214,26 @@ def classify_missing(row,evidence,roots):
     except (KeyError,TypeError,ValueError,AttributeError):
         return blocked('PROCESS_EVIDENCE_UNAVAILABLE')
 
-def assess_processes(rows,roots,expected_missing_pids):
+PUBLIC_PROCESS_REASONS=frozenset('PROCESS_INVENTORY_SCHEMA_INVALID '.split()) | frozenset('CIM_CREATION_MISMATCH CIM_IMAGE_NAME_MISMATCH CIM_IMAGE_PATH_MISMATCH DUPLICATE_PROCESS_ID GRID_PROCESS_INDICATOR IMAGE_HASH_CHANGED IMAGE_HASH_UNAVAILABLE IMAGE_PATH_CHANGED IMAGE_PATH_INVALID IMAGE_PATH_UNAVAILABLE IMAGE_PUBLISHER_UNAVAILABLE IMAGE_REPARSE_UNVERIFIED IMAGE_SIGNATURE_UNVERIFIED KERNEL_EVIDENCE_CONFLICT KERNEL_IDENTITY_CONFLICT KERNEL_IDENTITY_UNAVAILABLE NATIVE_PROCESS_API_UNAVAILABLE NATIVE_PROCESS_EVIDENCE_CHANGED PROCESS_CREATION_CHANGED PROCESS_CREATION_UNAVAILABLE PROCESS_EVIDENCE_SCHEMA_INVALID PROCESS_EVIDENCE_UNAVAILABLE PROCESS_ID_CONFLICT PROCESS_INVENTORY_COVERAGE_MISMATCH PROCESS_NOT_ALIVE SERVICE_API_UNAVAILABLE SERVICE_CONFIGURATION_CHANGED SERVICE_CONFIG_IMAGE_MISMATCH SERVICE_CONFIG_PATH_INVALID SERVICE_DLL_CONFIGURATION_UNREVIEWED SERVICE_DLL_SIGNATURE_UNVERIFIED SERVICE_EVIDENCE_CHANGED SERVICE_HOST_CONFIGURATION_UNREVIEWED SERVICE_IDENTITY_UNAVAILABLE SERVICE_IMAGE_NOT_REVIEWED SERVICE_IMPLEMENTATION_CHANGED SERVICE_IMPLEMENTATION_NOT_LOADED SERVICE_IMPLEMENTATION_UNVERIFIED SERVICE_MEMBERSHIP_CHANGED SERVICE_MEMBERSHIP_UNAVAILABLE SERVICE_MODULES_CHANGED SERVICE_MODULES_UNAVAILABLE SERVICE_MODULE_LIFETIME_MISMATCH SERVICE_NOT_RUNNING SERVICE_PID_CHANGED SERVICE_PID_MISMATCH SERVICE_PUBLISHER_NOT_REVIEWED SERVICE_RULE_UNREVIEWED SERVICE_STATE_CHANGED SIGNATURE_IMAGE_PATH_MISMATCH SYSTEM_IMAGE_PUBLISHER_NOT_REVIEWED UNREVIEWED_PROCESS_IMAGE'.split())
+
+
+def classify_missing(row,evidence,roots):
+    try:
+        from evidence_schema import json_value
+        json_value(row);json_value(evidence);json_value(roots)
+        result=_classify_missing(row,evidence,roots)
+    except (KeyError,TypeError,ValueError,AttributeError,OverflowError,RecursionError):
+        return dict(status='UNRESOLVED',reason_code='PROCESS_EVIDENCE_SCHEMA_INVALID')
+    if result['status'].startswith('VERIFIED_'):
+        try:
+            from evidence_schema import validate_success
+            validate_success(row,evidence,roots)
+        except (KeyError,TypeError,ValueError,AttributeError,OverflowError):
+            return dict(status='UNRESOLVED',reason_code='PROCESS_EVIDENCE_SCHEMA_INVALID')
+    return result
+
+
+def _assess_processes(rows,roots,expected_missing_pids):
     # Coverage equality must not alias JSON floats/bools to native integer PIDs.
     if (not isinstance(expected_missing_pids,list) or
             any(type(pid) is not int or not 0<=pid<=0x7fffffff for pid in expected_missing_pids)):
@@ -235,6 +254,15 @@ def assess_processes(rows,roots,expected_missing_pids):
     mismatch=len(rows)!=len(expected) or len(expected)!=len(set(expected)) or seen!=set(expected)
     if mismatch:reasons['PROCESS_INVENTORY_COVERAGE_MISMATCH']=1
     return dict(results=results,missing_process_paths=len(expected),verified_missing_process_paths=len(results)-len(unresolved),unknown_process_paths=len(unresolved)+int(mismatch),reason_counts=reasons)
+
+def assess_processes(rows,roots,expected_missing_pids):
+    try:
+        if type(rows) is not list:raise ValueError('PROCESS_INVENTORY_SCHEMA_INVALID')
+        return _assess_processes(rows,roots,expected_missing_pids)
+    except (KeyError,TypeError,ValueError,AttributeError,OverflowError):
+        return dict(results=[],missing_process_paths=0,verified_missing_process_paths=0,
+                    unknown_process_paths=1,reason_counts={'PROCESS_INVENTORY_SCHEMA_INVALID':1})
+
 
 def snapshot_refusal(row,evidence,native=None):
     """Check lifetime/topology only; no general kernel identity is established.

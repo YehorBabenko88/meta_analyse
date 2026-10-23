@@ -125,10 +125,10 @@ def validate_mutations(path):
         elif key=='operators':need(item=='12 distinct from earlier 15')
         elif key!='mutations':need(type(item) is int and 0<=item<=10000)
     need(type(value.get('mutations')) is list)
-    contracts={'KeyIso','SamSs','VaultSvc','DoSvc','wscsvc'}
+    contracts={'KeyIso','SamSs','VaultSvc','DoSvc','wscsvc','PUBLIC_PRIVATE_FILE_IDENTITY'}
     for mutation in value['mutations']:
         need(set(mutation)<={'predicate','result','baseline_rejected','witnesses','composite_witnesses','expected_witnesses'})
-        need(mutation['predicate'] in tags and mutation['result'] in ('KILLED','DEFENDED_BY_SCHEMA'))
+        need(mutation['predicate'] in tags and mutation['result'] in ('KILLED','DEFENDED_BY_SCHEMA','DEFENDED_BY_EXCLUSIVE_OUTPUT','DEFENDED_BY_OPEN_HANDLE'))
         for key,item in mutation.items():
             if key in ('witnesses','composite_witnesses'):need(type(item) is list and all(v in contracts for v in item))
             elif key in ('baseline_rejected','expected_witnesses'):need(type(item) is int and 0<=item<=5)

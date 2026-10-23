@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import types
 import tempfile
+import os
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path[:0]=[str(ROOT/'commissioning'),str(ROOT/'tests')]
@@ -27,6 +28,10 @@ MUTATIONS=[
  ('raw-ascii-before-casefold','schema',"need(p.command_argument_text(config['expanded_image_path']).isascii())\n            need(p.command_argument_text(service['binary_path']).isascii())\n            need(p.command_argument_text(raw_image).isascii())",'pass'),
  ('public-private-collision','host',"if output.resolve() == private.resolve() or (output.exists() and private.exists() and output.samefile(private)):", 'if False:'),
  ('junit-counter-preservation','projection',"cases=validate_raw_structure(tree.getroot())", "cases=list(tree.getroot().iter('testcase'))"),
+ ('exclusive-new-output','host',"Path(filename).open('x+b')","Path(filename).open('w+b')"),
+ ('public-handle-binding','host',"public_output.write(json.dumps(report, indent=2, allow_nan=False).encode('utf-8'))","Path(args.output).write_bytes(json.dumps(report, indent=2, allow_nan=False).encode('utf-8'))"),
+ ('private-handle-erasure','host',"self.stream.truncate(0)",'pass'),
+ ('public-nonadmission','host',"report.update(diagnostic_status='OBSERVATION_ONLY_NOT_AUTHORIZATION',reason_codes=[])","report.update(diagnostic_status='PASS_OBSERVATION_ONLY',reason_codes=[])"),
 ]
 
 
@@ -37,6 +42,8 @@ def load(source,name):
 
 def probe(module,tag):
     try:
+        if tag in ('exclusive-new-output','public-handle-binding','private-handle-erasure','public-nonadmission'):
+            return transaction_probe(module,tag)
         if tag=='raw-ascii-before-casefold':
             row,e=fixture()
             for suffix in ('before','after'):
@@ -88,20 +95,78 @@ def probe(module,tag):
             module.is_elevated=lambda:True
             module.collector_identity=lambda *a,**k:dict(candidate_sha='a'*40,version='synthetic')
             module.collect_facts=lambda:facts;module.save_private=lambda *a,**k:persisted.append(True)
-            class Output:
-                def __init__(self,value):self.value=value
-                def resolve(self):return self.value
-                def exists(self):return False
-                def write_text(self,*a,**k):pass
-            module.Path=Output
-            argv=sys.argv
-            try:
-                sys.argv=['synthetic','diagnose','--expected-sha','a'*40,'--output','public','--private-observation','private']
-                with contextlib.redirect_stdout(io.StringIO()):code=module.main()
-            finally:sys.argv=argv
+            with tempfile.TemporaryDirectory() as tmp:
+                argv=sys.argv
+                try:
+                    sys.argv=['synthetic','diagnose','--expected-sha','a'*40,'--output',str(Path(tmp)/'public'),'--private-observation',str(Path(tmp)/'private')]
+                    with contextlib.redirect_stdout(io.StringIO()):code=module.main()
+                finally:sys.argv=argv
             return code==1 and not persisted
     except (ValueError,KeyError,TypeError,AttributeError):return True
     return False
+
+
+def transaction_probe(module,tag='positive',release_for_witness=False):
+    module.is_elevated=lambda:True;module.collect_facts=raw_facts
+    module.collector_identity=lambda *a,**k:dict(candidate_sha='a'*40,version='synthetic')
+    module.dpapi=lambda *a,**k:b'SYNTHETIC_CIPHERTEXT'
+    with tempfile.TemporaryDirectory() as tmp:
+        public=Path(tmp)/'public';private=Path(tmp)/'private';observed=[]
+        if tag=='exclusive-new-output':public.write_bytes(b'SYNTHETIC_EXISTING')
+        if tag=='public-handle-binding':
+            first=Path(tmp)/'first';second=Path(tmp)/'second';link=Path(tmp)/'reparse'
+            first.mkdir();second.mkdir()
+            private=second/'record';public=link/'record'
+            private.write_bytes(b'SYNTHETIC_EXISTING')
+            def create(target):
+                if sys.platform=='win32':
+                    import _winapi
+                    _winapi.CreateJunction(str(target),str(link))
+                else:link.symlink_to(target,target_is_directory=True)
+            def remove():
+                if sys.platform=='win32':os.rmdir(link)
+                else:link.unlink()
+            create(first);changed_paths=[];sharing_fence=[];handles=[]
+            init=module.NewOutput.__init__
+            def opened(owned,path):
+                init(owned,path)
+                if Path(path)==public:handles.append(owned)
+            module.NewOutput.__init__=opened
+            def changed():
+                try:remove()
+                except PermissionError:
+                    if not release_for_witness:sharing_fence.append(True);raise
+                    handles[0].close();remove()
+                create(second);changed_paths.append(True)
+                return raw_facts()
+            module.collect_facts=changed
+        if tag=='private-handle-erasure':
+            calls=[]
+            def output(*a,**k):
+                if not calls:calls.append(True);raise BrokenPipeError('SYNTHETIC')
+            module.print=output
+        if tag=='public-nonadmission':
+            original=module.NewOutput.write
+            def write(owned,payload):
+                observed.append(b'PASS_OBSERVATION_ONLY' in payload)
+                return original(owned,payload)
+            module.NewOutput.write=write
+            def rejected(*a,**k):raise OSError('SYNTHETIC')
+            module.save_private=rejected
+        argv=sys.argv
+        try:
+            sys.argv=['synthetic','diagnose','--expected-sha','a'*40,'--output',str(public),'--private-observation',str(private)]
+            with contextlib.redirect_stdout(io.StringIO()):code=module.main()
+        finally:sys.argv=argv
+        if tag=='exclusive-new-output':return code==1 and public.read_bytes()==b'SYNTHETIC_EXISTING'
+        if tag=='public-handle-binding':
+            preserved=private.read_bytes()==b'SYNTHETIC_EXISTING'
+            remove()
+            assert changed_paths==[True] or sharing_fence==[True] or (sys.platform=='win32' and not handles)
+            return code==1 and preserved
+        if tag=='private-handle-erasure':return code==1 and private.read_bytes()==b''
+        if tag=='public-nonadmission':return code==1 and not any(observed)
+        return code==0 and bool(private.read_bytes())
 
 
 def main():
@@ -118,10 +183,20 @@ def main():
         mutant=load(sources[kind].replace(old,new),kind)
         if kind=='schema':
             r,e=fixture();mutant.validate_success(r,e,ROOTS)
-        results.append(dict(predicate=tag,result='KILLED' if not probe(mutant,tag) else 'SURVIVED'))
-    report=dict(mutations=results,killed=sum(r['result']=='KILLED' for r in results),survived=sum(r['result']=='SURVIVED' for r in results))
+        if kind=='host':assert transaction_probe(load(sources[kind],kind)) and transaction_probe(load(sources[kind].replace(old,new),kind)),tag
+        result=dict(predicate=tag,result='KILLED' if not probe(mutant,tag) else 'SURVIVED')
+        if tag=='public-private-collision' and result['result']=='SURVIVED':
+            composite=load(sources[kind].replace(old,new).replace("Path(filename).open('x+b')","Path(filename).open('w+b')"),kind)
+            assert not probe(composite,tag)
+            result.update(result='DEFENDED_BY_EXCLUSIVE_OUTPUT',composite_witnesses=['PUBLIC_PRIVATE_FILE_IDENTITY'])
+        if tag=='public-handle-binding' and result['result']=='SURVIVED' and sys.platform=='win32':
+            composite_source=sources[kind].replace(old,new).replace("Path(filename).open('x+b')","Path(filename).resolve().open('x+b')")
+            assert not transaction_probe(load(composite_source,kind),tag,release_for_witness=True)
+            result.update(result='DEFENDED_BY_EXCLUSIVE_OUTPUT',composite_witnesses=['PUBLIC_PRIVATE_FILE_IDENTITY'])
+        results.append(result)
+    report=dict(mutations=results,killed=sum(r['result']=='KILLED' for r in results),defended=sum(r['result'].startswith('DEFENDED_') for r in results),survived=sum(r['result']=='SURVIVED' for r in results))
     args.output.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
-    print(f"Schema/cross-stage/public mutations killed={report['killed']} survived={report['survived']}")
+    print(f"Schema/cross-stage/public mutations killed={report['killed']} defended={report['defended']} survived={report['survived']}")
     if report['survived']:raise SystemExit(1)
 
 

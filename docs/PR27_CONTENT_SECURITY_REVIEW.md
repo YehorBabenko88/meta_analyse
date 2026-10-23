@@ -7,7 +7,7 @@ Six new synthetic assertions were red on frozen PR27, then green with this fix:
 - The default ElementTree parser discards XML comments and processing instructions, accepts DTDs and expands internal entities. Post-parse structure checks therefore accept unprojected input carrying hidden raw metadata. No external-file/network exploit is claimed; all witnesses use tiny synthetic strings.
 - `str(exc)` on malformed numeric counters and OSError leaks raw values/paths into CLI stderr. Witnesses contain only synthetic sentinels.
 
-A separate deeper JSON witness (3 KiB, within the source size cap) caused uncaught RecursionError/traceback. Its red CLI assertion becomes green when that parser-depth refusal also uses the fixed error envelope. No success is claimed for malformed input.
+A separate deeper JSON witness (7001 bytes, within the source size cap) caused uncaught RecursionError/traceback on frozen PR27 locally. Its red CLI assertion becomes green when that parser-depth refusal also uses the fixed error envelope. A shallower 3001-byte sample did not trigger recursion failure on this Python build and is not counted as red evidence. No success is claimed for malformed input.
 
 The parser target now rejects comments, PI and DTD at parsing time, before entity handling. Reads are bounded on actual file descriptors (8 KiB JSON, 8 MiB XML), rather than relying on earlier stat sizes. Test counters must equal canonical actual counts. CLI refusal emits a fixed safe code without exception messages. Success JSON is unchanged. Positive compatibility is tested against real, authenticated PR26 artifacts as well as fixtures.
 

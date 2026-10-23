@@ -295,6 +295,13 @@ def dpapi(data, *, decrypt=False):
         free(target.data)
 
 
+def checked_output_path(filename):
+    path = Path(filename)
+    if any(':' in part for part in path.parts if part != path.anchor):
+        raise DiagnosticError('OUTPUT_STREAM_SYNTAX_UNREVIEWED')
+    return path
+
+
 class NewOutput:
     """Exclusive new inode, held until completion; never reopen/unlink its name.
 
@@ -302,6 +309,7 @@ class NewOutput:
     empty reservation and is not crash-atomic publication or durable storage.
     """
     def __init__(self, filename):
+        checked_output_path(filename)
         self.stream = Path(filename).open('x+b')
 
     def write(self, payload):
@@ -327,7 +335,7 @@ def save_private(filename, value, *, retain_handle=False):
     from evidence_schema import json_value
     json_value(value)
     serialized=json.dumps(value,allow_nan=False).encode()
-    path = Path(filename)
+    path = checked_output_path(filename)
     if path.resolve().is_relative_to(Path(__file__).resolve().parent.parent):
         raise ValueError('private identity records must be outside source/repository packet')
     payload = base64.b64encode(dpapi(serialized))

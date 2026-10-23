@@ -32,6 +32,7 @@ MUTATIONS=[
  ('public-handle-binding','host',"public_output.write(json.dumps(report, indent=2, allow_nan=False).encode('utf-8'))","Path(args.output).write_bytes(json.dumps(report, indent=2, allow_nan=False).encode('utf-8'))"),
  ('private-handle-erasure','host',"self.stream.truncate(0)",'pass'),
  ('public-nonadmission','host',"report.update(diagnostic_status='OBSERVATION_ONLY_NOT_AUTHORIZATION',reason_codes=[])","report.update(diagnostic_status='PASS_OBSERVATION_ONLY',reason_codes=[])"),
+ ('output-default-stream-only','host',"if any(':' in part for part in path.parts if part != path.anchor):",'if False:'),
 ]
 
 
@@ -42,7 +43,7 @@ def load(source,name):
 
 def probe(module,tag):
     try:
-        if tag in ('exclusive-new-output','public-handle-binding','private-handle-erasure','public-nonadmission'):
+        if tag in ('exclusive-new-output','public-handle-binding','private-handle-erasure','public-nonadmission','output-default-stream-only'):
             return transaction_probe(module,tag)
         if tag=='raw-ascii-before-casefold':
             row,e=fixture()
@@ -112,6 +113,11 @@ def transaction_probe(module,tag='positive',release_for_witness=False):
     module.dpapi=lambda *a,**k:b'SYNTHETIC_CIPHERTEXT'
     with tempfile.TemporaryDirectory() as tmp:
         public=Path(tmp)/'public';private=Path(tmp)/'private';observed=[]
+        if tag=='output-default-stream-only':
+            private.write_bytes(b'SYNTHETIC_EXISTING')
+            try:module.save_private(str(private)+':new',{'synthetic':True})
+            except ValueError:return private.read_bytes()==b'SYNTHETIC_EXISTING'
+            return False
         if tag=='exclusive-new-output':public.write_bytes(b'SYNTHETIC_EXISTING')
         if tag=='public-handle-binding':
             first=Path(tmp)/'first';second=Path(tmp)/'second';link=Path(tmp)/'reparse'

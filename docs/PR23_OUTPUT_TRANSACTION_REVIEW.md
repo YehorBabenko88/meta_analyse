@@ -6,7 +6,7 @@ Frozen candidate `14fc1653e7a8a347d4dd1a91148eb27e8b2c7d8c`, tree
 
 ## Red findings and bounded correction
 
-Five fresh tests fail on the frozen candidate: late public hardlink substitution
+Seven fresh negative cases fail (one default-stream collision control passes) on the frozen candidate: late public hardlink substitution
 can truncate an existing private file; private failure plus public rewrite refusal
 leaves PASS_OBSERVATION_ONLY; path-based cleanup can unlink a different record
 installed at the old name; interruption before private write leaves public PASS.
@@ -63,7 +63,7 @@ may itself be refused before collection; this is a conservative protection, not
 proof a late alias change completed. Linux exercises the completed late parent
 symlink change. The before-create swap asserts actual change independently.
 
-The 38 prior mutation operators remain, with four new transaction operators.
+The 38 prior mutation operators remain, with five new transaction/path operators.
 Disabling the old alias precheck alone is defended by exclusive output creation.
 Windows may also defend the handle-binding mutant via its exclusive/reparse or
 open-handle behavior. Composite witnesses are recorded separately; these are not
@@ -79,3 +79,5 @@ counts. The pure PowerShell adapter's eight controls remain required on Windows.
 No native collector, C# ABI, Add-Type, live DPAPI, PostgreSQL, ADMINIT diagnosis,
 enrollment, ACL/security/service/registry changes, merge or deployment is executed.
 Source/synthetic acceptance is bounded; ADMINIT remains NO-GO.
+
+Named-stream syntax is rejected before private IO. Exclusive creation alone can create an ADS on an existing NTFS file; default bytes remain unchanged but container metadata changes. Only ordinary output streams are reviewed. POSIX colon filenames are conservatively rejected by this Windows-oriented profile too.

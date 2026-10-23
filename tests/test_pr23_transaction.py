@@ -182,6 +182,13 @@ def test_success_writes_complete_private_and_only_nonadmitting_public(monkeypatc
     assert private.read_bytes()
     assert json.loads(public.read_text())['diagnostic_status']=='OBSERVATION_ONLY_NOT_AUTHORIZATION'
 
+@pytest.mark.parametrize('suffix',[':new',':new:$DATA','::$DATA'])
+def test_output_stream_syntax_never_modifies_existing_file(monkeypatch,tmp_path,suffix):
+    target=tmp_path/'existing';target.write_bytes(b'SYNTHETIC_EXISTING')
+    monkeypatch.setattr(h,'dpapi',lambda *a,**k:b'SYNTHETIC_CIPHERTEXT')
+    with pytest.raises((OSError,ValueError) if suffix=='::$DATA' else ValueError):h.save_private(str(target)+suffix,{'synthetic':True})
+    assert target.read_bytes()==b'SYNTHETIC_EXISTING'
+
 def test_after_close_error_reports_cleanup_limit_without_public_pass(monkeypatch,tmp_path,capsys):
     public,private=setup_main(monkeypatch,tmp_path);close=h.NewOutput.close;fired=[]
     def after_close(owned):

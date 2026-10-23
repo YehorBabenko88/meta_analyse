@@ -64,7 +64,10 @@ def test_fail_closed(tmp_path, mutation):
         other = tmp_path / "other"
         other.mkdir()
         cells[("push", "windows")] = other
-        (tmp_path / "link").symlink_to(target, target_is_directory=True)
+        try:
+            (tmp_path / "link").symlink_to(target, target_is_directory=True)
+        except OSError:
+            pytest.skip("symlink privilege unavailable on this runner")
         cells[("push", "windows")] = tmp_path / "link"
     with pytest.raises((ValueError, OSError)):
         m.verify(cells, SHA, TREE, 1)

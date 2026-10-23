@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import sys
 import types
+import tempfile
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path[:0]=[str(ROOT/'commissioning'),str(ROOT/'tests')]
@@ -23,6 +24,9 @@ MUTATIONS=[
  ('source-time-binding','schema',"need(ticks//10==item['CreationFileTime']//10)",'pass'),
  ('public-counter-type','schema',"if key in grid:integer(grid[key])",'if key in grid:pass'),
  ('failed-observation-persistence','host',"            if reasons:\n                raise DiagnosticError(reasons[0])",'            if reasons:pass'),
+ ('raw-ascii-before-casefold','schema',"need(p.command_argument_text(config['expanded_image_path']).isascii())\n            need(p.command_argument_text(service['binary_path']).isascii())\n            need(p.command_argument_text(raw_image).isascii())",'pass'),
+ ('public-private-collision','host',"if output.resolve() == private.resolve() or (output.exists() and private.exists() and output.samefile(private)):", 'if False:'),
+ ('junit-counter-preservation','projection',"cases=validate_raw_structure(tree.getroot())", "cases=list(tree.getroot().iter('testcase'))"),
 ]
 
 
@@ -33,6 +37,32 @@ def load(source,name):
 
 def probe(module,tag):
     try:
+        if tag=='raw-ascii-before-casefold':
+            row,e=fixture()
+            for suffix in ('before','after'):
+                e['services_'+suffix][0]['binary_path']=e['services_'+suffix][0]['binary_path'].replace('NetworkService','Networkſervice')
+                for key in ('image_path','expanded_image_path'):e['implementation_'+suffix]['DoSvc'][key]=e['implementation_'+suffix]['DoSvc'][key].replace('NetworkService','Networkſervice')
+            module.validate_success(row,e,ROOTS)
+            return False
+        if tag=='junit-counter-preservation':
+            with tempfile.TemporaryDirectory() as tmp:
+                path=Path(tmp)/'synthetic.xml'
+                path.write_text('<testsuites><testsuite tests="1" errors="1"><testcase classname="tests.test_process_identity_acceptance" name="test_acceptance_complete_service_controls"/></testsuite></testsuites>')
+                module.project_junit(path)
+            return False
+        if tag=='public-private-collision':
+            module.is_elevated=lambda:True;module.collect_facts=raw_facts
+            module.collector_identity=lambda *a,**k:dict(candidate_sha='a'*40,version='synthetic')
+            def collision(*a,**k):raise FileExistsError('SYNTHETIC')
+            module.save_private=collision
+            with tempfile.TemporaryDirectory() as tmp:
+                path=Path(tmp)/'synthetic';path.write_bytes(b'SYNTHETIC_EXISTING')
+                argv=sys.argv
+                try:
+                    sys.argv=['synthetic','diagnose','--expected-sha','a'*40,'--output',str(path),'--private-observation',str(path)]
+                    with contextlib.redirect_stdout(io.StringIO()):code=module.main()
+                finally:sys.argv=argv
+                return code==1 and path.read_bytes()==b'SYNTHETIC_EXISTING'
         if tag in ('raw-image-expansion','scm-diagnostic-reason','diagnostic-numeric-type','full-native-snapshot'):
             row,e=fixture()
             if tag=='raw-image-expansion':
@@ -59,11 +89,14 @@ def probe(module,tag):
             module.collector_identity=lambda *a,**k:dict(candidate_sha='a'*40,version='synthetic')
             module.collect_facts=lambda:facts;module.save_private=lambda *a,**k:persisted.append(True)
             class Output:
+                def __init__(self,value):self.value=value
+                def resolve(self):return self.value
+                def exists(self):return False
                 def write_text(self,*a,**k):pass
-            module.Path=lambda *a:Output()
+            module.Path=Output
             argv=sys.argv
             try:
-                sys.argv=['synthetic','diagnose','--expected-sha','a'*40,'--output','none','--private-observation','none']
+                sys.argv=['synthetic','diagnose','--expected-sha','a'*40,'--output','public','--private-observation','private']
                 with contextlib.redirect_stdout(io.StringIO()):code=module.main()
             finally:sys.argv=argv
             return code==1 and not persisted
@@ -74,7 +107,8 @@ def probe(module,tag):
 def main():
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);args=p.parse_args()
     sources={'schema':(ROOT/'commissioning/evidence_schema.py').read_text(encoding='utf-8-sig'),
-             'host':(ROOT/'commissioning/host_identity.py').read_text(encoding='utf-8-sig')}
+             'host':(ROOT/'commissioning/host_identity.py').read_text(encoding='utf-8-sig'),
+             'projection':(ROOT/'scripts/project_synthetic_artifacts.py').read_text(encoding='utf-8-sig')}
     results=[]
     for tag,kind,old,new in MUTATIONS:
         baseline=load(sources[kind],kind);assert probe(baseline,tag),tag

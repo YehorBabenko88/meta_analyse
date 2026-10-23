@@ -29,6 +29,31 @@ def unique_pairs(pairs):
 def reject_constant(_):
     raise ValueError("NONFINITE_JSON")
 
+
+class ProjectedXML(ET.TreeBuilder):
+    """Reject constructs discarded by the default ElementTree parser.
+
+    In particular, reject the DTD before entity processing; do not depend on
+    a particular Expat version's amplification threshold for this profile.
+    """
+    def doctype(self, *args):
+        raise ValueError("JUNIT_DTD_FORBIDDEN")
+
+    def comment(self, *args):
+        raise ValueError("JUNIT_COMMENT_FORBIDDEN")
+
+    def pi(self, *args):
+        raise ValueError("JUNIT_PI_FORBIDDEN")
+
+
+def read_limited(path, limit):
+    # Bound the actual read, not an earlier stat whose size may have changed.
+    with path.open('rb') as stream:
+        data = stream.read(limit + 1)
+    if not 0 < len(data) <= limit:
+        raise ValueError("ARTIFACT_SIZE_INVALID")
+    return data
+
 def verify_cell(directory, sha, tree, event, minimum):
     if not directory.is_dir() or directory.is_symlink():
         raise ValueError("MISSING_OR_SYMLINK_ARTIFACT_DIRECTORY")
@@ -38,9 +63,9 @@ def verify_cell(directory, sha, tree, event, minimum):
         raise ValueError("ARTIFACT_FILE_INVENTORY_MISMATCH")
     source = directory / "source-sha.json"
     junit = directory / "ci-audit.xml"
-    if source.stat().st_size > 8192 or not (0 < junit.stat().st_size <= 8 * 1024 * 1024):
-        raise ValueError("ARTIFACT_SIZE_INVALID")
-    data = json.loads(source.read_text(encoding="utf-8"), object_pairs_hook=unique_pairs,
+    source_bytes = read_limited(source, 8192)
+    junit_bytes = read_limited(junit, 8 * 1024 * 1024)
+    data = json.loads(source_bytes.decode('utf-8'), object_pairs_hook=unique_pairs,
                       parse_constant=reject_constant)
     if type(data) is not dict or set(data) != {"sha", "expected_sha", "event", "event_sha", "tree_sha"}:
         raise ValueError("SOURCE_SCHEMA_INVALID")
@@ -50,14 +75,14 @@ def verify_cell(directory, sha, tree, event, minimum):
         raise ValueError("EVENT_SHA_INVALID")
     if event == "push" and data["event_sha"] != sha:
         raise ValueError("PUSH_EVENT_SHA_MISMATCH")
-    root = ET.parse(junit).getroot()
+    root = ET.fromstring(junit_bytes, parser=ET.XMLParser(target=ProjectedXML()))
     if root.tag != "testsuites" or root.attrib != {"name": "synthetic"} or len(root) != 1:
         raise ValueError("JUNIT_ROOT_INVALID")
     suite = root[0]
     if suite.tag != "testsuite" or set(suite.attrib) != {"name", "tests", "errors", "failures", "skipped"} or suite.get("name") != "synthetic-identity":
         raise ValueError("JUNIT_SUITE_INVALID")
     cases = list(suite)
-    if len(cases) < minimum or len(cases) != int(suite.get("tests")):
+    if len(cases) < minimum or suite.get("tests") != str(len(cases)):
         raise ValueError("JUNIT_COUNT_INVALID")
     if any(suite.get(k) != "0" for k in ("errors", "failures", "skipped")):
         raise ValueError("JUNIT_NONPASS_COUNT")
@@ -99,8 +124,9 @@ def main():
     cells = {(event, os_name): getattr(a, event + "_" + os_name) for event, os_name in CELLS}
     try:
         count = verify(cells, a.sha, a.tree, a.minimum)
-    except (ValueError, OSError, ET.ParseError, TypeError, OverflowError) as exc:
-        print("CONTENT_GATE_BLOCKED: " + str(exc), file=sys.stderr)
+    except (ValueError, OSError, ET.ParseError, TypeError, OverflowError):
+        # Parser/OS exceptions may contain raw counter values or private paths.
+        print("CONTENT_GATE_BLOCKED: INVALID_CONTENT_OR_IO", file=sys.stderr)
         return 1
     print(json.dumps({"verdict": "CONTENT_PASS_ONLY", "sha": a.sha, "tree": a.tree,
                       "cells": len(CELLS), "identities": count,

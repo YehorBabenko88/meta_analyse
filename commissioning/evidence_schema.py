@@ -157,8 +157,9 @@ def validate_success(process,evidence,roots):
                 if key not in ('complete','dll_present','service_type'):text(config[key])
             raw_image=expanded(config['image_path'],roots)
             need(config['account'].isascii() and service['start_name'].isascii())
-            need(all(arg.isascii() for arg in p.command_arguments(config['expanded_image_path'])))
-            need(all(arg.isascii() for arg in p.command_arguments(service['binary_path'])))
+            need(p.command_argument_text(config['expanded_image_path']).isascii())
+            need(p.command_argument_text(service['binary_path']).isascii())
+            need(p.command_argument_text(raw_image).isascii())
             need(p.command_executable(raw_image)==p.command_executable(config['expanded_image_path']) and
                  p.command_arguments(raw_image)==p.command_arguments(config['expanded_image_path']))
             if config['dll_present']:

@@ -415,7 +415,13 @@ def main():
         check.add_argument('--' + key, required=True)
     args = parser.parse_args()
     created_private = None
+    public_output_safe = False
     try:
+        if args.command == 'diagnose':
+            output, private = Path(args.output), Path(args.private_observation)
+            if output.resolve() == private.resolve() or (output.exists() and private.exists() and output.samefile(private)):
+                raise DiagnosticError('PUBLIC_PRIVATE_PATH_COLLISION')
+            public_output_safe = True
         if args.command == 'check':
             authorize(args)
             print('Specific Windows installation/user/source authorization PASS')
@@ -475,7 +481,7 @@ def main():
         failure = dict(status='FAIL_CLOSED', diagnostic_status='FAIL_CLOSED',
                        reason_codes=[exc.code if isinstance(exc,DiagnosticError) else 'DIAGNOSTIC_UNAVAILABLE'],
                        detail='private identity/configuration values are not published')
-        if args.command == 'diagnose':
+        if args.command == 'diagnose' and public_output_safe:
             try: Path(args.output).write_text(json.dumps(failure,indent=2),encoding='utf-8')
             except OSError: pass
         print(json.dumps(failure))

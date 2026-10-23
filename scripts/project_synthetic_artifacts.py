@@ -40,9 +40,32 @@ def identity(classname,name):
     return root if name==root else root+'[sha256:'+hashlib.sha256(name.encode()).hexdigest()+']'
 
 
+def validate_raw_structure(node):
+    if node.tag in ('testsuites','testsuite'):
+        children={'testsuite','properties','system-out','system-err'}
+        if node.tag=='testsuite':children.add('testcase')
+        need(all(child.tag in children for child in node))
+        cases=[]
+        for child in node:
+            if child.tag in ('testsuite','testcase'):cases.extend(validate_raw_structure(child))
+            else:need(not any(n.tag in ('testcase','testsuite','testsuites','error','failure','skipped') for n in child.iter()))
+        counts=dict(tests=len(cases),errors=sum(c.find('error') is not None for c in cases),
+                    failures=sum(c.find('failure') is not None for c in cases),
+                    skipped=sum(c.find('skipped') is not None for c in cases))
+        for key,count in counts.items():
+            if key in node.attrib:need(node.get(key)==str(count))
+        return cases
+    need(node.tag=='testcase')
+    need(all(child.tag in ('error','failure','skipped','properties','system-out','system-err') for child in node))
+    need(sum(child.tag in ('error','failure','skipped') for child in node)<=1)
+    # Metadata/status payloads may contain text, never nested test records.
+    need(not any(child.tag in ('testcase','testsuite','testsuites','error','failure','skipped') for outer in node for child in outer.iter() if child is not outer))
+    return [node]
+
+
 def project_junit(path):
     need(path.stat().st_size<=8*1024*1024)
-    tree=ET.parse(path);cases=list(tree.getroot().iter('testcase'));need(bool(cases))
+    tree=ET.parse(path);cases=validate_raw_structure(tree.getroot());need(bool(cases))
     identities=set();result=ET.Element('testsuites',name='synthetic')
     suite=ET.SubElement(result,'testsuite',name='synthetic-identity')
     counts=dict(tests=len(cases),errors=0,failures=0,skipped=0)
@@ -72,6 +95,7 @@ def validate_junit(path):
         need(identity(cls,rootname)==rootname)
         need(name==rootname or re.fullmatch(re.escape(rootname)+r'\[sha256:[0-9a-f]{64}\]',name) is not None)
         need((cls,name) not in seen);seen.add((cls,name));counts['tests']+=1
+        need(len(case)<=1)
         for status in case:
             need(status.tag in ('error','failure','skipped') and status.attrib=={'message':'Synthetic status; raw detail omitted'} and not list(status) and not status.text)
             counts[{'error':'errors','failure':'failures','skipped':'skipped'}[status.tag]]+=1

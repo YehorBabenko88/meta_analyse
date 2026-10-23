@@ -42,10 +42,15 @@ def same_creation(left,right):
     return type(left) is int and type(right) is int and left>0 and left//10==right//10
 
 
-def command_arguments(command):
+def command_argument_text(command):
     if not command_executable(command):return None
     match=re.fullmatch(r'(?:"[^"\r\n]+\.exe"|[^\s"\r\n]+\.exe)(.*)',command,re.I)
-    return tuple(match[1].casefold().split()) if match else None
+    return match[1] if match else None
+
+
+def command_arguments(command):
+    arguments=command_argument_text(command)
+    return tuple(arguments.casefold().split()) if arguments is not None else None
 
 
 def service_implementation_refusal(svc,evidence,roots,native):

@@ -22,7 +22,7 @@ TARGET_HOST = 'ADMINIT-JQ1IQSV'
 TARGET_USER = r'ADMINIT-JQ1IQSV\Administrator'
 TARGET_EXE = r'C:\Users\Administrator\AppData\Local\MetaScalp\current\MetaScalp.exe'
 TARGET_EXE_SHA256 = '9f55837fafbf42b713ebe9206a23afb39ff5ff6de4911d676e7840ae657088df'
-COLLECTOR_VERSION = 'adminit-process-evidence-v4-schema-bound'
+COLLECTOR_VERSION = 'adminit-process-evidence-v5-exclusive-output'
 
 
 class DiagnosticError(ValueError):
@@ -295,27 +295,62 @@ def dpapi(data, *, decrypt=False):
         free(target.data)
 
 
-def save_private(filename, value):
+def checked_output_path(filename):
+    path = Path(filename)
+    if any(':' in part for part in path.parts if part != path.anchor):
+        raise DiagnosticError('OUTPUT_STREAM_SYNTAX_UNREVIEWED')
+    return path
+
+
+class NewOutput:
+    """Exclusive new inode, held until completion; never reopen/unlink its name.
+
+    This protects existing files across namespace changes. Erasure can leave an
+    empty reservation and is not crash-atomic publication or durable storage.
+    """
+    def __init__(self, filename):
+        checked_output_path(filename)
+        self.stream = Path(filename).open('x+b')
+
+    def write(self, payload):
+        self.stream.seek(0)
+        if self.stream.write(payload) != len(payload):
+            raise OSError('incomplete output write')
+        self.stream.truncate()
+        self.stream.flush()
+
+    def erase(self):
+        try:
+            self.stream.seek(0)
+            self.stream.truncate(0)
+            self.stream.flush()
+        except (OSError, ValueError):
+            raise DiagnosticError('PRIVATE_CLEANUP_FAILED') from None
+
+    def close(self):
+        self.stream.close()
+
+
+def save_private(filename, value, *, retain_handle=False):
     from evidence_schema import json_value
     json_value(value)
     serialized=json.dumps(value,allow_nan=False).encode()
-    path = Path(filename)
+    path = checked_output_path(filename)
     if path.resolve().is_relative_to(Path(__file__).resolve().parent.parent):
         raise ValueError('private identity records must be outside source/repository packet')
     payload = base64.b64encode(dpapi(serialized))
     path.parent.mkdir(parents=True, exist_ok=True)
-    created = False
+    owned = NewOutput(path)
     try:
-        with path.open('xb') as stream:
-            created = True
-            if stream.write(payload) != len(payload):
-                raise OSError('incomplete private write')
-    except Exception:
-        if created:
-            try:
-                path.unlink(missing_ok=True)
-            except OSError:
-                raise DiagnosticError('PRIVATE_CLEANUP_FAILED') from None
+        owned.write(payload)
+        if retain_handle:
+            return owned
+        owned.close()
+    except BaseException:
+        try:
+            owned.erase()
+        finally:
+            owned.close()
         raise
 
 
@@ -415,13 +450,15 @@ def main():
         check.add_argument('--' + key, required=True)
     args = parser.parse_args()
     created_private = None
-    public_output_safe = False
+    public_output = None
     try:
         if args.command == 'diagnose':
             output, private = Path(args.output), Path(args.private_observation)
             if output.resolve() == private.resolve() or (output.exists() and private.exists() and output.samefile(private)):
                 raise DiagnosticError('PUBLIC_PRIVATE_PATH_COLLISION')
-            public_output_safe = True
+            # Existing public files are never overwritten, including aliases
+            # installed after the precheck. All later writes use this handle.
+            public_output = NewOutput(output)
         if args.command == 'check':
             authorize(args)
             print('Specific Windows installation/user/source authorization PASS')
@@ -446,12 +483,17 @@ def main():
             if reasons:
                 raise DiagnosticError(reasons[0])
             report = public_report(facts, salt)
-            report.update(diagnostic_status='PASS_OBSERVATION_ONLY',reason_codes=[])
-            Path(args.output).write_text(json.dumps(report, indent=2, allow_nan=False), encoding='utf-8')
-            save_private(args.private_observation, dict(schema=2, collector=dict(**collector,elevated=True), salt=salt,
-                         fingerprint=fingerprint(facts, salt), observed_at=time.time(), facts=facts))
-            created_private = Path(args.private_observation)
+            # Public JSON is observation data, never a private-write commit
+            # receipt. Only successful process completion reports both writes.
+            report.update(diagnostic_status='OBSERVATION_ONLY_NOT_AUTHORIZATION',reason_codes=[])
+            public_output.write(json.dumps(report, indent=2, allow_nan=False).encode('utf-8'))
+            created_private = save_private(args.private_observation, dict(schema=2, collector=dict(**collector,elevated=True), salt=salt,
+                         fingerprint=fingerprint(facts, salt), observed_at=time.time(), facts=facts), retain_handle=True)
+            if not isinstance(created_private, NewOutput):
+                raise DiagnosticError('PRIVATE_WRITE_RECEIPT_INVALID')
             print(json.dumps(report, indent=2, allow_nan=False))
+            public_output.close()
+            if created_private is not None:created_private.close()
             return 1 if reasons else 0
         from preflight import verify_manifest
         root=verify_manifest(args.manifest, args.expected_sha, args.manifest_sha256)
@@ -468,24 +510,32 @@ def main():
                              port=int(args.port), data_directory=args.data_directory,
                              metascalp=dict(path=args.metascalp_exe,sha256=args.metascalp_sha256),
                              operator_approved=args.operator_approved, confirm_no_grid=args.confirm_no_grid)
-        save_private(args.enrollment, policy)
-        created_private = Path(args.enrollment)
+        created_private = save_private(args.enrollment, policy, retain_handle=True)
+        if not isinstance(created_private, NewOutput):
+            raise DiagnosticError('PRIVATE_WRITE_RECEIPT_INVALID')
         print('Private specific-host authorization created; this does not authorize automatic testing')
+        if created_private is not None:created_private.close()
         return 0
-    except Exception as exc:
-        if created_private is not None:
+    except BaseException as exc:
+        if isinstance(created_private, NewOutput):
             try:
-                created_private.unlink(missing_ok=True)
-            except OSError:
+                created_private.erase()
+            except (OSError, ValueError):
                 exc = DiagnosticError('PRIVATE_CLEANUP_FAILED')
         failure = dict(status='FAIL_CLOSED', diagnostic_status='FAIL_CLOSED',
                        reason_codes=[exc.code if isinstance(exc,DiagnosticError) else 'DIAGNOSTIC_UNAVAILABLE'],
                        detail='private identity/configuration values are not published')
-        if args.command == 'diagnose' and public_output_safe:
-            try: Path(args.output).write_text(json.dumps(failure,indent=2),encoding='utf-8')
-            except OSError: pass
+        if public_output is not None:
+            try: public_output.write(json.dumps(failure,indent=2).encode('utf-8'))
+            except (OSError, ValueError): pass
+        if not isinstance(exc, Exception):raise
         print(json.dumps(failure))
         return 1
+    finally:
+        for owned in (created_private, public_output):
+            if isinstance(owned, NewOutput):
+                try:owned.close()
+                except OSError:pass
 
 
 if __name__ == '__main__':

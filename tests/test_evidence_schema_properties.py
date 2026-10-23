@@ -254,11 +254,11 @@ def test_output_failure_leaves_no_new_private_observation(monkeypatch,tmp_path,f
     monkeypatch.setattr(h,'is_elevated',lambda:True)
     monkeypatch.setattr(h,'collector_identity',lambda *a,**k:dict(candidate_sha='a'*40,version='synthetic'))
     monkeypatch.setattr(h,'collect_facts',lambda:facts)
-    monkeypatch.setattr(h,'save_private',lambda filename,*a,**k:Path(filename).write_bytes(b'SYNTHETIC'))
+    monkeypatch.setattr(h,'dpapi',lambda *a,**k:b'SYNTHETIC_CIPHERTEXT')
     monkeypatch.setattr(sys,'argv',['synthetic','diagnose','--expected-sha','a'*40,
         '--output',str(public),'--private-observation',str(private)])
     if failure=='public-file':
-        monkeypatch.setattr(Path,'write_text',lambda *a,**k:(_ for _ in ()).throw(OSError('SYNTHETIC')))
+        monkeypatch.setattr(h.NewOutput,'write',lambda *a,**k:(_ for _ in ()).throw(OSError('SYNTHETIC')))
     else:
         calls=[]
         def failing_once(*a,**k):
@@ -266,7 +266,7 @@ def test_output_failure_leaves_no_new_private_observation(monkeypatch,tmp_path,f
             if len(calls)==1:raise BrokenPipeError('SYNTHETIC')
         monkeypatch.setattr('builtins.print',failing_once)
     assert h.main()==1
-    assert not private.exists()
+    assert not private.exists() or private.read_bytes()==b''
 
 
 def test_private_collision_preserves_existing_file(monkeypatch,tmp_path):
@@ -280,25 +280,22 @@ def test_partial_private_write_is_removed(monkeypatch,tmp_path):
     monkeypatch.setattr(h,'dpapi',lambda value:value)
     target=tmp_path/'partial';original_open=Path.open
     class Partial:
-        def __enter__(self):return self
-        def __exit__(self,*args):pass
+        def __init__(self):self.stream=original_open(target,'x+b')
+        def __getattr__(self,name):return getattr(self.stream,name)
         def write(self,value):
-            target.write_bytes(b'SYNTHETIC_PARTIAL')
+            self.stream.write(value[:1])
             return 1
-    monkeypatch.setattr(Path,'open',lambda path,*a,**k:Partial() if path==target and a==('xb',) else original_open(path,*a,**k))
+    monkeypatch.setattr(Path,'open',lambda path,*a,**k:Partial() if path==target and a==('x+b',) else original_open(path,*a,**k))
     with pytest.raises(OSError):h.save_private(target,{'synthetic':True})
-    assert not target.exists()
+    # Keep an empty exclusive reservation; never unlink through a mutable name.
+    assert target.read_bytes()==b''
 
 
 def test_private_cleanup_refusal_has_fixed_diagnostic(monkeypatch,tmp_path):
     monkeypatch.setattr(h,'dpapi',lambda value:value)
     target=tmp_path/'uncreated'
-    class Partial:
-        def __enter__(self):return self
-        def __exit__(self,*args):pass
-        def write(self,value):return 1
-    monkeypatch.setattr(Path,'open',lambda *a,**k:Partial())
-    monkeypatch.setattr(Path,'unlink',lambda *a,**k:(_ for _ in ()).throw(PermissionError('SYNTHETIC_PRIVATE_ERROR')))
+    monkeypatch.setattr(h.NewOutput,'write',lambda *a,**k:(_ for _ in ()).throw(OSError('SYNTHETIC')))
+    monkeypatch.setattr(h.NewOutput,'erase',lambda *a,**k:(_ for _ in ()).throw(h.DiagnosticError('PRIVATE_CLEANUP_FAILED')))
     with pytest.raises(h.DiagnosticError) as failure:h.save_private(target,{'synthetic':True})
     assert failure.value.code=='PRIVATE_CLEANUP_FAILED'
     assert 'SYNTHETIC_PRIVATE_ERROR' not in str(failure.value)

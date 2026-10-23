@@ -172,7 +172,12 @@ def test_observation_contains_collector_binding_only_privately(monkeypatch, tmp_
     monkeypatch.setattr(h,'collector_identity',lambda *a,**kw:meta)
     monkeypatch.setattr(h,'collect_facts',lambda:facts)
     captured=[]
-    monkeypatch.setattr(h,'save_private',lambda filename,value:captured.append(value))
+    save=h.save_private
+    monkeypatch.setattr(h,'dpapi',lambda *a,**k:b'SYNTHETIC_CIPHERTEXT')
+    def capture(filename,value,**options):
+        captured.append(value)
+        return save(filename,value,**options)
+    monkeypatch.setattr(h,'save_private',capture)
     monkeypatch.setattr(sys,'argv',['guard','diagnose','--expected-sha','1'*40,'--output',str(tmp_path/'public.json'),'--private-observation',str(tmp_path/'observation.dpapi')])
     assert h.main()==0
     assert captured[0]['schema']==2

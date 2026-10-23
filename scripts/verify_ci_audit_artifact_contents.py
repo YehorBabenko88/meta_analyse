@@ -124,7 +124,7 @@ def main():
     cells = {(event, os_name): getattr(a, event + "_" + os_name) for event, os_name in CELLS}
     try:
         count = verify(cells, a.sha, a.tree, a.minimum)
-    except (ValueError, OSError, ET.ParseError, TypeError, OverflowError):
+    except (ValueError, OSError, ET.ParseError, TypeError, OverflowError, RecursionError):
         # Parser/OS exceptions may contain raw counter values or private paths.
         print("CONTENT_GATE_BLOCKED: INVALID_CONTENT_OR_IO", file=sys.stderr)
         return 1

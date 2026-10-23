@@ -85,3 +85,11 @@ def test_actual_read_is_bounded_not_stat_size(monkeypatch,tmp_path):
             return b'x'*33
     monkeypatch.setattr(Path,'open',lambda *a,**k:Stream())
     with pytest.raises(ValueError,match='ARTIFACT_SIZE_INVALID'):m.read_limited(tmp_path/'synthetic',32)
+
+def test_deep_json_cli_returns_explicit_refusal_without_traceback(tmp_path):
+    value=cells(tmp_path)
+    (value['push','windows']/'source-sha.json').write_text('['*1500+'0'+']'*1500)
+    args=[sys.executable,str(SCRIPT),'--sha','a'*40,'--tree','b'*40,'--minimum','1']
+    for (event,platform),directory in value.items():args+=['--'+event.replace('_','-')+'-'+platform,str(directory)]
+    result=subprocess.run(args,capture_output=True,text=True)
+    assert result.returncode==1 and result.stderr.strip()=='CONTENT_GATE_BLOCKED: INVALID_CONTENT_OR_IO'

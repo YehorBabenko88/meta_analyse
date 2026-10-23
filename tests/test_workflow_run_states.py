@@ -37,3 +37,33 @@ def test_api_wrapper_and_bad_shape():
         pass
     else:
         raise AssertionError("malformed run list accepted")
+
+def test_cli_inventory_only_and_explicit_gate(tmp_path):
+    import json
+    import subprocess
+    import sys
+    fixture = tmp_path / "runs.json"
+    fixture.write_text(json.dumps({"workflow_runs": [run()]}), encoding="utf-8")
+    base = [sys.executable, str(p), "--runs-json", str(fixture), "--sha", SHA]
+    inventory = subprocess.run(base, capture_output=True, text=True, check=False)
+    assert inventory.returncode == 0
+    assert json.loads(inventory.stdout)["verdict"] == "INVENTORY_ONLY"
+    accepted = subprocess.run(base + ["--require-gate", "CI:push"],
+                              capture_output=True, text=True, check=False)
+    assert accepted.returncode == 0
+    assert json.loads(accepted.stdout)["verdict"] == "PASS"
+    missing = subprocess.run(base + ["--require-gate", "CI:pull_request"],
+                             capture_output=True, text=True, check=False)
+    assert missing.returncode == 1
+    assert json.loads(missing.stdout)["verdict"] == "BLOCKED"
+
+def test_cli_invalid_gate_fails(tmp_path):
+    import json
+    import subprocess
+    import sys
+    fixture = tmp_path / "runs.json"
+    fixture.write_text(json.dumps([run()]), encoding="utf-8")
+    result = subprocess.run([sys.executable, str(p), "--runs-json", str(fixture),
+                             "--sha", SHA, "--require-gate", "Unknown:push"],
+                            capture_output=True, text=True, check=False)
+    assert result.returncode == 2

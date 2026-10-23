@@ -29,7 +29,15 @@ def test_policy_preserves_old_exclusions_and_blocks_maintenance(event,branch):
 def test_synthetic_workflow_scope_and_permissions():
     text=(ROOT/'.github/workflows/ci-audit-synthetic.yml').read_text()
     assert 'contents: read' in text and 'max-parallel: 2' in text and 'fail-fast: false' in text
-    assert '--noconftest' in text and 'pytest\n' in text
+    assert '--noconftest' in text and 'pytest hypothesis\n' in text
     assert 'if-no-files-found: error' in text
     for forbidden in ('check-process-probe','prepare-ci-postgres','services:','workflow_dispatch:','self-hosted','pull_request_target:'):
         assert forbidden not in text
+
+def test_property_test_dependency_is_in_standard_test_extra():
+    import tomllib
+    project=tomllib.loads((ROOT/'pyproject.toml').read_text())
+    pin='hypothesis==6.170.6'
+    assert pin in project['project']['optional-dependencies']['test']
+    lock=(ROOT/'requirements.lock').read_text()
+    assert pin in lock and 'sortedcontainers==2.4.0' in lock

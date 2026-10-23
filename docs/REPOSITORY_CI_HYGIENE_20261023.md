@@ -41,3 +41,7 @@ Scope: maintenance only. Base is Draft PR #24 exact HEAD `95bb4efc635fa3ddee6c8a
 - A failed or incomplete public diagnostic observation must not authorize enrollment; consumer must validate private evidence.
 
 This document is an inventory and acceptance plan, not a claim that full CI has run.
+
+## Read-only workflow inventory CLI
+
+`python scripts/audit_workflow_run_states.py --runs-json runs.json --sha <full-40-char-sha>` emits an inventory and exits 0 on valid input, **not** a CI PASS. To enforce an explicitly required gate, add `--require-gate 'Kernel identity offline:push'` (repeat as needed). The caller must define applicable required gates; path/branch-triggered workflows cannot be inferred from the run list alone. An absent run is `NOT_RUN`, never `PASS`. The tool does not determine native or physical authorization.

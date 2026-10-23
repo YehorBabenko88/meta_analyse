@@ -60,6 +60,24 @@ def test_cleanup_never_unlinks_a_rebound_private_path(monkeypatch,tmp_path):
     with pytest.raises(OSError):h.save_private(target,{'synthetic':True})
     assert target.exists() and target.read_bytes()==b'SYNTHETIC_EXISTING'
 
+def test_real_close_boundary_rebind_preserves_existing_record(monkeypatch,tmp_path):
+    target=tmp_path/'new';victim=tmp_path/'existing';abandoned=tmp_path/'abandoned'
+    victim.write_bytes(b'SYNTHETIC_EXISTING');rebound=[];original=Path.open
+    monkeypatch.setattr(h,'dpapi',lambda *a,**k:b'SYNTHETIC_CIPHERTEXT')
+    class CloseRace:
+        def __init__(self,mode):self.stream=original(target,mode)
+        def __enter__(self):return self
+        def __getattr__(self,name):return getattr(self.stream,name)
+        def write(self,payload):
+            self.stream.write(payload[:1]);raise OSError('SYNTHETIC')
+        def __exit__(self,*a):
+            self.stream.close()
+            target.rename(abandoned);victim.rename(target);rebound.append(True)
+    monkeypatch.setattr(Path,'open',lambda path,*a,**k:CloseRace(a[0]) if path==target and a and a[0] in ('xb','x+b') else original(path,*a,**k))
+    with pytest.raises(OSError):h.save_private(target,{'synthetic':True})
+    preserved=target if rebound else victim
+    assert preserved.exists() and preserved.read_bytes()==b'SYNTHETIC_EXISTING'
+
 def test_crash_before_private_write_leaves_no_public_pass(monkeypatch,tmp_path):
     public,private=setup_main(monkeypatch,tmp_path)
     monkeypatch.setattr(h,'save_private',lambda *a,**k:(_ for _ in ()).throw(KeyboardInterrupt()))
@@ -199,7 +217,7 @@ def hit(owned,stage):
 def created(owned,path):init(owned,path);hit(owned,'create')
 def written(owned,payload):write(owned,payload);hit(owned,'write')
 def closed(owned):
-    hit(owned,'close');close(owned)
+    close(owned);hit(owned,'close')
 h.NewOutput.__init__=created;h.NewOutput.write=written;h.NewOutput.close=closed
 sys.argv=['synthetic','diagnose','--expected-sha','a'*40,'--output',PUBLIC,'--private-observation',PRIVATE]
 raise SystemExit(h.main())

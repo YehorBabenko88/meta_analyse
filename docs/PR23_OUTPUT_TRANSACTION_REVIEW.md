@@ -6,7 +6,7 @@ Frozen candidate `14fc1653e7a8a347d4dd1a91148eb27e8b2c7d8c`, tree
 
 ## Red findings and bounded correction
 
-Four fresh tests fail on the frozen candidate: late public hardlink substitution
+Five fresh tests fail on the frozen candidate: late public hardlink substitution
 can truncate an existing private file; private failure plus public rewrite refusal
 leaves PASS_OBSERVATION_ONLY; path-based cleanup can unlink a different record
 installed at the old name; interruption before private write leaves public PASS.

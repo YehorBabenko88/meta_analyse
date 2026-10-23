@@ -1,0 +1,52 @@
+name: CI audit synthetic
+on:
+  push:
+    branches: ['maintenance/actions-audit-hardening-20261023']
+  pull_request:
+    paths:
+      - 'scripts/audit_workflow_run_states.py'
+      - 'tests/test_workflow_run_states*.py'
+      - 'tests/test_ci_audit_workflow_policy.py'
+      - '.github/workflows/ci-audit-synthetic.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ci-audit-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    if: (github.head_ref || github.ref_name) == 'maintenance/actions-audit-hardening-20261023'
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/record_ci_source.py
+      - run: python -m pip install -c requirements.lock pytest hypothesis
+      - name: Offline CI metadata and policy tests only
+        run: python -m pytest --noconftest -q tests/test_workflow_run_states.py tests/test_workflow_run_states_adversarial.py tests/test_ci_audit_workflow_policy.py --junitxml=ci-audit.xml
+      - name: Collect pure property tests to verify Hypothesis dependency
+        run: python -m pytest --noconftest --collect-only -q tests/test_evidence_schema_properties.py
+      - name: Strict projection and privacy gate
+        id: privacy
+        if: always()
+        run: |
+          python -c "import sys; from pathlib import Path; sys.path.insert(0,'scripts'); import project_synthetic_artifacts as p; p.project_junit(Path('ci-audit.xml')); p.validate_source(Path('source-sha.json'))"
+          python scripts/check_public_diagnostic_artifacts.py ci-audit.xml source-sha.json
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: ci-audit-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            ci-audit.xml
+            source-sha.json

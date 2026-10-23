@@ -10,10 +10,23 @@ SHA = "a" * 40
 
 def run(name="CI", event="push", sha=SHA, status="completed", conclusion="success", id=1):
     return dict(name=name, event=event, head_sha=sha, status=status,
-                conclusion=conclusion, id=id, run_number=id, run_attempt=1)
+                conclusion=conclusion, id=id, run_number=id, run_attempt=1,
+                path='.github/workflows/ci.yml', run_started_at='2026-10-23T08:00:00Z')
+
+def complete_payload(runs):
+    receipts={}
+    for r in runs:
+        receipts[str(r['id'])]={'run_attempt':r['run_attempt'],
+            'jobs':{'total_count':3,'jobs':[dict(id=i+1,name=name,run_id=r['id'],run_attempt=r['run_attempt'],
+                head_sha=r['head_sha'],status='completed',conclusion='success')
+                for i,name in enumerate(['windows','linux','archive-pinned-contract'])]},
+            'artifacts':{'total_count':3,'artifacts':[dict(id=i+1,name=name,expired=False,size_in_bytes=1,
+                workflow_run={'id':r['id'],'head_sha':r['head_sha']},created_at='2026-10-23T08:01:00Z')
+                for i,name in enumerate(['windows-test-evidence','linux-test-evidence','archive-pinned-contract-evidence'])]}}
+    return {'workflow_runs':runs,'run_evidence':receipts}
 
 def test_success_only_exact_sha():
-    assert m.audit([run(), run(sha="b" * 40, id=99)], SHA)["CI"]["push"]["state"] == "PASS"
+    assert m.audit(complete_payload([run(), run(sha="b" * 40, id=99)]), SHA)["CI"]["push"]["state"] == "PASS"
 
 def test_skipped_and_queued_are_blocked():
     for status, conclusion in [("completed", "skipped"), ("queued", None), ("completed", "cancelled")]:
@@ -30,7 +43,7 @@ def test_no_cross_sha_promotion():
     assert m.audit([run(sha="b" * 40)], SHA)["CI"]["push"]["state"] == "NOT_RUN"
 
 def test_api_wrapper_and_bad_shape():
-    assert m.audit({"workflow_runs": [run()]}, SHA)["CI"]["push"]["state"] == "PASS"
+    assert m.audit(complete_payload([run()]), SHA)["CI"]["push"]["state"] == "PASS"
     try:
         m.audit({"workflow_runs": {}}, SHA)
     except ValueError:
@@ -43,7 +56,7 @@ def test_cli_inventory_only_and_explicit_gate(tmp_path):
     import subprocess
     import sys
     fixture = tmp_path / "runs.json"
-    fixture.write_text(json.dumps({"workflow_runs": [run()]}), encoding="utf-8")
+    fixture.write_text(json.dumps(complete_payload([run()])), encoding="utf-8")
     base = [sys.executable, str(p), "--runs-json", str(fixture), "--sha", SHA]
     inventory = subprocess.run(base, capture_output=True, text=True, check=False)
     assert inventory.returncode == 0

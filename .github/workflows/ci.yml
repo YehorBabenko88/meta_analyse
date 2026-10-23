@@ -6,7 +6,7 @@ permissions:
   contents: read
 jobs:
   windows:
-    if: github.ref_name != 'parallel/adminit-kernel-identity-evidence' && github.head_ref != 'parallel/adminit-kernel-identity-evidence' && github.ref_name != 'parallel/adminit-identity-integration-20261021' && github.head_ref != 'parallel/adminit-identity-integration-20261021' && github.ref_name != 'parallel/adminit-identity-acceptance-fix-20261022' && github.head_ref != 'parallel/adminit-identity-acceptance-fix-20261022' && github.ref_name != 'parallel/adminit-pr20-security-fix-20261022' && github.head_ref != 'parallel/adminit-pr20-security-fix-20261022' && github.ref_name != 'parallel/adminit-pr21-evidence-schema-20261022' && github.head_ref != 'parallel/adminit-pr21-evidence-schema-20261022' && github.ref_name != 'parallel/adminit-pr22-boundary-review-20261022' && github.head_ref != 'parallel/adminit-pr22-boundary-review-20261022' && github.ref_name != 'parallel/adminit-pr23-output-transaction-20261023' && github.head_ref != 'parallel/adminit-pr23-output-transaction-20261023'
+    if: ${{ !contains(fromJSON('["parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023"]'), github.head_ref || github.ref_name) }}
     runs-on: windows-latest
     timeout-minutes: 20
     env:
@@ -81,7 +81,7 @@ jobs:
             ${{ runner.temp }}/meta-analyse-ci/ui-performance.json
             ${{ runner.temp }}/meta-analyse-pg18/provenance.json
   linux:
-    if: github.ref_name != 'parallel/adminit-kernel-identity-evidence' && github.head_ref != 'parallel/adminit-kernel-identity-evidence' && github.ref_name != 'parallel/adminit-identity-integration-20261021' && github.head_ref != 'parallel/adminit-identity-integration-20261021' && github.ref_name != 'parallel/adminit-identity-acceptance-fix-20261022' && github.head_ref != 'parallel/adminit-identity-acceptance-fix-20261022' && github.ref_name != 'parallel/adminit-pr20-security-fix-20261022' && github.head_ref != 'parallel/adminit-pr20-security-fix-20261022' && github.ref_name != 'parallel/adminit-pr21-evidence-schema-20261022' && github.head_ref != 'parallel/adminit-pr21-evidence-schema-20261022' && github.ref_name != 'parallel/adminit-pr22-boundary-review-20261022' && github.head_ref != 'parallel/adminit-pr22-boundary-review-20261022' && github.ref_name != 'parallel/adminit-pr23-output-transaction-20261023' && github.head_ref != 'parallel/adminit-pr23-output-transaction-20261023'
+    if: ${{ !contains(fromJSON('["parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023"]'), github.head_ref || github.ref_name) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -153,7 +153,7 @@ jobs:
             postgres-version.json
 
   archive-pinned-contract:
-    if: github.ref_name != 'parallel/adminit-kernel-identity-evidence' && github.head_ref != 'parallel/adminit-kernel-identity-evidence' && github.ref_name != 'parallel/adminit-identity-integration-20261021' && github.head_ref != 'parallel/adminit-identity-integration-20261021' && github.ref_name != 'parallel/adminit-identity-acceptance-fix-20261022' && github.head_ref != 'parallel/adminit-identity-acceptance-fix-20261022' && github.ref_name != 'parallel/adminit-pr20-security-fix-20261022' && github.head_ref != 'parallel/adminit-pr20-security-fix-20261022' && github.ref_name != 'parallel/adminit-pr21-evidence-schema-20261022' && github.head_ref != 'parallel/adminit-pr21-evidence-schema-20261022' && github.ref_name != 'parallel/adminit-pr22-boundary-review-20261022' && github.head_ref != 'parallel/adminit-pr22-boundary-review-20261022' && github.ref_name != 'parallel/adminit-pr23-output-transaction-20261023' && github.head_ref != 'parallel/adminit-pr23-output-transaction-20261023'
+    if: ${{ !contains(fromJSON('["parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023"]'), github.head_ref || github.ref_name) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

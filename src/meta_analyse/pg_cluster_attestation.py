@@ -54,7 +54,7 @@ def attest_connected_cluster(conn, expected: ExpectedCluster) -> None:
             row = conn.execute(
                 """SELECT pg_catalog.current_database(), current_user,
                           pg_catalog.current_setting('server_version_num')::pg_catalog.int4,
-                          pg_catalog.inet_server_addr()::pg_catalog.text, pg_catalog.inet_server_port(),
+                          pg_catalog.host(pg_catalog.inet_server_addr()), pg_catalog.inet_server_port(),
                           (pg_catalog.pg_control_system()).system_identifier::pg_catalog.text,
                           (SELECT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb
                                   AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls

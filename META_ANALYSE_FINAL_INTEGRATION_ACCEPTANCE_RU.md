@@ -18,6 +18,7 @@
 | P1 | Bootstrap SQL не сравнивал независимый file-control system identifier до CREATE | pg_controldata нового PGDATA до start, canonicalID, SQL source/catalog binding перед DDL |
 | P1 | Failure cleanup останавливал процесс по mutable path/$started | Удалён auto-stop; UNKNOWN process/partial PGDATA сохраняется для manual ownership review |
 | P1 conditional | SET LOCAL identity path истекал до caller SQL | Отдельно committed session catalog path, затем idle connection; witness начинает свой READ ONLY transaction |
+| P1 viability | inet::text включает /32, поэтому корректный loopback ошибочно не совпадал с127.0.0.1 | pg_catalog.host(inet_server_addr()) в attestation/controller/realtest; сравнение exactIPv4 сохранено |
 | P1 | Raw parser допускал nonfinite prices/sizes и coercion идентичности/времени | Finite positive decimal strings, exact positive int timestamp, nonempty stringID/symbol/topic binding |
 | P2 | Book timestamp coercion, probe update-ID regression, duplicate start | Строгие timestamps; обе sequence/update-ID проверки; повторный start отклоняется |
 | P2 | DB rollback не увеличивал health gap | Gap до распространения ошибки, без telemetry promotion |
@@ -79,3 +80,5 @@ Selected synthetic command находится в `.github/workflows/adminit-fina
 | G3/G4/G5 | NOT_RUN; 30min/2h/24h требуют отдельных PASS/допусков |
 
 Остаточные BLOCKED: actual hosted runs/ZIPs; protected/native/kernel/process identities; real source/host/toolchain/PGDATA ownership; exact server SQL/checkpoint/crash tests; physical API/TLS/GUI/CPU/RAM/disk; длительная стабильность. Synthetic PASS не разрешает commissioning, production service, merge, deployment или trading.
+
+Документированная network projection: [PostgreSQL18 functions-net](https://www.postgresql.org/docs/18/functions-net.html) отличает text(inet) с netmask от host(inet). Source/model regression не заменяет фактический hostedSQLrun.

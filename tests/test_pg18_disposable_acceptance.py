@@ -32,7 +32,7 @@ def require(condition):
 
 def _bootstrap_identity(conn, identifier):
     row = conn.execute("""SELECT pg_catalog.current_setting('server_version_num'),
-        pg_catalog.inet_server_addr()::pg_catalog.text, pg_catalog.inet_server_port(),
+        pg_catalog.host(pg_catalog.inet_server_addr()), pg_catalog.inet_server_port(),
         current_user, pg_catalog.current_database(),
         (pg_catalog.pg_control_system()).system_identifier::pg_catalog.text""").fetchone()
     require(row == ('180001', '127.0.0.1', 55480, 'disposable_admin', 'postgres', identifier))

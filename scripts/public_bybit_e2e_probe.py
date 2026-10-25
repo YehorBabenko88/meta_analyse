@@ -31,7 +31,10 @@ def evaluate(record, *, min_snapshots=1):
         return "FAIL"
     if record["stale_symbols"] or record["pending_symbols"]:
         return "FAIL"
-    return "PASS"
+    if record.get("connection_epochs", 0) > 0 and set(record.get("snapshot_epoch_by_symbol", {})) != set(record.get("symbols", [])):
+        return "BLOCKED"
+    # Transport evidence is not PostgreSQL/Qt end-to-end evidence.
+    return "TRANSPORT_PASS"
 
 
 async def probe(symbols, duration, *, depth=50, max_events=200000):
@@ -47,12 +50,34 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
     }
     seen = set()
     last_update = {}
+    first_snapshot_epochs = {}
+    latest_epoch = 0
+    last_sequence = {}
+    snapshot_pending = set(symbols)
     async def on_book(symbol, book, timestamp):
+        nonlocal latest_epoch
+        epoch = stream.connection_epoch
+        if epoch != latest_epoch:
+            latest_epoch = epoch
+            seen.clear()
+            last_sequence.clear()
+            snapshot_pending.clear()
+            snapshot_pending.update(symbols)
         if not book.valid or book.update_id is None or book.sequence is None:
             record["false_valid"] += 1
             return
+        previous = last_sequence.get(symbol)
+        if previous is not None and epoch == previous[0] and book.sequence <= previous[1]:
+            record["false_valid"] += 1
+            return
+        last_sequence[symbol] = (epoch, book.sequence)
         if symbol not in seen:
+            if symbol not in snapshot_pending:
+                record["false_valid"] += 1
+                return
+            snapshot_pending.discard(symbol)
             record["snapshots"] += 1
+            first_snapshot_epochs[symbol] = epoch
             seen.add(symbol)
         record["updates"] += 1
         last_update[symbol] = time.monotonic()
@@ -63,6 +88,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
         record["gaps"] += 1
         for symbol in symbols:
             seen.discard(symbol)
+            snapshot_pending.add(symbol)
     stream = OrderBookStream(on_book, on_gap, depth=depth)
     task = asyncio.create_task(stream.run(list(symbols), stop))
     try:
@@ -81,9 +107,12 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
         except Exception:
             record["unexpected_exits"] += 1
     record["connection_epochs"] = stream.connection_epoch
+    record["last_sequence_by_symbol"] = {k: v[1] for k, v in last_sequence.items()}
+    record["snapshot_epoch_by_symbol"] = first_snapshot_epochs
     if time.monotonic() - now < duration * 0.95:
         record["unexpected_exits"] += 1
-    record["pending_symbols"] = sorted(set(symbols) - set(last_update))
+    record["pending_symbols"] = sorted(snapshot_pending)
+    record["unverified_at_exit"] = bool(snapshot_pending)
     record["stale_symbols"] = sorted(s for s in symbols
                                       if s in last_update and time.monotonic() - last_update[s] > stream.silence_timeout)
     record["elapsed_seconds"] = round(time.monotonic() - now, 3)
@@ -111,7 +140,7 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
     print(json.dumps({"verdict": result["verdict"], "output": str(args.output)}))
-    raise SystemExit(0 if result["verdict"] == "PASS" else 1)
+    raise SystemExit(0 if result["verdict"] == "TRANSPORT_PASS" else 1)
 
 
 if __name__ == "__main__":

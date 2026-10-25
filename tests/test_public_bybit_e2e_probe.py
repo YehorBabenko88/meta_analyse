@@ -64,3 +64,15 @@ def test_ui_health_missing_timestamp_is_stale():
 
 def test_ui_health_recent_verified_feed_current():
     assert module.health_state(valid=True, age_seconds=1, max_age_seconds=90) == "CURRENT"
+
+
+def test_epoch_witness_missing_is_blocked():
+    result = record(connection_epochs=2, symbols=["BTCUSDT"],
+                    snapshot_epoch_by_symbol={})
+    assert module.evaluate(result) == "BLOCKED"
+
+
+def test_epoch_witness_present_allows_transport_only():
+    result = record(connection_epochs=2, symbols=["BTCUSDT"],
+                    snapshot_epoch_by_symbol={"BTCUSDT": 2})
+    assert module.evaluate(result) == "TRANSPORT_PASS"

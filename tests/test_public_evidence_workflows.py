@@ -20,7 +20,7 @@ def test_every_upload_is_gated_and_staging_only():
             assert 'if-no-files-found: error' in block and 'path: public-evidence/' in block
             assert block.count('path:')==1
         assert 'scripts/project_public_ci_evidence.py --validate public-evidence' in text
-    assert uploads==9
+    assert uploads==10
 
 def test_projection_commands_stop_on_first_failure():
     for path in (ROOT/'.github/workflows').glob('*.yml'):

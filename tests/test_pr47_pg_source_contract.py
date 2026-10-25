@@ -32,7 +32,7 @@ def test_cluster_setup_refuses_5432_and_existing_pgdata():
     assert "55480" in text
     assert "Test-Path -LiteralPath $data" in text
     assert "ReparsePoint" in text
-    assert "PostgreSQL\\) 18\\.1" in text
+    assert "Exact PostgreSQL 18.1 binaries required" in text
     assert "OperatorApproved" in text
 
 

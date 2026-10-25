@@ -1,8 +1,8 @@
-# MetaAnalyse E2E readiness — independent integration QA addendum (2026-10-25)
+# MetaAnalyse — независимый аудит архитектуры и E2E-готовности (25.10.2026)
 
-**Verdict: ADMINIT NO-GO.** This is an offline code/CI audit; no live Bybit connection, physical machine, deployment or merge.
+**Вердикт: ADMINIT — NO-GO.** Проверка только исходного кода и CI: без подключения к реальному Bybit, физических компьютеров, развёртывания и merge.
 
-## Exact source boundaries
+## Точные SHA и границы проверки
 
 - PR #7 `0086e338ee668f2fb1b4a9dd7253b16b8469ce13`: orderbook autonomous reconnect and immutable snapshots.
 - PR #9 `383458001a65224094c43a049e20f9c9cbcef50c` before this addendum: JUnit/CI guards and cancellation-drain tests.
@@ -10,7 +10,7 @@
 - PR #12 `86181d2d110688c13250a8be26b8743bcd1eb8e9`: commissioning evidence candidate. CI runs 39490043666 and 39490043670 succeeded; not a physical GO.
 - PR #28 `15a9d25233cc2383f2f771c0536bb1b1eeaae20a`: content-security synthetic workflow succeeded, other workflows policy-skipped; skips are not successes.
 
-## Producer → consumer contracts
+## Матрица контрактов producer → consumer
 
 | Producer | Consumer | Enforced invariant | Gap |
 |---|---|---|---|
@@ -23,7 +23,7 @@
 | Worker loop | Qt closeEvent | Worker exit precedes accepted close; incomplete shutdown shown | Unbounded background SQL operation may leave window waiting indefinitely |
 | GitHub Actions | Release decision | JUnit test identity, skip and count checks | Provenance binding across exact checkout, jobs, artifacts and evidence is incomplete |
 
-## Prioritized unresolved defects and evidence
+## Незакрытые дефекты и доказательства
 
 **P0 — end-to-end readiness:** PR #10 is not the same exact source tree as later PR #7 recovery fixes. Rebuild an isolated candidate and independently prove INVALID → new connection epoch → fresh snapshot → VALID on that SHA. An isolated PR #7 green test is not sufficient.
 
@@ -35,7 +35,7 @@
 
 **P2 — docs:** default-branch README is skeletal and not evidence of full commissioning readiness. Release checklist should pin SHA, dependency lock, test inventory, CI run/job/attempt IDs and artifacts.
 
-## Physical commissioning gates (do not run until explicitly approved)
+## Критерии будущих физических испытаний (не запускать без отдельного разрешения)
 
 | Stage | Minimum measurable acceptance | Evidence |
 |---|---|---|
@@ -45,7 +45,7 @@
 
 **Release rule:** any missing evidence, unexpected skipped mandatory test, failed job, stale orderbook marked VALID, unbounded write after claimed shutdown, or mismatched exact SHA = **NO-GO**.
 
-## Suggested separate Draft PRs
+## Предлагаемые отдельные Draft PR
 
 1. Orderbook queue-overflow and slow-consumer continuity fault harness (Order Flow owner).
 2. Disposable PostgreSQL crash/rollback/lock and shutdown ownership proof (Storage owner).

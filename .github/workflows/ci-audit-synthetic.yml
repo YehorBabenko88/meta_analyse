@@ -1,7 +1,7 @@
 name: CI audit synthetic
 on:
   push:
-    branches: ['maintenance/actions-audit-hardening-20261023']
+    branches: ['maintenance/actions-audit-hardening-20261023', 'audit/public-evidence-transaction-20261023']
   pull_request:
     paths:
       - 'scripts/audit_workflow_run_states.py'
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   audit:
-    if: (github.head_ref || github.ref_name) == 'maintenance/actions-audit-hardening-20261023'
+    if: contains(fromJSON('["maintenance/actions-audit-hardening-20261023","audit/public-evidence-transaction-20261023"]'), github.head_ref || github.ref_name)
     strategy:
       fail-fast: false
       max-parallel: 2

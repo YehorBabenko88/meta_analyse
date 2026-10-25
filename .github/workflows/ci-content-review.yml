@@ -1,7 +1,7 @@
 name: CI content security synthetic
 on:
   push:
-    branches: ['maintenance/pr27-content-review-20261023']
+    branches: ['maintenance/pr27-content-review-20261023', 'audit/public-evidence-transaction-20261023']
   pull_request:
     paths:
       - 'scripts/verify_ci_audit_artifact_contents.py'
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   content:
-    if: (github.head_ref || github.ref_name) == 'maintenance/pr27-content-review-20261023'
+    if: contains(fromJSON('["maintenance/pr27-content-review-20261023","audit/public-evidence-transaction-20261023"]'), github.head_ref || github.ref_name)
     strategy:
       fail-fast: false
       max-parallel: 2

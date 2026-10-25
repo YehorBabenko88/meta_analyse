@@ -56,3 +56,7 @@ For each stage: immediately stop on unknown cluster identity, unexpected role/po
 ## Exact SHA follow-up
 
 На source SHA `fe9833a3aa9606b04f98f0f655916b83270dfdb3` GitHub Actions завершились: CI run `40182611622` SUCCESS; Storage `40182611620` SUCCESS; Kernel offline `40182611611` SUCCESS; Public JUnit privacy `40182611664` SUCCESS. CI content security `40182611625` и CI audit synthetic `40182611639` SKIPPED по политике, не засчитываются как PASS. Эти результаты относятся к исходному SHA, а не к данному документальному audit-коммиту. Физическая готовность ADMINIT по-прежнему NO-GO.
+
+## Follow-up: 2026-10-25 / PR #31
+
+Открыт независимый PR #31 (`da0fb4735d2019e0ffa8b9f796b73725272daa5f`) с исправлением Windows QueryServiceConfig NULL-buffer sizing. На проверенном HEAD `Windows native ABI static audit` и основной `CI` завершились FAILURE; `Kernel identity offline` и `Storage ingestion integration` SUCCESS. Это отдельная ветка от PR #24, её результаты нельзя считать подтверждением PR #30 или PostgreSQL commissioning. Причины двух отказов требуют анализа job logs. В `flow_history_storage.py` обнаружен существующий `truncated` с LIMIT+1 — рекомендация об отсутствии truncation относится к другому API (`orderflow_archive_reader.py`), не ко всем адаптерам. Потребитель должен явно обрабатывать различие контрактов. ADMINIT NO-GO.

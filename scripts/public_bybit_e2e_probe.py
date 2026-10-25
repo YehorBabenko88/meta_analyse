@@ -31,6 +31,8 @@ def evaluate(record, *, min_snapshots=1):
         return "FAIL"
     if record["stale_symbols"] or record["pending_symbols"]:
         return "FAIL"
+    if record.get("connection_epochs", 0) > 0 and set(record.get("snapshot_epoch_by_symbol", {})) != set(record.get("symbols", [])):
+        return "BLOCKED"
     # Transport evidence is not PostgreSQL/Qt end-to-end evidence.
     return "TRANSPORT_PASS"
 

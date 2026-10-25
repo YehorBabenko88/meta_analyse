@@ -13,7 +13,7 @@ def main():
     p.add_argument("--require-identity", action="append", default=[],
                    help="Required exact classname.testname, unskipped and unique")
     a = p.parse_args()
-    root = ET.parse(a.xml).getroot()
+    # Reject DTD/entities rather than trusting XML parser-specific behaviour.\n    from pathlib import Path\n    raw = Path(a.xml).read_bytes()\n    if len(raw) > 32 * 1024 * 1024:\n        raise SystemExit("JUnit report exceeds 32 MiB limit")\n    if b"<!DOCTYPE" in raw.upper() or b"<!ENTITY" in raw.upper():\n        raise SystemExit("DTD and entities are forbidden in JUnit evidence")\n    root = ET.fromstring(raw)\n    if root.tag not in ("testsuite", "testsuites"):\n        raise SystemExit("Invalid JUnit root element")
     cases = list(root.iter("testcase"))
     names = [f"{c.get('classname', '')}.{c.get('name', '')}" for c in cases]
     identities = [(c.get("classname", ""), c.get("name", "")) for c in cases]

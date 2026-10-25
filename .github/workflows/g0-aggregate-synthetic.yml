@@ -1,0 +1,48 @@
+name: G0 aggregate diagnostics synthetic
+on:
+  push:
+    branches: ['parallel/adminit-g0-aggregate-20261025']
+  pull_request:
+    paths:
+      - 'commissioning/aggregate_diagnostics.py'
+      - 'commissioning/host_identity.py'
+      - 'commissioning/collect-host.ps1'
+      - 'tests/test_g0_aggregate_diagnostics.py'
+      - '.github/workflows/g0-aggregate-synthetic.yml'
+permissions:
+  contents: read
+jobs:
+  synthetic:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/record_ci_source.py
+      - run: python -m pip install -c requirements.lock pytest
+      - name: Synthetic refusal and privacy regressions only
+        run: python -m pytest --noconftest -q tests/test_g0_aggregate_diagnostics.py tests/test_public_junit.py tests/test_project_public_ci_evidence.py tests/test_public_evidence_workflows.py --junitxml=g0-aggregate-tests.xml
+      - name: Reject missing, failed or unexpected skipped cases
+        run: python scripts/check_integration_junit.py g0-aggregate-tests.xml --minimum 141 --allow-skip test_symlink_is_rejected --require-exact test_privacy_all_raw_fields_and_unknown_reason_keys --require-exact test_child_launch_obeys_persisted_policy_and_never_echoes_errors --require-exact test_aggregate_reaches_refusal_without_private_observation --require-exact test_no_elevation_no_child_collection --require-exact test_dedicated_ci_is_synthetic_and_full_native_pg_jobs_are_excluded --require-exact test_source_binding_failure_discards_all_counts --require-exact test_failed_collection_is_still_post_bound --require-exact test_stdout_failure_never_emits_raw_exception
+      - name: Project isolated public evidence
+        id: privacy
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit g0-aggregate-tests.xml
+          python scripts/project_public_ci_evidence.py --validate public-evidence
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: g0-aggregate-${{ matrix.os }}
+          if-no-files-found: error
+          path: public-evidence/

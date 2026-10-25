@@ -128,7 +128,7 @@ def test_failed_tls_never_reaches_qt_or_runtime(monkeypatch):
     import ssl
     import run_readonly
     args=['launcher','--manifest','unused','--manifest-sha256','2'*64,'--expected-sha','1'*40,
-          '--expected-computer','LS5','--enrollment','unused','--metascalp-exe','unused','--log-dir','unused','--operator-approved-readonly-run']
+          '--expected-computer','LS5','--enrollment','unused','--metascalp-exe','unused','--log-dir','unused','--cluster-system-identifier','12345678901234567890','--operator-approved-readonly-run']
     monkeypatch.setattr(sys,'argv',args)
     async def fail(_):raise ssl.SSLCertVerificationError('fixture')
     monkeypatch.setattr(run_readonly,'inspect',fail)

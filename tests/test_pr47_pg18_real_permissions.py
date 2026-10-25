@@ -26,7 +26,7 @@ def test_pg18_real_catalog_permissions_and_fail_closed():
     with psycopg.connect(DSN, autocommit=True) as admin:
         assert admin.execute("SHOW server_version_num").fetchone()[0] == "180001"
         assert admin.execute("SELECT inet_server_addr()::text").fetchone()[0] == "127.0.0.1"
-        assert admin.execute("SELECT inet_server_port()").fetchone()[0] == 5432
+        assert admin.execute("SELECT inet_server_port()").fetchone()[0] == 5432\n        assert admin.execute("SELECT current_user").fetchone()[0] == "disposable_admin"
         # Port 5432 here belongs exclusively to the disposable Actions service.
         role = "meta_commission_" + uuid.uuid4().hex[:12]
         admin.execute(sql.SQL("CREATE ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS").format(sql.Identifier(role)))

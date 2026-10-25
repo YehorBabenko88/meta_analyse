@@ -31,7 +31,8 @@ def evaluate(record, *, min_snapshots=1):
         return "FAIL"
     if record["stale_symbols"] or record["pending_symbols"]:
         return "FAIL"
-    return "PASS"
+    # Transport evidence is not PostgreSQL/Qt end-to-end evidence.
+    return "TRANSPORT_PASS"
 
 
 async def probe(symbols, duration, *, depth=50, max_events=200000):

@@ -82,3 +82,10 @@ Exact HEAD неизменен: `a04f132d64db0981ef93de1be8208612de08a194`. По�
 Открытый privacy-risk из cross-PR review: пять агрегированных SCM type co-occurrence buckets могут иметь низкую кардинальность; до публичного evidence acceptance проверить, что host-specific малые группы не публикуются, даже если персональные service names исключены.
 
 **Вердикт неизменен: BLOCKED; ADMINIT NO-GO.** Следующий шаг — authenticated Actions scheduling diagnostics и exact-HEAD ZIP/JUnit custody после завершения jobs.
+
+
+## 8. Повторная проверка очереди без изменения исходников
+
+PR #43 HEAD `a04f132d64db0981ef93de1be8208612de08a194` остаётся неизменным. Повторные API запросы jobs для push `40200317121` и PR `40200322626`: все четыре Windows/Ubuntu synthetic jobs QUEUED, `conclusion=null`; оба artifact inventories пусты. Новых комментариев с доказанной scheduling-причиной не получено.
+
+**Решение аудитора:** не создавать corrective PR и не менять workflow только из-за QUEUED. Утверждение об инфраструктурной первопричине остаётся BLOCKED до authenticated admin evidence. Следующий необходимый источник — UI предупреждения Actions, repo/org Actions policy, runner inventory и usage/quota/concurrency settings. Любой eventual SUCCESS обязан проверяться на exact SHA, run attempt, ZIP digests и raw-to-projected JUnit identities. Существующие full CI/Storage SKIPPED не превращать в PASS. ADMINIT NO-GO.

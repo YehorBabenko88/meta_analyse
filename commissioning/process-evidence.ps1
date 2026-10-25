@@ -108,9 +108,11 @@ namespace MetaCommissionInventory {
     try {
      ServiceStatus status=new ServiceStatus();int size;
      if(!QueryServiceStatusEx(service,0,ref status,Marshal.SizeOf(typeof(ServiceStatus)),out size)){row.win32_error=Marshal.GetLastWin32Error();row.error_stage="QUERY_SERVICE_STATUS";return row;}
-     QueryServiceConfig(service,IntPtr.Zero,0,out size);
+     bool sizeQuerySucceeded=QueryServiceConfig(service,IntPtr.Zero,0,out size);
      int configError=Marshal.GetLastWin32Error();
-     if(size<=0||size>65536){row.win32_error=configError;row.error_stage="QUERY_SERVICE_CONFIG_SIZE";return row;}
+     // A NULL buffer must fail with ERROR_INSUFFICIENT_BUFFER (122).
+     // Any other status is ambiguous: never consume an untrusted size.
+     if(sizeQuerySucceeded||configError!=122||size<=0||size>65536){row.win32_error=configError;row.error_stage="QUERY_SERVICE_CONFIG_SIZE";return row;}
      IntPtr buffer=Marshal.AllocHGlobal(size);
      try {
       if(!QueryServiceConfig(service,buffer,size,out size)){row.win32_error=Marshal.GetLastWin32Error();row.error_stage="QUERY_SERVICE_CONFIG";return row;}

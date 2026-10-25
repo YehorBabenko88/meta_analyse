@@ -134,3 +134,17 @@ Exact HEAD по-прежнему `fe9833a3aa9606b04f98f0f655916b83270dfdb3`; tre
 Оба ZIP digest совпали с GitHub API; внутренние manifest hashes и source provenance сверены с новым HEAD/run/job/attempt. В каждом JUnit 948 testcase, 0 failures/errors/skips. Наличие двух успешных offline jobs не заменяет full CI, Storage и Public JUnit privacy acceptance.
 
 На момент проверки `CI #1287`, `Storage #247` и `Public JUnit #12` оставались queued; content/audit synthetic policy-skipped. **Итог PR #30: BLOCKED**, ADMINIT NO-GO.
+
+
+## 10. Новый HEAD: Storage #247 и Public JUnit #12
+
+На HEAD `346b9fbfcf293d3745920240e530b76fd03ebb07` run `40183321651` Storage integration terminal SUCCESS (job `integration`). Run `40183321643` Public JUnit synthetic terminal SUCCESS (jobs Windows и Ubuntu).
+
+Скачаны три оригинальных artifacts, проверены SHA256 ZIP по GitHub API, manifest file hashes и source/run/job/attempt:
+- Storage artifact `12594808337`: `2402398cd0acda3f186700a388d7fc130ef385fe4c43fecc3a5efd12e763f075`, 107 JUnit testcase, 0 failures/errors/skips.
+- Public JUnit Windows `12594887858`: `71e13a9f2d98a963966a7011c69aa880e09e2d9ffcb50ca92b162891a02721f2`, 86 testcase, 0 failures/errors/skips.
+- Public JUnit Linux `12594768196`: `e7aa0cbcb604df51ea6ecbbeceee5bb8518315801f4983d0e83c583beb6f21cf`, 86 testcase, 0 failures/errors/skips.
+
+На момент проверки `CI #1287` (run `40183321671`) остаётся queued, поэтому full Windows/Linux/PG18 evidence на новом HEAD ещё отсутствует. Policy-skipped synthetic workflows не считать PASS.
+
+**Вердикт:** подтверждённые Storage/Public JUnit/Kernel artifacts PASS в пределах custody и projected content; **PR #30 overall BLOCKED**, ADMINIT NO-GO.

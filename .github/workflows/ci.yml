@@ -18,8 +18,24 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: requirements.lock
-      - run: python -m pip install -c requirements.lock -e ".[test]"
+      - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
+      - name: Mandatory baseline integration suite
+        run: python -m pytest -q tests --junitxml=integration-gate.xml
+      - name: Verify baseline suite ran without skips
+        run: python scripts/check_integration_junit.py integration-gate.xml --minimum 100 --require-identity tests.test_integration_contract_shutdown.test_shutdown_waits_for_thread_write_before_cancelled_task_finishes --require-identity tests.test_integration_contract_shutdown.test_repeated_cancellation_does_not_abandon_write --require-identity tests.test_integration_contract_shutdown.test_failed_write_after_cancellation_waits_for_rollback --allow-skip test_fifty_connect_disconnect_cycles_drain_collectors --allow-skip test_close_with_twenty_active_instruments_and_pending_db_write --allow-skip test_windows_qt_mock_network_postgres_disconnect_restart --allow-skip test_database_operations_have_bounded_timeouts
+      - name: Discover PostgreSQL 18 binaries on hosted Windows runner
+        shell: pwsh
+        run: |
+          $roots = @('C:\Program Files\PostgreSQL', 'C:\hostedtoolcache\windows\PostgreSQL')
+          foreach ($root in $roots) {
+            if (Test-Path $root) {
+              Get-ChildItem $root -Recurse -Filter postgres.exe -ErrorAction SilentlyContinue |
+                ForEach-Object { Write-Host "Candidate: $($_.FullName)"; & $_.FullName --version }
+            }
+          }
+          $cmd = Get-Command postgres.exe -ErrorAction SilentlyContinue
+          if ($cmd) { Write-Host "PATH postgres: $($cmd.Source)"; & $cmd.Source --version }
       - name: Windows Qt and disposable PostgreSQL integration
         shell: pwsh
         run: ./scripts/test-windows.ps1
@@ -46,7 +62,7 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:17.6
+        image: postgres:18
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
@@ -58,6 +74,7 @@ jobs:
       QT_QPA_PLATFORM: offscreen
       PYTHONASYNCIODEBUG: '1'
       META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+      META_ANALYSE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -66,8 +83,14 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.lock
       - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
-      - run: python -m pip install -c requirements.lock -e ".[test]"
+      - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
+      - name: Confirm PostgreSQL 18 server
+        run: python -c "import os, psycopg; conn=psycopg.connect(os.environ['META_ANALYSE_TEST_ADMIN_DSN']); version=conn.execute('SHOW server_version_num').fetchone()[0]; print('PostgreSQL server version:', version); assert 180000 <= int(version) < 190000; conn.close()"
+      - name: Mandatory baseline integration suite
+        run: python -m pytest -q tests --junitxml=integration-gate.xml
+      - name: Verify baseline suite ran without skips
+        run: python scripts/check_integration_junit.py integration-gate.xml --minimum 100 --require-identity tests.test_integration_contract_shutdown.test_shutdown_waits_for_thread_write_before_cancelled_task_finishes --require-identity tests.test_integration_contract_shutdown.test_repeated_cancellation_does_not_abandon_write --require-identity tests.test_integration_contract_shutdown.test_failed_write_after_cancellation_waits_for_rollback --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
       - run: python -m compileall -q src
       - name: Repeat lifecycle resource regressions in fresh processes
         run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir repeat-lifecycle
@@ -84,3 +107,29 @@ jobs:
             tests.xml
             tests.log
             ui-performance.json
+
+  archive-contract:
+    name: Archive HTTP fault contract (PR 6)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 091e9db1a9c7f144a34150da81eae64cf9d7d8e3
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify pinned archive source SHA
+        run: python -c "import subprocess; expected='091e9db1a9c7f144a34150da81eae64cf9d7d8e3'; actual=subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(); print('Archive source SHA:',actual); assert actual == expected"
+      - name: Install archive contract dependencies
+        run: python -m pip install -c requirements.lock -e ".[test,archive]"
+      - name: Run mandatory HTTP fault contracts
+        run: python -m pytest -q tests/test_archive_http_server.py tests/test_archive_resumable_faults.py tests/test_archive_resume_strict_headers.py --junitxml=archive-contract.xml
+      - uses: actions/checkout@v4
+        with:
+          path: integration-gate
+          ref: ${{ github.sha }}
+      - name: Verify contract coverage and no skips
+        run: python integration-gate/scripts/check_integration_junit.py archive-contract.xml --minimum 3 --require test_archive_http_server --require test_archive_resumable_faults --require test_archive_resume_strict_headers

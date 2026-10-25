@@ -32,6 +32,13 @@ class SCMOracle(unittest.TestCase):
         for x in (True,32.0,'32',16,0x120,None):
             self.assertEqual(model([(x,32,True)])['REGISTRY_ONLY_FAILED'],1)
             self.assertEqual(model([(32,x,True)])['SCM_ONLY_FAILED'],1)
+    def test_invalid_lifetime_does_not_create_identity(self):
+        self.assertIn("require(item['pid']==row['pid'],'LIFETIME_BINDING_INVALID')",ADAPTER)
+        self.assertIn("require(all(t==times[0] for t in times),'LIFETIME_BINDING_INVALID')",ADAPTER)
+        self.assertIn("require(row==by_id[row['pid']]['process'])",ADAPTER)
+    def test_no_new_privileged_native_operations(self):
+        for forbidden in ('SeDebugPrivilege','AdjustTokenPrivileges','OpenProcessToken','SetServiceStatus','RegSetValue','WriteProcessMemory'):
+            self.assertNotIn(forbidden,ADAPTER)
     def test_unknown_not_neither(self):
         self.assertEqual(model([(32,32,False)])['NOT_EVALUATED'],1)
     def test_per_member_projection_source(self):

@@ -66,8 +66,9 @@ def test_existing_target_preserved(tmp_path, receipt):
     target.mkdir()
     marker = target / 'marker'
     marker.write_text('keep')
+    source = raw(tmp_path, '<testsuite><testcase classname="x" name="a"/></testsuite>')
     with pytest.raises(ValueError):
-        p.publish(target, receipt, [])
+        p.publish(target, receipt, [source])
     assert marker.read_text() == 'keep'
 
 def test_tampering_and_extra_inventory_rejected(tmp_path, receipt):
@@ -179,3 +180,46 @@ def test_repeated_identity_in_distinct_reports_allowed(tmp_path, receipt):
     p.publish(target, receipt, [first, second])
     p.validate(target)
     assert len(list(target.glob('junit-*.xml'))) == 2
+
+
+@pytest.mark.parametrize('field', ['sha', 'tree_sha'])
+def test_wrong_source_sha_or_tree_rejected_independently(monkeypatch, field):
+    actual_sha='a'*40;actual_tree='b'*40
+    good=dict(sha=actual_sha,expected_sha=actual_sha,tree_sha=actual_tree,event='push',event_sha=actual_sha)
+    monkeypatch.setattr(p.subprocess,'check_output',lambda args,**kwargs:actual_tree if args[-1]=='HEAD^{tree}' else actual_sha)
+    for key,value in dict(GITHUB_SHA=actual_sha,GITHUB_EVENT_NAME='push',GITHUB_RUN_ID='123',GITHUB_RUN_ATTEMPT='1',GITHUB_JOB='unit').items():monkeypatch.setenv(key,value)
+    assert p.provenance(good)['sha']==actual_sha
+    changed=dict(good);changed[field]='c'*40
+    if field=='sha':changed['expected_sha']='c'*40
+    with pytest.raises(ValueError):p.provenance(changed)
+
+
+def test_invalid_utf8_never_publishes(tmp_path,receipt):
+    source=tmp_path/'invalid.xml';source.write_bytes(b'\xff')
+    with pytest.raises(UnicodeError):p.publish(tmp_path/'public',receipt,[source])
+    assert not (tmp_path/'public').exists()
+
+
+def test_cli_refusal_does_not_echo_os_error_path(tmp_path):
+    import subprocess
+    result=subprocess.run([sys.executable,str(ROOT/'scripts/project_public_ci_evidence.py'),'--output',str(tmp_path/'public'),
+        '--source',str(tmp_path/'SYNTHETIC_PRIVATE_SOURCE'),'--junit',str(tmp_path/'unused.xml')],capture_output=True,text=True)
+    assert result.returncode==1 and result.stderr.strip()=='BLOCKED: public CI evidence rejected'
+    assert 'SYNTHETIC_PRIVATE_SOURCE' not in result.stdout+result.stderr and 'Traceback' not in result.stderr
+
+
+def test_input_inode_substitution_after_read_is_blocked(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    source=tmp_path/'synthetic.xml';source.write_bytes(b'SYNTHETIC')
+    original=Path.lstat;calls=[]
+    def replaced(path):
+        info=original(path)
+        if path==source:
+            calls.append(True)
+            if len(calls)>=3:
+                return SimpleNamespace(st_mode=info.st_mode,st_file_attributes=getattr(info,'st_file_attributes',0),
+                    st_dev=info.st_dev,st_ino=info.st_ino+1)
+        return info
+    monkeypatch.setattr(Path,'lstat',replaced)
+    with pytest.raises(ValueError):p.read(source)
+    assert len(calls)>=3

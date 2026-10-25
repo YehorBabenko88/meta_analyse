@@ -68,3 +68,29 @@
 Только после terminal exact-HEAD runs: все обязательные jobs success; отсутствие неожиданных skips; загрузка каждого ZIP по artifact ID; SHA256 по API; строгая проверка inventory и manifest; независимый raw-to-public JUnit identity/status oracle; безопасная публикация failure evidence; проверка logs и отсутствие новых утечек. Отдельная physical authorization обязательна даже после CI PASS.
 
 **Вердикт сейчас: BLOCKED. ADMINIT NO-GO.** Не выполнялись merge, deployment, native/physical tests, production DB changes или изменения PR #30.
+
+
+## 7. PR #41: независимый queued-run security review (2026-10-25)
+
+PR #41 exact HEAD `5b622cc218fdf90d26164d544176dd647297fc53`, tree `210d69f19d3912013414e550da04594e6b7fd3f2` (PR description; проверить git tree с будущим artifact). Обязательные runs:
+- Push `40198863425`: Windows job `121185520860` QUEUED, Ubuntu job `121185521141` QUEUED, artifacts 0.
+- Pull request `40198867909`: Ubuntu job `121185535374` QUEUED, Windows job `121185535625` QUEUED, artifacts 0.
+
+`.github/workflows/native-scm-adapter-synthetic.yml` разрешает обе ветки push, PR path filters включают изменённые файлы, jobs не имеют `if`-guards, матрица Windows/Linux с `fail-fast: false`, `permissions: contents: read`, checkout exact `github.event.pull_request.head.sha || github.sha`. В самом workflow нет `concurrency`; это не исключает организационные или внешние ограничения. Source receipt и privacy projection включены; upload только после `steps.privacy.outcome == 'success'` с `if: always()`, `if-no-files-found: error` и только `public-evidence/`.
+
+Full CI и Storage workflow имеют явные branch exclusion guards для `parallel/adminit-r0-r5-liveness-20261025`; их PR runs `40198867906` и `40198867897` намеренно SKIPPED, а не PASS. Наличие синтетических job объектов доказывает, что trigger/guard обработаны, но не доказывает runner availability или execution.
+
+### Причина очереди: граница доказательств
+
+Все четыре обязательных job QUEUED, нет runner assignment/started_at и нет artifacts. Через доступный GitHub connector отсутствуют административные endpoints billing/usage, hosted-runner inventory и org policy. Следовательно, **не установлена** причина (billing/quota/capacity/concurrency). Запрещено объявлять любую из них установленной без authenticated evidence.
+
+### План безопасного восстановления CI
+
+1. Через GitHub Actions UI проверить предупреждения на run страницах, repo/org Actions policy, hosted runner availability, usage/billing/quota, лимиты concurrent jobs и текущую очередь; сохранить timestamps/screenshots/API receipts, не изменяя settings.
+2. Не выполнять массовые rerun/отмены, не менять trigger/permissions/concurrency и не ослаблять mandatory test collection, skip/identity gate или privacy projection.
+3. После устранения подтверждённой инфраструктурной причины дождаться terminal jobs на **том же HEAD**, проверить run attempts и отсутствие unexpected skips.
+4. Скачать все четыре ожидаемых ZIP по authenticated artifact ID; сверить API digest с локальным SHA256, exact source SHA/tree/run/attempt/job, manifest inventory и hashes, JUnit counts/identities/failures/errors/skips.
+5. Проверить raw job logs на hostname/paths/DSN/traceback, и отдельно проверить, что failure-path projection не публикует raw JUnit и не превращает test FAIL в workflow PASS.
+6. Если HEAD изменится — начать проверку заново. Если jobs остаются QUEUED — verdict BLOCKED; не подменять результатами прежнего SHA.
+
+**PR #41: BLOCKED (CI not executed), ADMINIT NO-GO.** Ни merge, deployment, физические тесты, ни изменения исходных PR/workflows не выполнялись.

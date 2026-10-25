@@ -22,10 +22,14 @@ class ExpectedCluster:
 
     def __post_init__(self):
         if (not isinstance(self.system_identifier, str)
+                or not self.system_identifier.isascii()
                 or not self.system_identifier.isdecimal()
                 or not 1 <= len(self.system_identifier) <= 20
+                or self.system_identifier.startswith("0")
                 or not isinstance(self.database, str)
                 or not self.database.startswith("meta_commission_")
+                or len(self.database) <= len("meta_commission_")
+                or not all(c.isascii() and (c.islower() or c.isdigit() or c == "_") for c in self.database)
                 or not isinstance(self.role, str)
                 or self.role != self.database
                 or type(self.port) is not int or self.port != 55480

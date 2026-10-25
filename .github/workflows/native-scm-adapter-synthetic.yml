@@ -1,7 +1,7 @@
 name: Native SCM diagnostic adapter synthetic
 on:
   push:
-    branches: ['parallel/adminit-r0-r5-adapter-20261025', 'parallel/adminit-r0-r5-liveness-20261025']
+    branches: ['parallel/adminit-r0-r5-adapter-20261025', 'parallel/adminit-r0-r5-liveness-20261025', 'parallel/adminit-scm-correlation-20261025']
   pull_request:
     paths:
       - 'commissioning/native_scm_diagnostic.py'
@@ -32,7 +32,7 @@ jobs:
       - name: Synthetic adapter, existing refusal and public privacy tests
         run: python -m pytest --noconftest -q tests/test_native_scm_adapter.py tests/test_windows_native_abi_source.py tests/test_inventory_refusal_projection.py tests/test_public_junit.py tests/test_project_public_ci_evidence.py tests/test_public_evidence_workflows.py --junitxml=native-scm-adapter-tests.xml
       - name: Reject missing, failed or unexpected skipped cases
-        run: python scripts/check_integration_junit.py native-scm-adapter-tests.xml --minimum 315 --allow-skip test_symlink_is_rejected --require-exact test_early_failure_does_not_assert_process_death --require-exact test_post_liveness_failure_preserves_observed_boolean --require-exact test_type_counter_totals_do_not_establish_same_contract --require-exact test_query_image_error31_never_uses_native_format_as_identity --require-exact test_adapter_does_not_reclassify_or_persist --require-exact test_shared_predicate_refactor_is_equivalent_to_frozen_pr39 --require-exact test_raw_identifiers_and_exception_fields_never_leave_projection --require-exact test_source_binding_is_finally_checked_and_clears_partial_data --require-exact test_dedicated_ci_is_exact_and_does_not_start_native_or_pg_jobs
+        run: python scripts/check_integration_junit.py native-scm-adapter-tests.xml --minimum 338 --allow-skip test_symlink_is_rejected --require-exact test_type_cooccurrence_host_publication_is_closed_and_all_or_nothing --require-exact test_type_cooccurrence_unobserved_is_not_neither --require-exact test_type_cooccurrence_distinguishes_joint_and_separate_refusals --require-exact test_type_cooccurrence_malformed_or_changed_evidence_rejects_whole_projection --require-exact test_type_cooccurrence_projection_has_nonunique_member_inverse --require-exact test_early_failure_does_not_assert_process_death --require-exact test_post_liveness_failure_preserves_observed_boolean --require-exact test_type_counter_totals_do_not_establish_same_contract --require-exact test_query_image_error31_never_uses_native_format_as_identity --require-exact test_adapter_does_not_reclassify_or_persist --require-exact test_shared_predicate_refactor_is_equivalent_to_frozen_pr39 --require-exact test_raw_identifiers_and_exception_fields_never_leave_projection --require-exact test_source_binding_is_finally_checked_and_clears_partial_data --require-exact test_dedicated_ci_is_exact_and_does_not_start_native_or_pg_jobs
       - name: Project isolated public evidence
         id: privacy
         if: always()

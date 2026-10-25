@@ -19,6 +19,7 @@ EARLY=frozenset('OPEN_PROCESS GET_PROCESS_TIMES GET_EXIT_CODE OPEN_PROCESS_MODUL
 ERRORS={0:'NONE',5:'ACCESS_DENIED',31:'GEN_FAILURE',87:'INVALID_PARAMETER',122:'INSUFFICIENT_BUFFER',299:'PARTIAL_COPY'}
 CHECKS=('CONFIG_MEMBER_MATCH','REGISTRY_TYPE_REVIEWED','SCM_TYPE_REVIEWED','REGISTRY_ACCOUNT_MATCH',
         'SCM_ACCOUNT_MATCH','REGISTRY_IMAGE_MATCH','REGISTRY_ARGS_MATCH','SCM_ARGS_MATCH')
+COOCCURRENCE=('BOTH_FAILED','REGISTRY_ONLY_FAILED','SCM_ONLY_FAILED','NEITHER_FAILED','NOT_EVALUATED')
 SAFE_ERRORS=frozenset(('SOURCE_BINDING_INVALID EVIDENCE_INVALID LIFETIME_BINDING_INVALID ARGUMENTS_INVALID '
     'OUTPUT_UNAVAILABLE COLLECTOR_UNAVAILABLE ELEVATED_TOKEN_REQUIRED COLLECTOR_CHILD_BLOCKED '
     'PROCESS_INVENTORY_SNAPSHOT_INVALID PROCESS_SNAPSHOT_BINDING_INVALID').split())
@@ -84,6 +85,33 @@ def add_endpoint(target,value):
     target['alive_counts'][alive]+=1
 
 
+def configuration_counts():
+    return dict(member_checks=0,checks={key:dict(PASS=0,FAIL=0,NOT_EVALUATED=0) for key in CHECKS},
+                type_cooccurrence={key:0 for key in COOCCURRENCE})
+
+
+def paired_configuration(proof):
+    # No per-member join leaves this boundary. Order is irrelevant, membership/config drift is not.
+    reviewed=set()
+    for phase in ('before','after'):
+        services=proof.get('services_'+phase,[])
+        require(type(services) is list and len(services)<=65536)
+        for service in services:
+            require(type(service) is dict and type(service.get('name')) is str)
+            if service['name'] in identity.WINDOWS_SERVICE_CONTRACTS:reviewed.add(service['name'])
+    if not reviewed:return
+    members=[];configs=[];coverage=[]
+    for phase in ('before','after'):
+        services=proof.get('services_'+phase);require(type(services) is list)
+        by_name={service['name']:service for service in services}
+        require(len(by_name)==len(services))
+        complete=proof.get('services_'+phase+'_complete');require(type(complete) is bool)
+        config=proof.get('implementation_'+phase,{})
+        require(type(config) is dict and set(config)<=reviewed)
+        members.append(by_name);configs.append(config);coverage.append(complete)
+    require(members[0]==members[1] and configs[0]==configs[1] and coverage[0]==coverage[1])
+
+
 def config_checks(proof,phase,roots,row,target):
     key='services_'+phase
     if key not in proof:return
@@ -107,6 +135,13 @@ def config_checks(proof,phase,roots,row,target):
             schema.integer(c['service_type'],schema.DWORD_MAX)
             for field in ('name','account','expanded_image_path','image_path'):require(type(c.get(field)) is str)
             if c['complete'] and c['error_stage']=='':checks=identity.service_host_configuration_checks(service,c,roots)
+        if checks is not None:
+            require(type(checks) is dict and set(checks)==set(CHECKS) and all(type(value) is bool for value in checks.values()))
+        category='NOT_EVALUATED'
+        if checks is not None and proof['services_'+phase+'_complete'] and service['error_stage']=='' and service['win32_error']==0:
+            registry_failed=not checks['REGISTRY_TYPE_REVIEWED'];scm_failed=not checks['SCM_TYPE_REVIEWED']
+            category='BOTH_FAILED' if registry_failed and scm_failed else 'REGISTRY_ONLY_FAILED' if registry_failed else 'SCM_ONLY_FAILED' if scm_failed else 'NEITHER_FAILED'
+        target['type_cooccurrence'][category]+=1
         for field in CHECKS:
             target['checks'][field]['NOT_EVALUATED' if checks is None else 'PASS' if checks[field] else 'FAIL']+=1
 
@@ -134,7 +169,7 @@ def _project(facts):
     for phase in ('before','after'):
         for group in ('native','modules'):
             output[group][phase]=dict(stage_counts=Counter(),error_counts=Counter(),lifetime_counts=Counter(),alive_counts=Counter())
-        output['configuration'][phase]=dict(member_checks=0,checks={key:dict(PASS=0,FAIL=0,NOT_EVALUATED=0) for key in CHECKS})
+        output['configuration'][phase]=configuration_counts()
     for result in results:
         schema.record(result,('process','assessment'));row=result['process'];schema.row(row)
         require(row['pid'] in by_id and row['pid'] not in observed)
@@ -146,6 +181,7 @@ def _project(facts):
             require(type(reason) is str and reason in identity.PUBLIC_PROCESS_REASONS)
             reasons[reason]+=1;unresolved.append(result)
         else:require(type(status) is str and status in valid and reason==valid[status])
+        paired_configuration(proof)
         times=[]
         for group in ('native','kernel','modules'):
             for phase in ('before','after'):
@@ -171,7 +207,7 @@ def _project(facts):
             applicable=any(type(s) is dict and s.get('name') in identity.WINDOWS_SERVICE_CONTRACTS for s in services) or 'modules_'+phase in proof
             modules=endpoint(proof,'modules_'+phase,row,times,'modules',applicable)
             # Validate every binding, but publish only unresolved diagnostics.
-            cfg=output['configuration'][phase] if status=='UNRESOLVED' else dict(member_checks=0,checks={key:dict(PASS=0,FAIL=0,NOT_EVALUATED=0) for key in CHECKS})
+            cfg=output['configuration'][phase] if status=='UNRESOLVED' else configuration_counts()
             config_checks(proof,phase,roots,row,cfg)
             if status=='UNRESOLVED':
                 add_endpoint(output['native'][phase],native);add_endpoint(output['modules'][phase],modules)

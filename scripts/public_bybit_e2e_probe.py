@@ -104,6 +104,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
     if time.monotonic() - now < duration * 0.95:
         record["unexpected_exits"] += 1
     record["pending_symbols"] = sorted(snapshot_pending)
+    record["unverified_at_exit"] = bool(snapshot_pending)
     record["stale_symbols"] = sorted(s for s in symbols
                                       if s in last_update and time.monotonic() - last_update[s] > stream.silence_timeout)
     record["elapsed_seconds"] = round(time.monotonic() - now, 3)

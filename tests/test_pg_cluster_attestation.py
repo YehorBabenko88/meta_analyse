@@ -78,3 +78,16 @@ def test_invalid_expected_cluster_refused(bad):
     args.update(bad)
     with pytest.raises(AttestationRefused, match="INVALID_EXPECTED_CLUSTER"):
         ExpectedCluster(**args)
+
+
+@pytest.mark.parametrize("bad", [
+    {"database": "meta_commission_", "role": "meta_commission_"},
+    {"system_identifier": "012345"},
+    {"system_identifier": "１２３４"},
+])
+def test_noncanonical_expected_cluster_refused(bad):
+    args = dict(system_identifier=EXPECTED.system_identifier,
+                database=EXPECTED.database, role=EXPECTED.role)
+    args.update(bad)
+    with pytest.raises(AttestationRefused, match="INVALID_EXPECTED_CLUSTER"):
+        ExpectedCluster(**args)

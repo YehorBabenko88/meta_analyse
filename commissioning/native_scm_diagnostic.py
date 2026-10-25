@@ -71,7 +71,9 @@ def endpoint(proof,key,row,native_times,kind,applicable=True):
         if item['complete']:require(item['created']>0 and bool(item['paths']))
         stage='REPORTED_COMPLETE' if item['complete'] else 'INCOMPLETE_WITHOUT_STAGE'
     if item['error_stage']:stage=item['error_stage'] if item['error_stage'] in STAGES else 'OTHER'
-    return stage,ERRORS.get(item['win32_error'],'OTHER'),lifetime,'ALIVE' if item['alive'] else 'NOT_ALIVE'
+    # Early failures precede the producer's assignment of alive; false is a default, not an observation.
+    alive='NOT_OBSERVED' if item['error_stage'] in EARLY else 'ALIVE' if item['alive'] else 'NOT_ALIVE'
+    return stage,ERRORS.get(item['win32_error'],'OTHER'),lifetime,alive
 
 
 def add_endpoint(target,value):

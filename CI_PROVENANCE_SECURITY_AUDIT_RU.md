@@ -111,3 +111,14 @@ Exact HEAD по-прежнему `fe9833a3aa9606b04f98f0f655916b83270dfdb3`; tre
 - Исторические ZIP с raw hostname metadata остаются отдельным открытым вопросом управления доступом и сроками хранения; текущий PR не исправляет уже опубликованные файлы.
 
 **Приоритет следующей независимой приёмки:** 1) exact raw-JUnit mandatory identity/skip oracle, 2) failure-path `pytest FAIL -> privacy projection -> minimal artifact -> workflow FAIL`, 3) повторная проверка GitHub raw job logs и archive/mutation receipts, 4) явная матрица всех workflow, включая policy-skipped как BLOCKED/NOT_APPLICABLE, а не PASS.
+
+
+## 8. Новый HEAD PR #30: encoding-smuggling hardening
+
+Новый HEAD `346b9fbfcf293d3745920240e530b76fd03ebb07` заменил `fe9833a3...`. Diff затрагивает только `scripts/project_public_ci_evidence.py`, `tests/test_project_public_ci_evidence.py` и `docs/PUBLIC_CI_EVIDENCE_HARDENING.md`.
+
+Добавлен `NoDeclarations(ET.TreeBuilder)`, явный отказ от NUL и параметризованные тесты UTF-16 LE/BE XML declarations с DTD и без DTD. Это адресует обход текстового regex при alternate-encoding XML. Код проверен read-only; новые тесты ещё требуют exact-SHA CI.
+
+На момент проверки: `CI #1287` (run `40183321671`) и `Storage #247` (run `40183321651`) queued; `Public JUnit #12` queued; `Kernel offline #40` in_progress; `CI content synthetic #11` и `CI audit synthetic #9` policy-skipped. Нельзя переносить успешные результаты предыдущего HEAD `fe9833a3` на этот коммит.
+
+Независимая приёмка **BLOCKED**, ADMINIT **NO-GO**. Повторить ZIP digest, manifest, provenance, JUnit counts/statuses/identities и privacy gate на всех artifacts нового HEAD после завершения запусков. Проверить также encoding cases `utf-16`, `utf-32`, BOM, XML declaration с иным charset и NUL в payload.

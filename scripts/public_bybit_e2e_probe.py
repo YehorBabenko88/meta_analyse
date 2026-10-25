@@ -14,6 +14,15 @@ import time
 from meta_analyse.orderbook_stream import OrderBookStream
 
 
+def health_state(*, valid, age_seconds, max_age_seconds):
+    """UI-facing fail-closed freshness classification (offline contract only)."""
+    if not valid:
+        return "UNVERIFIED"
+    if age_seconds is None or age_seconds > max_age_seconds:
+        return "STALE"
+    return "CURRENT"
+
+
 def evaluate(record, *, min_snapshots=1):
     """Fail closed: a successful transport connection is not an E2E PASS."""
     if record.get("event_budget_exhausted") or record["snapshots"] < min_snapshots:

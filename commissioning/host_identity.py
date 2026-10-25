@@ -478,7 +478,8 @@ def aggregate_main(argv):
             except OSError:
                 diagnostics.failure('AGGREGATE_OUTPUT_UNAVAILABLE')
                 report=diagnostics.report()
-    print(json.dumps(report,allow_nan=False))
+    try:print(json.dumps(report,allow_nan=False))
+    except (OSError,ValueError):pass
     return 1
 
 

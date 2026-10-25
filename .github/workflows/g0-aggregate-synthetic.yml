@@ -31,7 +31,7 @@ jobs:
       - name: Synthetic refusal and privacy regressions only
         run: python -m pytest --noconftest -q tests/test_g0_aggregate_diagnostics.py tests/test_public_junit.py tests/test_project_public_ci_evidence.py tests/test_public_evidence_workflows.py --junitxml=g0-aggregate-tests.xml
       - name: Reject missing, failed or unexpected skipped cases
-        run: python scripts/check_integration_junit.py g0-aggregate-tests.xml --minimum 138 --allow-skip test_symlink_is_rejected --require-exact test_privacy_all_raw_fields_and_unknown_reason_keys --require-exact test_child_launch_obeys_persisted_policy_and_never_echoes_errors --require-exact test_aggregate_reaches_refusal_without_private_observation --require-exact test_no_elevation_no_child_collection --require-exact test_dedicated_ci_is_synthetic_and_full_native_pg_jobs_are_excluded --require-exact test_source_binding_failure_discards_all_counts --require-exact test_failed_collection_is_still_post_bound
+        run: python scripts/check_integration_junit.py g0-aggregate-tests.xml --minimum 141 --allow-skip test_symlink_is_rejected --require-exact test_privacy_all_raw_fields_and_unknown_reason_keys --require-exact test_child_launch_obeys_persisted_policy_and_never_echoes_errors --require-exact test_aggregate_reaches_refusal_without_private_observation --require-exact test_no_elevation_no_child_collection --require-exact test_dedicated_ci_is_synthetic_and_full_native_pg_jobs_are_excluded --require-exact test_source_binding_failure_discards_all_counts --require-exact test_failed_collection_is_still_post_bound --require-exact test_stdout_failure_never_emits_raw_exception
       - name: Project isolated public evidence
         id: privacy
         if: always()

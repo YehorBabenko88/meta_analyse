@@ -218,6 +218,28 @@ def test_aggregate_argument_errors_never_echo_supplied_private_values(boundary,c
     assert json.loads(output.out)['reason_codes']==['AGGREGATE_ARGUMENTS_INVALID']
 
 
+def test_stdout_failure_never_emits_raw_exception(boundary,tmp_path,monkeypatch):
+    child(boundary,raw_facts())
+    boundary.setattr(sys,'argv',['x','diagnose-aggregate','--expected-sha','a'*40,'--output',str(tmp_path/'aggregate.json')])
+    monkeypatch.setattr('builtins.print',lambda *a,**kw:(_ for _ in ()).throw(OSError('PRIVATE_STDOUT_PATH')))
+    assert h.main()==1
+
+
+@pytest.mark.parametrize('operation',['write','close'])
+def test_output_io_refusal_never_echoes_raw_exception(boundary,tmp_path,capsys,operation):
+    child(boundary,raw_facts())
+    original=h.NewOutput.close
+    def fail(*args):
+        if operation=='close':original(*args)
+        raise OSError('PRIVATE_OUTPUT_PATH')
+    boundary.setattr(h.NewOutput,operation,fail)
+    boundary.setattr(sys,'argv',['x','diagnose-aggregate','--expected-sha','a'*40,'--output',str(tmp_path/'aggregate.json')])
+    assert h.main()==1
+    result=capsys.readouterr()
+    assert 'PRIVATE' not in result.out+result.err
+    assert 'AGGREGATE_OUTPUT_UNAVAILABLE' in json.loads(result.out)['reason_codes']
+
+
 def test_wrapper_has_separate_parameter_set_and_no_policy_override():
     text=(Path(h.__file__).with_name('collect-host.ps1')).read_text()
     assert 'diagnose-aggregate' in text and 'AggregateReasons' in text
@@ -262,7 +284,7 @@ def test_dedicated_ci_is_synthetic_and_full_native_pg_jobs_are_excluded():
     assert 'python-version: \'3.12\'' in text and 'pytest --noconftest' in text
     assert 'windows-latest' in text and 'ubuntu-latest' in text
     assert 'scripts/record_ci_source.py' in text
-    assert '--minimum 138' in text and 'path: public-evidence/' in text
+    assert '--minimum 141' in text and 'path: public-evidence/' in text
     for forbidden in ('Add-Type','DPAPI','initdb','services:','host-facts.ps1 -File'):
         assert forbidden not in text
     branch='parallel/adminit-g0-aggregate-20261025'

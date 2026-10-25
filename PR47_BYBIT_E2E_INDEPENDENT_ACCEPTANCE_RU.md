@@ -68,3 +68,12 @@
 4. Provenance evidence with exact SHA/tree/run attempt/artifact digest.
 
 **Никаких торговых ключей, private endpoints, ордеров, merge/deployment и физических запусков.**
+
+
+## Дополнение: cancellation/slow-write witness
+
+На отдельной ветке PR #50 добавлены два offline fault-injection сценария:
+- блокировка синхронной DB операции удерживает публикацию telemetry и UI до освобождения;
+- отмена ожидающей задачи не освобождает ответственность за ещё работающий `to_thread`, и после завершения SQL не публикует ложное подтверждение.
+
+Это **не физический PostgreSQL rollback**: тест использует управляемый fake DB. Для G2 требуется disposable PostgreSQL 18, SQL commit/rollback receipts, JUnit с точным SHA и контроль того, что активная транзакция не пережила подтверждённый shutdown.

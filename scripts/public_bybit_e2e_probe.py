@@ -57,7 +57,10 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
     stream = OrderBookStream(on_book, on_gap, depth=depth)
     task = asyncio.create_task(stream.run(list(symbols), stop))
     try:
-        await asyncio.sleep(duration)
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=duration)
+        except asyncio.TimeoutError:
+            pass
     finally:
         stop.set()
         try:

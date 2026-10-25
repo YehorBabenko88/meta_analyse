@@ -153,3 +153,31 @@ async def test_gap_invalidates_telemetry_without_persisted_success():
         ("gap", "orderbook", "BTCUSDT"),
         ("callback", ("BTCUSDT",), "synthetic sequence regression"),
     ]
+
+
+@pytest.mark.asyncio
+async def test_failed_write_after_cancellation_retains_original_error_in_logs(caplog):
+    import threading
+    entered, release = threading.Event(), threading.Event()
+    class FailingDB:
+        def book(self, *_):
+            entered.set()
+            if not release.wait(3):
+                raise TimeoutError("blocked test write")
+            raise ValueError("synthetic commit failure")
+    class Telemetry:
+        def observe(self, *_):
+            raise AssertionError("failed write must not be observed")
+    collector = MarketCollector(None, None, telemetry=Telemetry())
+    collector.db = FailingDB()
+    task = asyncio.create_task(collector._book("BTCUSDT", SimpleNamespace(valid=True), 1))
+    try:
+        assert await asyncio.to_thread(entered.wait, 2)
+        task.cancel()
+        await asyncio.sleep(0.01)
+        assert not task.done()
+    finally:
+        release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(task, 3)
+    assert "synthetic commit failure" in caplog.text

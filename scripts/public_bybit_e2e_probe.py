@@ -107,6 +107,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
         except Exception:
             record["unexpected_exits"] += 1
     record["connection_epochs"] = stream.connection_epoch
+    record["last_sequence_by_symbol"] = {k: v[1] for k, v in last_sequence.items()}
     record["snapshot_epoch_by_symbol"] = first_snapshot_epochs
     if time.monotonic() - now < duration * 0.95:
         record["unexpected_exits"] += 1

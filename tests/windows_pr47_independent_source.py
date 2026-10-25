@@ -25,6 +25,10 @@ class SourceGuard(unittest.TestCase):
   src=read('commissioning/native_scm_diagnostic.py')
   for x in ("LIFETIME_BINDING_INVALID","source_binding(args.expected_sha,args.expected_tree)","require(row==by_id[row['pid']]['process'])"):
    self.assertIn(x,src)
+ def test_lifetime_and_service_identity_guards(self):
+  src=read('commissioning/process_identity.py')
+  for marker in ('SERVICE_MODULE_LIFETIME_MISMATCH','SERVICE_MODULES_CHANGED','SERVICE_IMPLEMENTATION_CHANGED','SERVICE_DLL_SIGNATURE_UNVERIFIED','SERVICE_HOST_CONFIGURATION_UNREVIEWED'):
+   self.assertIn(marker,src)
  def test_no_forced_bypass_in_g0(self):
   src=read('commissioning/adminit-g0-readonly.ps1')
   self.assertNotIn('-ExecutionPolicy Bypass',src)

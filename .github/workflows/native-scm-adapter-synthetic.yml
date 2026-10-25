@@ -1,0 +1,49 @@
+name: Native SCM diagnostic adapter synthetic
+on:
+  push:
+    branches: ['parallel/adminit-r0-r5-adapter-20261025']
+  pull_request:
+    paths:
+      - 'commissioning/native_scm_diagnostic.py'
+      - 'commissioning/process_identity.py'
+      - 'tests/test_native_scm_adapter.py'
+      - '.github/workflows/native-scm-adapter-synthetic.yml'
+permissions:
+  contents: read
+jobs:
+  synthetic:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Fetch frozen predicate oracle without changing HEAD
+        run: git fetch --no-tags --depth=1 origin 4a92643c00a7e4d113025e1df427d8f4850f0981
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/record_ci_source.py
+      - run: python -m pip install -c requirements.lock pytest
+      - name: Synthetic adapter, existing refusal and public privacy tests
+        run: python -m pytest --noconftest -q tests/test_native_scm_adapter.py tests/test_windows_native_abi_source.py tests/test_inventory_refusal_projection.py tests/test_public_junit.py tests/test_project_public_ci_evidence.py tests/test_public_evidence_workflows.py --junitxml=native-scm-adapter-tests.xml
+      - name: Reject missing, failed or unexpected skipped cases
+        run: python scripts/check_integration_junit.py native-scm-adapter-tests.xml --minimum 270 --allow-skip test_symlink_is_rejected --require-exact test_adapter_does_not_reclassify_or_persist --require-exact test_shared_predicate_refactor_is_equivalent_to_frozen_pr39 --require-exact test_raw_identifiers_and_exception_fields_never_leave_projection --require-exact test_source_binding_is_finally_checked_and_clears_partial_data --require-exact test_dedicated_ci_is_exact_and_does_not_start_native_or_pg_jobs
+      - name: Project isolated public evidence
+        id: privacy
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit native-scm-adapter-tests.xml
+          python scripts/project_public_ci_evidence.py --validate public-evidence
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: native-scm-adapter-${{ matrix.os }}
+          if-no-files-found: error
+          path: public-evidence/

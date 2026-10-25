@@ -53,6 +53,19 @@ def command_arguments(command):
     return tuple(arguments.casefold().split()) if arguments is not None else None
 
 
+def service_host_configuration_checks(svc,config,roots):
+    """The original host predicates, shared with read-only diagnostics."""
+    name=svc['name'];host,_,args,account,_=WINDOWS_SERVICE_CONTRACTS[name]
+    return dict(CONFIG_MEMBER_MATCH=config.get('name')==name,
+        REGISTRY_TYPE_REVIEWED=type(config.get('service_type')) is int and config.get('service_type')==32,
+        SCM_TYPE_REVIEWED=type(svc.get('service_type')) is int and svc.get('service_type')==32,
+        REGISTRY_ACCOUNT_MATCH=str(config.get('account','')).casefold()==account,
+        SCM_ACCOUNT_MATCH=str(svc.get('start_name','')).casefold()==account,
+        REGISTRY_IMAGE_MATCH=command_executable(config.get('expanded_image_path'))==canonical(ntpath.join(roots['system32'],host)),
+        REGISTRY_ARGS_MATCH=command_arguments(config.get('expanded_image_path'))==args,
+        SCM_ARGS_MATCH=command_arguments(svc.get('binary_path'))==args)
+
+
 def service_implementation_refusal(svc,evidence,roots,native):
     name=svc['name'];host,dll,args,account,source=WINDOWS_SERVICE_CONTRACTS[name]
     host_path=canonical(ntpath.join(roots['system32'],host))
@@ -64,11 +77,7 @@ def service_implementation_refusal(svc,evidence,roots,native):
         return 'SERVICE_IMPLEMENTATION_UNVERIFIED'
     if before!=after:return 'SERVICE_IMPLEMENTATION_CHANGED'
     for c in (before,after):
-        if (c.get('name')!=name or type(c.get('service_type')) is not int or c.get('service_type')!=32
-                or type(svc.get('service_type')) is not int or svc.get('service_type')!=32
-                or str(c.get('account','')).casefold()!=account or str(svc.get('start_name','')).casefold()!=account
-                or command_executable(c.get('expanded_image_path'))!=host_path
-                or command_arguments(c.get('expanded_image_path'))!=args or command_arguments(svc.get('binary_path'))!=args):
+        if not all(service_host_configuration_checks(svc,c,roots).values()):
             return 'SERVICE_HOST_CONFIGURATION_UNREVIEWED'
         if c.get('dll_source')!=source:return 'SERVICE_DLL_CONFIGURATION_UNREVIEWED'
         if source=='integrated':

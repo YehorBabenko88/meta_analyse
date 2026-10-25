@@ -1,0 +1,29 @@
+name: Windows native ABI static audit
+on:
+  push:
+    branches: ['audit/windows-native-abi-readonly-20261025']
+  pull_request:
+    paths:
+      - 'commissioning/process-evidence.ps1'
+      - 'tests/test_windows_native_abi_source.py'
+      - '.github/workflows/windows-native-abi-static.yml'
+permissions:
+  contents: read
+jobs:
+  source-only:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pytest only
+        run: python -m pip install pytest==8.3.5
+      - name: Source-only tests, no native invocation
+        run: python -m pytest -q tests/test_windows_native_abi_source.py

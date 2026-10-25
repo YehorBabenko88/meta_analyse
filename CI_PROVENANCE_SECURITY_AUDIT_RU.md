@@ -79,3 +79,24 @@
 **PR #30: BLOCKED (не окончательный FAIL)** на указанном HEAD: исправления выглядят направленными на известные утечки, первый реальный bundle проходит ZIP custody и инвентаризацию, но полная Windows/Linux CI матрица и все реальные artifacts ещё не подтверждены. Synthetic `success` не повышается до global PASS.
 
 Никаких изменений PR #26–#30, workflows или GitHub settings этим независимым отчётом не выполнено. Документ находится в отдельной audit-ветке и не разрешает merge/deployment.
+
+
+## 6. Повторная проверка PR #30 после завершения CI (2026-10-25)
+
+Exact HEAD по-прежнему `fe9833a3aa9606b04f98f0f655916b83270dfdb3`; tree в восьми manifests `925e1450c847de660bc370644aab7ea389ab8bdb`. Run `40182611622` завершился SUCCESS: jobs `archive-pinned-contract`, `linux`, `windows` — все completed/success. Storage run `40182611620`, Kernel run `40182611611`, Public JUnit run `40182611664` также completed/success.
+
+Независимо скачаны и проверены восемь реальных ZIP по ID:
+- `12594881656` archive: SHA256 `31ff3f720eb5f048304fe8983b583c8d2a08c599692af9a045ed99a2ad7e2778`, 8 testcase.
+- `12593819737` Linux: `779dd6954f5a9f96db2fb10eda2e845987e95f0867fdbb9f158ec61b3e69d4ac`, 12 JUnit (400 diagnostic, 1817 full, 10×67 lifecycle), PG `server_version=180001`.
+- `12593639957` Windows: `9af4b1a18112eb6e45aa2e0259fb86fc071ed6669ad66f158c56732b05a4dbe2`, 12 JUnit (400 diagnostic, 1817 full, 10×67 lifecycle), pinned PG18 binary receipt.
+- `12594592277` Storage: `7ef53259430997b8e3f2aed5cc84a6f46406292415885fd82af945602deb1728`, 107 testcase.
+- `12595186001` Kernel Windows: `00f30b3501a85a4bf3190348f2c4051eccc33a7dcd74bcf5c5ecb1244fd5c354`, 948 testcase.
+- `12594499719` Kernel Linux: `6b58a42e35506680c1ce2feb1437af706f42ebf0604687bd0cbb87cbea07d5b9`, 948 testcase.
+- `12594861574` Public JUnit Linux: `8d594c612dd43c616fc860caaf4213167045d7432ad8cd5f48dfb6f82c02a6b1`, 86 testcase.
+- `12593439838` Public JUnit Windows: `c3d2f545ff85390045138ba26ce13e6df044bc0c5548fe53aba362f542f4d6a1`, 86 testcase.
+
+Все ZIP digests совпали с GitHub API. Все ZIP inventory и `manifest.files` hashes совпали; не обнаружены duplicate ZIP filenames. В каждом manifest source SHA/tree/run/job/attempt соответствуют полученным API evidence. В проецированных XML отсутствуют hostname, properties, system-out, system-err и типичные runner paths.
+
+**Открытый риск:** Linux full JUnit `junit-001.xml` содержит 1 skipped testcase из 1817. Публичная identity `public.tests/case_2b90538d529ab6a4aa10f5eb427aa750ecbabde849679b9321d15d74dafd6c94` не раскрывает исходное имя. Независимая сверка с исходным JUnit/allowlist ещё не выполнена. Это не автоматический FAIL, но и не независимый mandatory-test PASS. Два synthetic workflows `CI content security synthetic` и `CI audit synthetic` были policy-skipped на данном PR: не считать их успешными выполнениями.
+
+**Вердикт PR #30: CONTENT_AND_CUSTODY_PASS_ONLY / OVERALL BLOCKED.** ZIP, manifests и projected privacy на проверенных восьми artifacts PASS; полный expected test identity oracle, failure-path uploads, raw GitHub logs и historical artifact exposure требуют отдельного доказательства. ADMINIT NO-GO. Ни один original PR/workflow не изменён.

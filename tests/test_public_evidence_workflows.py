@@ -21,6 +21,13 @@ def test_every_upload_is_gated_and_staging_only():
         assert 'scripts/project_public_ci_evidence.py --validate public-evidence' in text
     assert uploads==9
 
+def test_projection_commands_stop_on_first_failure():
+    for path in (ROOT/'.github/workflows').glob('*.yml'):
+        text=path.read_text()
+        for block in text.split('      - name: Project isolated public evidence')[1:]:
+            block=block.split('      - uses: actions/upload-artifact@v4')[0]
+            assert ('shell: bash' in block and 'set -euo pipefail' in block) or ('shell: pwsh' in block and block.count('$LASTEXITCODE -ne 0')==2)
+
 @pytest.mark.parametrize('ordinal',[1,2,3])
 def test_write_fault_never_publishes_partial_set(tmp_path,receipt,monkeypatch,ordinal):
     source=raw(tmp_path,'<testsuite><testcase classname="x" name="a"/></testsuite>')

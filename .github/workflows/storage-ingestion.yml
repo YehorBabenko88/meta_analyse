@@ -75,7 +75,9 @@ jobs:
       - name: Project isolated public evidence
         id: privacy_gate
         if: always()
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit storage-tests.xml
           python scripts/project_public_ci_evidence.py --validate public-evidence
       - uses: actions/upload-artifact@v4

@@ -62,7 +62,9 @@ jobs:
       - name: Project isolated public evidence
         id: privacy
         if: always()
+        shell: bash
         run: |
+          set -euo pipefail
           python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit kernel-tests.xml --mutations identity-mutations.json --mutations security-mutations.json --mutations schema-mutations.json
           python scripts/project_public_ci_evidence.py --validate public-evidence
       - uses: actions/upload-artifact@v4

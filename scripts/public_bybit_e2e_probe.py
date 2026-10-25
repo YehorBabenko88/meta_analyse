@@ -60,6 +60,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
         if epoch != latest_epoch:
             latest_epoch = epoch
             seen.clear()
+            last_sequence.clear()
             snapshot_pending.clear()
             snapshot_pending.update(symbols)
         if not book.valid or book.update_id is None or book.sequence is None:

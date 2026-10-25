@@ -69,6 +69,8 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
         except Exception:
             record["unexpected_exits"] += 1
     record["connection_epochs"] = stream.connection_epoch
+    if time.monotonic() - now < duration * 0.95:
+        record["unexpected_exits"] += 1
     record["pending_symbols"] = sorted(set(symbols) - set(last_update))
     record["stale_symbols"] = sorted(s for s in symbols
                                       if s in last_update and time.monotonic() - last_update[s] > stream.silence_timeout)

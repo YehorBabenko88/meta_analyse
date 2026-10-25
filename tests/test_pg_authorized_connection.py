@@ -66,3 +66,31 @@ def test_invalid_expected_cluster_refuses_before_connect():
 def test_unicode_digit_identifier_refused():
     with pytest.raises(AttestationRefused):
         ExpectedCluster("１２３", "meta_commission_test", "meta_commission_test")
+
+
+def test_connection_factory_failure_does_not_authorize():
+    def unavailable():
+        raise OSError("disposable server not running")
+    with pytest.raises(OSError, match="disposable server"):
+        with authorized_private_connection(unavailable, POLICY):
+            pytest.fail("connection must not be yielded")
+
+
+def test_attestation_failure_closes_connection_context():
+    conn = FakeConn(("postgres", *GOOD[1:]))
+    exited = []
+    original_exit = conn.__exit__
+    def record_exit(*args):
+        exited.append(True)
+        return original_exit(*args)
+    conn.__exit__ = record_exit
+    # Python special-method lookup uses the class, so use a wrapper below.
+    class Tracked(FakeConn):
+        def __exit__(self, *args):
+            exited.append(True)
+            return False
+    tracked = Tracked(("postgres", *GOOD[1:]))
+    with pytest.raises(AttestationRefused):
+        with authorized_private_connection(lambda: tracked, POLICY):
+            pytest.fail("wrong cluster must not be yielded")
+    assert exited == [True]

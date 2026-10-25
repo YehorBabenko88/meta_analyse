@@ -33,7 +33,7 @@ permissions:
   contents: read
 jobs:
   integration:
-    if: ${{ !contains(fromJSON('["parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023","maintenance/pr27-content-review-20261023"]'), github.head_ref || github.ref_name) }}
+    if: ${{ !contains(fromJSON('["parallel/adminit-minimal-refusal-20261025","parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023","maintenance/pr27-content-review-20261023"]'), github.head_ref || github.ref_name) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:

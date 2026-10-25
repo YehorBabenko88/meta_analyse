@@ -51,3 +51,65 @@ async def test_successful_commit_precedes_telemetry_and_publish():
     collector.db = SuccessfulDB()
     await collector._book("BTCUSDT", SimpleNamespace(valid=True), 1)
     assert order == ["commit", "telemetry", "publish"]
+
+
+@pytest.mark.asyncio
+async def test_blocked_write_cannot_publish_before_release():
+    import threading
+    entered, release = threading.Event(), threading.Event()
+    events = []
+    class BlockingDB:
+        def book(self, *_):
+            entered.set()
+            if not release.wait(3):
+                raise TimeoutError("synthetic blocked write")
+            events.append("committed")
+    class Telemetry:
+        def observe(self, *_):
+            events.append("observed")
+    async def publish(*_):
+        events.append("published")
+    collector = MarketCollector(None, None, telemetry=Telemetry(), on_book=publish)
+    collector.db = BlockingDB()
+    task = asyncio.create_task(collector._book("BTCUSDT", SimpleNamespace(valid=True), 1))
+    try:
+        assert await asyncio.to_thread(entered.wait, 2)
+        await asyncio.sleep(0)
+        assert events == []
+        assert not task.done()
+    finally:
+        release.set()
+    await asyncio.wait_for(task, 3)
+    assert events == ["committed", "observed", "published"]
+
+
+@pytest.mark.asyncio
+async def test_cancellation_during_blocked_write_never_publishes():
+    import threading
+    entered, release = threading.Event(), threading.Event()
+    events = []
+    class BlockingDB:
+        def book(self, *_):
+            entered.set()
+            if not release.wait(3):
+                raise TimeoutError("synthetic blocked write")
+            events.append("committed")
+    class Telemetry:
+        def observe(self, *_):
+            events.append("observed")
+    async def publish(*_):
+        events.append("published")
+    collector = MarketCollector(None, None, telemetry=Telemetry(), on_book=publish)
+    collector.db = BlockingDB()
+    task = asyncio.create_task(collector._book("BTCUSDT", SimpleNamespace(valid=True), 1))
+    try:
+        assert await asyncio.to_thread(entered.wait, 2)
+        task.cancel()
+        await asyncio.sleep(0.01)
+        assert not task.done(), "active DB write must retain cancellation ownership"
+        assert events == []
+    finally:
+        release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(task, 3)
+    assert events == ["committed"]

@@ -48,3 +48,19 @@ def test_callback_failure_fails_closed():
 
 def test_unexpected_exit_fails_closed():
     assert module.evaluate(record(unexpected_exits=1)) == "FAIL"
+
+
+def test_ui_health_never_marks_invalid_book_current():
+    assert module.health_state(valid=False, age_seconds=0, max_age_seconds=90) == "UNVERIFIED"
+
+
+def test_ui_health_marks_silent_feed_stale():
+    assert module.health_state(valid=True, age_seconds=91, max_age_seconds=90) == "STALE"
+
+
+def test_ui_health_missing_timestamp_is_stale():
+    assert module.health_state(valid=True, age_seconds=None, max_age_seconds=90) == "STALE"
+
+
+def test_ui_health_recent_verified_feed_current():
+    assert module.health_state(valid=True, age_seconds=1, max_age_seconds=90) == "CURRENT"

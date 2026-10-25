@@ -58,21 +58,28 @@ def test_new_schema_check_and_ddl_share_transaction_and_lock(monkeypatch,existin
     import importlib.util
     spec=importlib.util.spec_from_file_location('schema_setup',Path(h.__file__).with_name('initialize-private-schema.py'))
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    from test_pg_cluster_connection import POLICY,GOOD
+    config=dict(host='127.0.0.1',port='55480',dbname=POLICY.database,user=POLICY.role)
     calls=[]
     class Connection:
         def __enter__(self):calls.append('begin');return self
         def __exit__(self,*args):calls.append('rollback' if args[0] else 'commit')
         def execute(self,sql,*args):calls.append(sql);return self
-        def fetchone(self):return (existing,)
+        def transaction(self):
+            from contextlib import nullcontext
+            return nullcontext()
+        def fetchone(self):return GOOD if 'pg_control_system()' in calls[-1] else (existing,)
     monkeypatch.setattr(module.psycopg,'connect',lambda **kwargs:Connection())
     monkeypatch.setattr(module,'verify_database_role',lambda *args:calls.append('verify_role'))
     if existing:
-        with pytest.raises(ValueError):module.initialize_new_schema({}, {})
+        with pytest.raises(ValueError):module.initialize_new_schema(config, {}, POLICY)
         assert calls[-1]=='rollback'
     else:
-        module.initialize_new_schema({}, {})
+        module.initialize_new_schema(config, {}, POLICY)
         assert calls[-1]=='commit'
         assert any('CREATE SCHEMA' in s for s in calls)
-    assert calls[2].startswith('SELECT pg_advisory_xact_lock')
-    assert 'pg_namespace' in calls[3] and 'pg_proc' in calls[3]
+    lock=next(i for i,s in enumerate(calls) if s.startswith('SELECT pg_catalog.pg_advisory_xact_lock'))
+    assert calls[lock-1]=='verify_role'
+    assert 'pg_namespace' in calls[lock+1] and 'pg_proc' in calls[lock+1]
+    assert 'pg_control_system()' in calls[lock-2]
     if existing: assert not any('CREATE SCHEMA' in s for s in calls)

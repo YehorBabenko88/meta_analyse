@@ -21,12 +21,13 @@ class BookSnapshot:
     update_id: int
     sequence: int
     valid: bool
+    message_type: str | None = None
 
     @classmethod
-    def from_book(cls, book):
+    def from_book(cls, book, message_type=None):
         return cls(book.symbol, MappingProxyType(dict(book.bids)),
                    MappingProxyType(dict(book.asks)), book.update_id,
-                   book.sequence, book.valid)
+                   book.sequence, book.valid, message_type)
 
 
 class _ResubscribeRequired(ConnectionError):
@@ -115,7 +116,7 @@ class OrderBookStream:
                             await self.on_gap([symbol], "invalid orderbook timestamp")
                             raise _ResubscribeRequired("malformed orderbook timestamp") from exc
                         last_message[symbol] = time.monotonic()
-                        await self.on_book(symbol, BookSnapshot.from_book(book), timestamp_ms)
+                        await self.on_book(symbol, BookSnapshot.from_book(book, msg.get("type")), timestamp_ms)
                         # Reset backoff only after a verified snapshot, not merely
                         # after a TCP/WebSocket handshake (which may flap rapidly).
                         if msg.get("type") == "snapshot":

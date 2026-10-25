@@ -41,10 +41,18 @@ def initialize_schema(store, ddl):
 
 
 class Store:
-    def __init__(self, dsn):
+    def __init__(self, dsn, *, expected_cluster=None):
         self.dsn = dsn
+        self.expected_cluster = expected_cluster
 
     def connect(self):
+        if self.expected_cluster is not None:
+            from .pg_authorized_connection import authorized_private_connection, validate_connection_parameters
+            from psycopg.conninfo import conninfo_to_dict
+            validate_connection_parameters(conninfo_to_dict(self.dsn), self.expected_cluster)
+            return authorized_private_connection(
+                lambda: psycopg.connect(self.dsn, connect_timeout=5,
+                    options="-c statement_timeout=5000 -c lock_timeout=5000"), self.expected_cluster)
         return psycopg.connect(self.dsn, connect_timeout=5,
                                options="-c statement_timeout=5000 -c lock_timeout=5000")
 

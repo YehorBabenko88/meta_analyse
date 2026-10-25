@@ -43,7 +43,7 @@ class WorkerSignals(QObject):
 
 
 class Window(QWidget):
-    def __init__(self):
+    def __init__(self, *, expected_cluster=None):
         super().__init__()
         self.setWindowTitle("Meta Analyse — read-only / paper")
         self.resize(1000, 690)
@@ -57,7 +57,7 @@ class Window(QWidget):
         self.signals.snapshot.connect(self._receive_snapshot, Qt.ConnectionType.QueuedConnection)
         self.signals.error.connect(self._receive_error, Qt.ConnectionType.QueuedConnection)
         dsn = os.getenv("META_ANALYSE_DSN", "")
-        self.store = Store(dsn) if dsn else None
+        self.store = Store(dsn, expected_cluster=expected_cluster) if dsn else None
         self.service = DesktopService(self.store, self.signals.snapshot.emit)
         self.worker = threading.Thread(target=self._thread_main, name="meta-analyse-worker", daemon=False)
         self.tabs = QTabWidget()

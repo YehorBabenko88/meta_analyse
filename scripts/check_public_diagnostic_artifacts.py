@@ -23,7 +23,7 @@ def main():
             raise SystemExit('PUBLIC_ARTIFACT_REJECTED') from None
         if PRIVATE_KEYS.search(text) or 'PRIVATE_SENTINEL_' in text or re.search(r'\bS-1-5-(?:\d+-){2,}\d+', text):
             raise SystemExit('PUBLIC_ARTIFACT_REJECTED')
-    print('Explicit public artifacts passed diagnostic privacy gate')
+    print('Diagnostic pattern scan complete; publication NOT_AUTHORIZED')
 
 
 if __name__ == '__main__':

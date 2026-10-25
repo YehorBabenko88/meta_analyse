@@ -39,12 +39,15 @@ jobs:
           python scripts/check_integration_postgres.py pg18-tests.xml --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
       - name: Repeat lifecycle without missing or skipped cases
         run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir pg18-lifecycle
-      - uses: actions/upload-artifact@v4
+      - name: Project isolated public evidence
+        id: privacy_gate
         if: always()
+        run: |
+          python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit pg18-tests.xml --junit-glob "pg18-lifecycle/*/tests.xml" --postgres-version postgres-version.json
+          python scripts/project_public_ci_evidence.py --validate public-evidence
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy_gate.outcome == 'success'
         with:
           name: commissioning-postgres18
-          path: |
-            source-sha.json
-            pg18-tests.*
-            postgres-version.json
-            pg18-lifecycle/**/tests.*
+          if-no-files-found: error
+          path: public-evidence/

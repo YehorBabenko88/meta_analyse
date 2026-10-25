@@ -72,14 +72,15 @@ jobs:
         run: python -m pytest -q tests/test_storage_ingestion_unit.py tests/test_storage_ingestion_postgres.py tests/test_flow_history_storage.py --junitxml=storage-tests.xml
       - name: Reject missing, failed or skipped integration evidence
         run: python -c "import xml.etree.ElementTree as E; c=list(E.parse('storage-tests.xml').getroot().iter('testcase')); assert c and all(all(x.find(t) is None for t in ('skipped','error','failure')) for x in c)"
-      - name: Verify public-only integration artifacts
+      - name: Project isolated public evidence
         id: privacy_gate
         if: always()
-        run: python scripts/check_public_diagnostic_artifacts.py source-sha.json storage-tests.xml
+        run: |
+          python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit storage-tests.xml
+          python scripts/project_public_ci_evidence.py --validate public-evidence
       - uses: actions/upload-artifact@v4
         if: always() && steps.privacy_gate.outcome == 'success'
         with:
           name: storage-ingestion-exact-source
-          path: |
-            source-sha.json
-            storage-tests.xml
+          if-no-files-found: error
+          path: public-evidence/

@@ -55,31 +55,21 @@ jobs:
         run: |
           ./install.ps1 -Python (Get-Command python).Source -InstallRoot "$env:RUNNER_TEMP\installer target"
           ./install.ps1 -Python (Get-Command python).Source -InstallRoot "$env:RUNNER_TEMP\installer target"
-      - name: Verify public-only Windows artifacts
+      - name: Project isolated public evidence
         id: privacy_gate
         if: always()
         shell: pwsh
         run: |
-          $files = @('source-sha.json', 'diagnostic-tests.xml', 'process-probe.json')
-          $files += @('tests.log','tests.xml','postgresql.log','ui-performance.json') | ForEach-Object { Join-Path "$env:RUNNER_TEMP/meta-analyse-ci" $_ }
-          $files += @(Get-ChildItem "$env:RUNNER_TEMP/meta-analyse-ci/repeat-lifecycle" -File -Recurse -Filter 'tests.*' | ForEach-Object { $_.FullName })
-          $files += "$env:RUNNER_TEMP/meta-analyse-pg18/provenance.json"
-          python scripts/check_public_diagnostic_artifacts.py @files
-          if ($LASTEXITCODE -ne 0) { throw 'Public artifact privacy gate rejected output' }
+          python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit diagnostic-tests.xml --junit "$env:RUNNER_TEMP/meta-analyse-ci/tests.xml" --junit-glob "$env:RUNNER_TEMP/meta-analyse-ci/repeat-lifecycle/*/tests.xml" --postgres-version "$env:RUNNER_TEMP/meta-analyse-pg18/provenance.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Public projection blocked' }
+          python scripts/project_public_ci_evidence.py --validate public-evidence
+          if ($LASTEXITCODE -ne 0) { throw 'Public inventory blocked' }
       - uses: actions/upload-artifact@v4
         if: always() && steps.privacy_gate.outcome == 'success'
         with:
           name: windows-test-evidence
-          path: |
-            ${{ runner.temp }}/meta-analyse-ci/repeat-lifecycle/**/tests.*
-            source-sha.json
-            diagnostic-tests.xml
-            process-probe.json
-            ${{ runner.temp }}/meta-analyse-ci/tests.log
-            ${{ runner.temp }}/meta-analyse-ci/tests.xml
-            ${{ runner.temp }}/meta-analyse-ci/postgresql.log
-            ${{ runner.temp }}/meta-analyse-ci/ui-performance.json
-            ${{ runner.temp }}/meta-analyse-pg18/provenance.json
+          if-no-files-found: error
+          path: public-evidence/
   linux:
     if: ${{ !contains(fromJSON('["parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023","maintenance/pr27-content-review-20261023"]'), github.head_ref || github.ref_name) }}
     runs-on: ubuntu-latest
@@ -135,22 +125,18 @@ jobs:
       - name: Verify eleven PostgreSQL and five shutdown integration cases executed without skips
         run: python scripts/check_integration_postgres.py tests.xml --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
       - run: python scripts/benchmark_flow_ui.py --seconds 3 --output ui-performance.json
-      - name: Verify public-only Linux artifacts
+      - name: Project isolated public evidence
         id: privacy_gate
         if: always()
-        run: python scripts/check_public_diagnostic_artifacts.py source-sha.json diagnostic-tests.xml tests.xml tests.log ui-performance.json postgres-version.json repeat-lifecycle/*/tests.*
+        run: |
+          python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit diagnostic-tests.xml --junit tests.xml --junit-glob "repeat-lifecycle/*/tests.xml" --postgres-version postgres-version.json
+          python scripts/project_public_ci_evidence.py --validate public-evidence
       - uses: actions/upload-artifact@v4
         if: always() && steps.privacy_gate.outcome == 'success'
         with:
           name: linux-test-evidence
-          path: |
-            repeat-lifecycle/**/tests.*
-            source-sha.json
-            diagnostic-tests.xml
-            tests.xml
-            tests.log
-            ui-performance.json
-            postgres-version.json
+          if-no-files-found: error
+          path: public-evidence/
 
   archive-pinned-contract:
     if: ${{ !contains(fromJSON('["parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023","maintenance/pr27-content-review-20261023"]'), github.head_ref || github.ref_name) }}
@@ -168,8 +154,15 @@ jobs:
       - run: python -m pytest tests/test_archive_http_server.py tests/test_archive_resumable_faults.py -q --junitxml=archive-contract.xml
       - name: Reject archive skips and empty report
         run: python -c "import xml.etree.ElementTree as E; c=list(E.parse('archive-contract.xml').getroot().iter('testcase')); assert c and all(all(x.find(t) is None for t in ('skipped','error','failure')) for x in c)"
-      - uses: actions/upload-artifact@v4
+      - name: Project isolated public evidence
+        id: privacy_gate
         if: always()
+        run: |
+          python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit archive-contract.xml
+          python scripts/project_public_ci_evidence.py --validate public-evidence
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy_gate.outcome == 'success'
         with:
           name: archive-pinned-contract-evidence
-          path: archive-contract.xml
+          if-no-files-found: error
+          path: public-evidence/

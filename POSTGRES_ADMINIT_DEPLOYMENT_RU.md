@@ -49,3 +49,11 @@
 Остановка при любом неизвестном cluster identity, подключении к 5432, превышении budget, расхождении checkpoint, незавершённом writer, неконтролируемом UNVERIFIED или privacy incident. Никакой автоматической эскалации этапов.
 
 **Статус:** SOURCE IMPLEMENTED (opt-in guard) / SYNTHETIC NOT YET VERIFIED / DISPOSABLE PG NOT YET VERIFIED / G0 NOT EXECUTED / G1 BLOCKED / ADMINIT NO-GO.
+
+## PlanOnly и rollback — уточнение
+
+Новый `pg_cluster_plan.plan_only` — чистая функция без IO. Он отклоняет порт 5432, wildcard host, недопустимые роли и пересечения с явно переданными существующими PGDATA. **Это не физическая проверка существования каталога, symlink/junction, ACL, диска или слушателя.** Эти предикаты должны быть заново подтверждены G0 непосредственно перед отдельным G1; между проверкой порта и bind остаётся TOCTOU. Нельзя выдавать результат PlanOnly за разрешение initdb.
+
+**Rollback после разрешённого G1:** сначала остановить только новый postmaster, причём после подтверждения PID, data_directory, system_identifier и владельца. При несовпадении — остановиться и не трогать процесс. Не использовать `DROP DATABASE`, `Remove-Item -Recurse` или `pg_ctl -D` для непроверенного каталога. Сохранять частично созданный новый PGDATA для ручного разбора; удаление требует отдельного разрешения. Не затрагивать 5432 и Windows services.
+
+**Открытые блокеры:** независимое извлечение ожидаемого system_identifier в G1 receipt, read-only проверка роли/GRANTs и проверка `pg_control_system()` на disposable PG18.1. Код PlanOnly и аттестации не подключён к физическому setup; G1 по-прежнему запрещён.

@@ -11,7 +11,12 @@ def initialize_new_schema(config, policy, expected_cluster=None):
     from meta_analyse.storage import SCHEMA
     from meta_analyse.pg_authorized_connection import authorized_private_connection, validate_connection_parameters
     validate_connection_parameters(config, expected_cluster)
-    with authorized_private_connection(lambda: psycopg.connect(**config), expected_cluster) as conn:
+    # Trusted fixed bounds override caller timeout without accepting startup options.
+    bounded_config = dict(config, connect_timeout=5,
+        options="-c statement_timeout=5000 -c lock_timeout=5000")
+    with authorized_private_connection(lambda: psycopg.connect(**bounded_config), expected_cluster) as conn:
+        # The identity transaction committed: its SET LOCAL no longer applies.
+        conn.execute("SET LOCAL search_path TO pg_catalog")
         verify_database_role(conn,policy)
         conn.execute('SELECT pg_catalog.pg_advisory_xact_lock(%s)',(0x4D455441414E414C,))
         existing=conn.execute("""SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_namespace

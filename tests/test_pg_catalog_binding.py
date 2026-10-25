@@ -73,5 +73,6 @@ def test_each_identity_and_witness_read_pins_catalog_search_path_before_query():
     statements = [sql for sql, _ in observation.statements]
     assert statements[:2] == ["SET TRANSACTION READ ONLY", "SET LOCAL search_path TO pg_catalog"]
     assert "pg_control_system()" in statements[2]
-    assert statements[3:5] == ["SET TRANSACTION READ ONLY", "SET LOCAL search_path TO pg_catalog"]
-    assert "pg_control_checkpoint()" in statements[5]
+    assert statements[3] == "SET search_path TO pg_catalog"
+    assert statements[4:6] == ["SET TRANSACTION READ ONLY", "SET LOCAL search_path TO pg_catalog"]
+    assert "pg_control_checkpoint()" in statements[6]

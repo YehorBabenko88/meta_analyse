@@ -24,6 +24,11 @@ def authorized_private_connection(connect, expected: ExpectedCluster):
         raise AttestationRefused("INVALID_CONNECTION_FACTORY")
     with connect() as conn:
         attest_connected_cluster(conn, expected)
+        # Attestation's SET LOCAL expires at commit. Pin this owned connection's
+        # session path too, and commit setup before yielding an idle connection:
+        # witnesses must be able to start their own READ ONLY transaction.
+        with conn.transaction():
+            conn.execute("SET search_path TO pg_catalog")
         yield conn
 
 

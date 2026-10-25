@@ -40,7 +40,8 @@ def test_successful_attestation_precedes_any_write():
     assert conn.queries[0] == "SET TRANSACTION READ ONLY"
     assert conn.queries[1] == "SET LOCAL search_path TO pg_catalog"
     assert "pg_control_system()" in conn.queries[2]
-    assert conn.queries[3].startswith("INSERT")
+    assert conn.queries[3] == 'SET search_path TO pg_catalog'
+    assert conn.queries[4].startswith("INSERT")
 
 
 @pytest.mark.parametrize("index,value", [

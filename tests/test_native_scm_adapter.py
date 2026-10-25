@@ -312,8 +312,74 @@ def test_dedicated_ci_is_exact_and_does_not_start_native_or_pg_jobs():
     text=path.read_text()
     assert 'windows-latest' in text and 'ubuntu-latest' in text
     assert 'pytest --noconftest' in text and 'python-version: \'3.12\'' in text
-    assert 'scripts/record_ci_source.py' in text and '--minimum 270' in text
+    assert 'scripts/record_ci_source.py' in text and '--minimum 315' in text
     assert 'path: public-evidence/' in text
-    branch='parallel/adminit-r0-r5-adapter-20261025'
+    branch='parallel/adminit-r0-r5-liveness-20261025'
+    assert branch in text
     for filename,count in [('ci.yml',3),('storage-ingestion.yml',1)]:
         assert (ROOT/'.github/workflows'/filename).read_text().count('"'+branch+'"')==count
+
+@pytest.mark.parametrize('kind,stage',[
+    ('native','OPEN_PROCESS'),('native','GET_PROCESS_TIMES'),('native','GET_EXIT_CODE'),
+    ('modules','OPEN_PROCESS_MODULES'),('modules','MODULE_PROCESS_TIMES'),('modules','MODULE_EXIT_CODE'),
+])
+def test_early_failure_does_not_assert_process_death(kind,stage):
+    a=adapter();row,e=evidence()
+    for phase in ('before','after'):
+        item=e[kind+'_'+phase]
+        item.update(created=0,alive=False,error_stage=stage,win32_error=5)
+        if kind=='native':item.update(path='',image_query_succeeded=False)
+        else:item.update(paths=[],complete=False)
+    result=a.project(facts(row,e))
+    for phase in ('before','after'):
+        assert result[kind][phase]['alive_counts']=={'NOT_OBSERVED':1}
+        assert result[kind][phase]['lifetime_counts']=={'NOT_OBSERVED':1}
+    assert result['process_count']==1
+
+
+@pytest.mark.parametrize('kind,stage',[('native','QUERY_IMAGE'),('modules','ENUM_MODULES'),('modules','MODULE_PATH')])
+@pytest.mark.parametrize('alive',[True,False])
+def test_post_liveness_failure_preserves_observed_boolean(kind,stage,alive):
+    a=adapter();row,e=evidence()
+    for phase in ('before','after'):
+        item=e[kind+'_'+phase];item.update(alive=alive,error_stage=stage,win32_error=5)
+        if kind=='native':item.update(path='',image_query_succeeded=False)
+        else:item.update(paths=[],complete=False)
+    result=a.project(facts(row,e))
+    for phase in ('before','after'):
+        assert result[kind][phase]['alive_counts']=={'ALIVE' if alive else 'NOT_ALIVE':1}
+
+
+@pytest.mark.parametrize('name',list(CONTRACTS))
+@pytest.mark.parametrize('service_type',[32,16,48,288,True,32.0])
+def test_reviewed_type_is_exact_policy_not_generic_windows_validity(name,service_type):
+    row,e=evidence(name)
+    for phase in ('before','after'):
+        e['services_'+phase][0]['service_type']=service_type
+        e['implementation_'+phase][name]['service_type']=service_type
+    result=p.classify_missing(row,e,ROOTS)
+    assert result['status']==('VERIFIED_SERVICE' if type(service_type) is int and service_type==32 else 'UNRESOLVED')
+
+
+def test_type_counter_totals_do_not_establish_same_contract():
+    def totals(split):
+        checks=[]
+        for index,name in enumerate(CONTRACTS):
+            row,e=evidence(name);svc=e['services_before'][0];config=e['implementation_before'][name]
+            if index==0:config['service_type']=16
+            if index==(1 if split else 0):svc['service_type']=16
+            checks.append(p.service_host_configuration_checks(svc,config,ROOTS))
+        return {key:sum(not c[key] for c in checks) for key in checks[0]}
+    assert totals(False)==totals(True)
+    assert totals(False)['REGISTRY_TYPE_REVIEWED']==totals(False)['SCM_TYPE_REVIEWED']==1
+
+
+@pytest.mark.parametrize('native_format_success',[True,False])
+def test_query_image_error31_never_uses_native_format_as_identity(native_format_success):
+    row,e=missing_image()
+    for phase in ('before','after'):
+        e['native_'+phase].update(native_format_query_succeeded=native_format_success,
+            native_format_path=r'\Device\Synthetic\private.exe' if native_format_success else '',
+            native_format_win32_error=0 if native_format_success else 31)
+    assert p.classify_missing(row,e,ROOTS)==dict(status='UNRESOLVED',reason_code='IMAGE_PATH_UNAVAILABLE')
+    assert 'Synthetic' not in json.dumps(adapter().project(facts(row,e)))

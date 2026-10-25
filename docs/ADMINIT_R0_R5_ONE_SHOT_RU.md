@@ -26,7 +26,7 @@ CLI не имеет параметров enrollment/private observation/DSN. Н�
 
 Из готовых paired native records публикуются fixed stage/error buckets, alive/lifetime counts и pair stability. Публичных PID/имён/путей нет. Неизвестный stage/error → OTHER, отсутствующая phase → NOT_OBSERVED; malformed types/contradictory source bindings → UNAVAILABLE целиком. Не добавлены GetProcessInformation/IsWow64Process2: protection и architecture имеют NOT_COLLECTED, PPL не угадывается по access denied.
 
-Нулевой creation time допустим только на pre-lifetime failure stage и отмечается NOT_OBSERVED. Положительный FILETIME проверяется против исходного CIM record; native/kernel/module known times должны совпадать точно. PID reuse, kernel creation drift и parent/session binding mismatch отвергаются. PID0/4 controls сохранены, они не исключаются из inventory.
+Нулевой creation time допустим только на pre-lifetime failure stage и отмечается NOT_OBSERVED. На шести ранних error stages alive также NOT_OBSERVED: producer default false не доказывает завершения процесса. Поздний NOT_ALIVE отражает только наблюдавшийся producer boolean. Положительный FILETIME проверяется против исходного CIM record; native/kernel/module known times должны совпадать точно. PID reuse, kernel creation drift и parent/session binding mismatch отвергаются. PID0/4 controls сохранены, они не исключаются из inventory.
 
 ## R3 — modules
 

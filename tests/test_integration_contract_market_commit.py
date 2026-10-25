@@ -24,7 +24,9 @@ async def test_failed_orderbook_commit_never_promotes_telemetry():
     collector = MarketCollector(None, None, telemetry=telemetry)
     collector.db = FailingDB()
     published = []
-    collector.on_book = lambda *args: published.append(args)
+    async def on_book(*args):
+        published.append(args)
+    collector.on_book = on_book
     snapshot = SimpleNamespace(valid=True, symbol="BTCUSDT",
         bids={Decimal("100"): Decimal("1")},
         asks={Decimal("101"): Decimal("1")}, update_id=1, sequence=1)

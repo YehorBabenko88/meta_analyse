@@ -113,3 +113,24 @@ async def test_cancellation_during_blocked_write_never_publishes():
     with pytest.raises(asyncio.CancelledError):
         await asyncio.wait_for(task, 3)
     assert events == ["committed"]
+
+
+@pytest.mark.asyncio
+async def test_database_write_exception_does_not_increment_gapless_health():
+    class FailingDB:
+        def book(self, *_):
+            raise RuntimeError("transaction rolled back")
+    class Telemetry:
+        def __init__(self):
+            self.events = 0
+            self.gaps = 0
+        def observe(self, *_):
+            self.events += 1
+        def gap(self, *_):
+            self.gaps += 1
+    telemetry = Telemetry()
+    collector = MarketCollector(None, None, telemetry=telemetry)
+    collector.db = FailingDB()
+    with pytest.raises(RuntimeError, match="transaction rolled back"):
+        await collector._book("BTCUSDT", SimpleNamespace(valid=True), 1)
+    assert telemetry.events == 0

@@ -100,3 +100,14 @@ Exact HEAD по-прежнему `fe9833a3aa9606b04f98f0f655916b83270dfdb3`; tre
 **Открытый риск:** Linux full JUnit `junit-001.xml` содержит 1 skipped testcase из 1817. Публичная identity `public.tests/case_2b90538d529ab6a4aa10f5eb427aa750ecbabde849679b9321d15d74dafd6c94` не раскрывает исходное имя. Независимая сверка с исходным JUnit/allowlist ещё не выполнена. Это не автоматический FAIL, но и не независимый mandatory-test PASS. Два synthetic workflows `CI content security synthetic` и `CI audit synthetic` были policy-skipped на данном PR: не считать их успешными выполнениями.
 
 **Вердикт PR #30: CONTENT_AND_CUSTODY_PASS_ONLY / OVERALL BLOCKED.** ZIP, manifests и projected privacy на проверенных восьми artifacts PASS; полный expected test identity oracle, failure-path uploads, raw GitHub logs и historical artifact exposure требуют отдельного доказательства. ADMINIT NO-GO. Ни один original PR/workflow не изменён.
+
+
+## 7. Дополнительный независимый review исходного CI #1264
+
+- На HEAD #30 в `.github/workflows/ci.yml` явно указаны `permissions: contents: read`, checkout `github.event.pull_request.head.sha || github.sha`, обязательные diagnostic, Windows native boundary, Windows/Linux PostgreSQL 18, HTTP archive fault, lifecycle и privacy projection. Для Windows и Linux публикация разрешена только после успешного `privacy_gate`. Все три jobs run `40182611622` завершены `success`.
+- Проверка `if: always()` разрешает создание **публичного минимального доказательства** при неуспехе тестов, если необходимые входы уже доступны и projection прошла. Это не равнозначно workflow PASS; отдельный failure-path CI witness не предъявлен.
+- Хеш `case_<SHA256(classname,name)>` является **детерминированным псевдонимом**, а не криптографической анонимизацией. Для низкоэнтропийных известных названий тестов возможен словарный перебор. Не публиковать секреты в имени testcase; для строгой privacy-модели использовать ограниченный allowlist безопасных исходных идентификаторов либо keyed non-public mapping, а независимую сверку выполнять на приватном oracle.
+- Публикация ZIP с `manifest.json` доказывает контроль целостности содержимого после загрузки, но не подлинность runner, корректность выполнения самих тестов или отсутствие утечки в Actions raw logs. Не выдавать `CONTENT_AND_CUSTODY_PASS_ONLY` за разрешение запуска на ADMINIT.
+- Исторические ZIP с raw hostname metadata остаются отдельным открытым вопросом управления доступом и сроками хранения; текущий PR не исправляет уже опубликованные файлы.
+
+**Приоритет следующей независимой приёмки:** 1) exact raw-JUnit mandatory identity/skip oracle, 2) failure-path `pytest FAIL -> privacy projection -> minimal artifact -> workflow FAIL`, 3) повторная проверка GitHub raw job logs и archive/mutation receipts, 4) явная матрица всех workflow, включая policy-skipped как BLOCKED/NOT_APPLICABLE, а не PASS.

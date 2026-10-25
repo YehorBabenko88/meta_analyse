@@ -41,8 +41,9 @@ def test_commissioning_store_attests_every_fresh_connection(monkeypatch):
     assert len(connections)==2
     for conn in connections:
         assert conn.queries[0]=='SET TRANSACTION READ ONLY'
-        assert 'pg_control_system' in conn.queries[1]
-        assert conn.queries[2].startswith('INSERT')
+        assert conn.queries[1]=='SET LOCAL search_path TO pg_catalog'
+        assert 'pg_control_system' in conn.queries[2]
+        assert conn.queries[3].startswith('INSERT')
 
 def test_system_identifier_result_requires_exact_text():
     from meta_analyse.pg_cluster_attestation import attest_connected_cluster
@@ -70,4 +71,5 @@ def test_preflight_database_connection_is_freshly_attested(monkeypatch,wrong):
         assert calls==[]
     else:
         assert preflight.inspect_database(config,{},POLICY.system_identifier)[0]==180001
-        assert calls==['role'] and 'pg_control_system()' in conn.queries[1]
+        assert conn.queries[:2]==['SET TRANSACTION READ ONLY','SET LOCAL search_path TO pg_catalog']
+        assert calls==['role'] and 'pg_control_system()' in conn.queries[2]

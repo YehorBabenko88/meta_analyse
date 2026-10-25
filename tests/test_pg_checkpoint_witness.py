@@ -39,9 +39,12 @@ def test_capture_then_later_checkpoint_and_flush_observed_read_only():
     later=Fake((True, "0/40", "0/40", "0/40", "0/30", 1))
     assert verify_witness(lambda: later, EXPECTED, result.ticket, now=NOW+timedelta(seconds=1)).status == "OBSERVED"
     for conn in (first,later):
-        assert "pg_control_system()" in conn.statements[1][0]
+        assert [sql for sql,_ in conn.statements[:2]] == ["SET TRANSACTION READ ONLY", "SET LOCAL search_path TO pg_catalog"]
+        assert "pg_control_system()" in conn.statements[2][0]
+        assert [sql for sql,_ in conn.statements[3:5]] == ["SET TRANSACTION READ ONLY", "SET LOCAL search_path TO pg_catalog"]
+        assert "pg_control_checkpoint()" in conn.statements[5][0]
         for sql,params in conn.statements:
-            assert sql.strip().upper().startswith(("SELECT", "SET TRANSACTION READ ONLY"))
+            assert sql.strip().upper().startswith(("SELECT", "SET TRANSACTION READ ONLY", "SET LOCAL SEARCH_PATH TO PG_CATALOG"))
         assert conn.statements[-1][1] == ("BTCUSDT",1,2)
     assert "BTCUSDT" not in repr(result)
     assert EXPECTED.system_identifier not in repr(result.ticket)

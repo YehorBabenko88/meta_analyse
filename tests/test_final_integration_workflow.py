@@ -10,7 +10,7 @@ def test_final_workflow_checks_exact_candidate_and_synthetic_bounds():
     assert BRANCH in s and 'ubuntu-latest' in s and 'windows-latest' in s
     assert 'github.event.pull_request.head.sha || github.sha' in s
     assert 'pytest --noconftest' in s and '-p scripts.integration_synthetic_boundary' in s
-    assert '--minimum 1619' in s and 'scripts/record_ci_source.py' in s
+    assert '--minimum 1620' in s and 'scripts/record_ci_source.py' in s
     for forbidden in ('services:','initdb','pg_ctl','run_readonly.py','--enable-public-network','collect-host.ps1','Add-Type'):
         assert forbidden not in s
 

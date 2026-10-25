@@ -67,6 +67,7 @@ def _observe(connect, expected, symbol, update_id, sequence):
     with authorized_private_connection(connect, expected) as conn:
         with conn.transaction():
             conn.execute("SET TRANSACTION READ ONLY")
+            conn.execute("SET LOCAL search_path TO pg_catalog")
             row = conn.execute(_QUERY, (symbol, update_id, sequence)).fetchone()
     if (type(row) not in (tuple, list) or len(row) != 6
             or row[0] is not True or type(row[5]) is not int

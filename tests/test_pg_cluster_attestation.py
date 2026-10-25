@@ -45,7 +45,7 @@ GOOD = ("meta_commission_test", "meta_commission_test", 180001,
 def test_expected_identity_matches_read_only():
     conn = FakeConnection(GOOD)
     attest_connected_cluster(conn, EXPECTED)
-    assert conn.statements[0] == "SET TRANSACTION READ ONLY"
+    assert conn.statements[:2] == ["SET TRANSACTION READ ONLY", "SET LOCAL search_path TO pg_catalog"]
     assert all(not x.lstrip().upper().startswith(("INSERT", "UPDATE", "DELETE",
                                                   "CREATE", "DROP", "ALTER"))
                for x in conn.statements)
@@ -83,7 +83,7 @@ def test_invalid_expected_cluster_refused(bad):
 @pytest.mark.parametrize("bad", [
     {"database": "meta_commission_", "role": "meta_commission_"},
     {"system_identifier": "012345"},
-    {"system_identifier": "１２３４"},
+    {"system_identifier": "пј‘пј’пј“пј”"},
 ])
 def test_noncanonical_expected_cluster_refused(bad):
     args = dict(system_identifier=EXPECTED.system_identifier,

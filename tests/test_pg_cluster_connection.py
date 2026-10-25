@@ -38,8 +38,9 @@ def test_successful_attestation_precedes_any_write():
     with authorized_private_connection(lambda: conn, POLICY) as allowed:
         allowed.execute("INSERT INTO synthetic VALUES (1)")
     assert conn.queries[0] == "SET TRANSACTION READ ONLY"
-    assert "pg_control_system()" in conn.queries[1]
-    assert conn.queries[2].startswith("INSERT")
+    assert conn.queries[1] == "SET LOCAL search_path TO pg_catalog"
+    assert "pg_control_system()" in conn.queries[2]
+    assert conn.queries[3].startswith("INSERT")
 
 
 @pytest.mark.parametrize("index,value", [
@@ -66,7 +67,7 @@ def test_invalid_expected_cluster_refuses_before_connect():
 
 def test_unicode_digit_identifier_refused():
     with pytest.raises(AttestationRefused):
-        ExpectedCluster("１２３", "meta_commission_test", "meta_commission_test")
+        ExpectedCluster("пј‘пј’пј“", "meta_commission_test", "meta_commission_test")
 
 
 def test_connection_factory_failure_does_not_authorize():

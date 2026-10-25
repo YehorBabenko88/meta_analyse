@@ -50,6 +50,7 @@ def attest_connected_cluster(conn, expected: ExpectedCluster) -> None:
     try:
         with conn.transaction():
             conn.execute("SET TRANSACTION READ ONLY")
+            conn.execute("SET LOCAL search_path TO pg_catalog")
             row = conn.execute(
                 """SELECT pg_catalog.current_database(), current_user,
                           pg_catalog.current_setting('server_version_num')::pg_catalog.int4,

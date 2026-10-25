@@ -1,3 +1,9 @@
+# Интеграция и приёмка ADMINIT — краткое заключение
+
+Подготовлена отдельная интеграционная ветка от exact PR43. Исходные PR не изменены. Windows/SCM сохраняет FAIL_CLOSED, authorization NONE, exit1 и прежние VERIFIED predicates. PostgreSQL PlanOnly/attestation/DSN guards и checkpoint witness проверяются только на fake connections; реальный кластер/DDL/DML не запускались. Bybit probe различает TRANSPORT_PASS и полноценную E2E-приёмку, сохраняет epoch/snapshot/UNVERIFIED и cooperative drain. Ни public Bybit network, ни Desktop на ADMINIT здесь не запускались.
+
+Ниже приведены происхождение изменений, preconditions G0–G5, бюджеты, stop conditions, evidence capture и rollback ownership. Все этапы требуют отдельного допуска; evidence evaluator ничего не запускает и не выдаёт authorization. Exact final SHA/tree, JUnit и ссылки actual Actions фиксируются в accompanying dated report после commit. Без hosted evidence интеграция не готова. Физические CPU/RAM/disk, PostgreSQL, network и UI результаты остаются BLOCKED/NOT_RUN. **G0 FAIL_CLOSED; ADMINIT/G1 NO-GO.**
+
 # MetaAnalyse ADMINIT — integration and staged acceptance
 
 ## Scope and status
@@ -30,7 +36,7 @@ PlanOnly executes zero actions, reserves loopback127.0.0.1:55480 and a new path 
 
 Independent expected system_identifier, dedicated role/db, exact18.1 version, fixed port/host and least-privilege/current-session/database-owner/no-other-DB-CONNECT predicates precede caller SQL. New private connection context freshly attests each connection. Initializer refuses missing identity and wrongDSN before connect; preflight read-only DB connection is guarded too. Approved commissioning Window gets explicit ExpectedCluster into Store; normal noncommissioning Store default is unchanged and outside this guard. No claim that arbitrary application callers are automatically protected.
 
-PG identity/control functions, catalog relations and output types are explicitly pg_catalog qualified. Nonempty PG* environment is refused before guarded connects. This closes source-level search_path/implicit-libpq ambiguity; no real exploit or server SQL validation was run. The system identifier supplied on CLI must come from independently reviewed local G1 evidence, never inferred from the server being checked; this typed value alone is not an authenticated G1 receipt. Existing authorization/enrollment/operator gates remain required and are not generated here.
+PG identity/control functions, catalog relations and output types are explicitly pg_catalog qualified; each identity/witness read-only transaction pins SET LOCAL search_path TO pg_catalog before its query. Nonempty PG* environment is refused before guarded connects. This closes source-level search_path/implicit-libpq ambiguity; no real exploit or server SQL validation was run. The system identifier supplied on CLI must come from independently reviewed local G1 evidence, never inferred from the server being checked; this typed value alone is not an authenticated G1 receipt. Existing authorization/enrollment/operator gates remain required and are not generated here.
 
 Read-only checkpoint witness: capture a committed row identity and WAL marker through fresh attestation, then explicitly verify later visibility/flush/redo/checkpoint/timeline. No forced CHECKPOINT, grants, automatic polling or DDL/DML. Permission denial/malformed/wrongcluster/stale marker BLOCKED. OBSERVED describes SQL metadata, not physical disk durability or proof of automatic checkpoint scheduling. Live witness remains BLOCKED.
 

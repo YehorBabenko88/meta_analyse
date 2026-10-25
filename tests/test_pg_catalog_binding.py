@@ -17,7 +17,7 @@ CONFIG = dict(host="127.0.0.1", port="55480", dbname="meta_commission_test", use
 def test_identity_sql_does_not_resolve_system_names_through_caller_search_path():
     conn = FakeConn(GOOD)
     attest_connected_cluster(conn, POLICY)
-    sql = conn.queries[1]
+    sql = conn.queries[2]
     names = ("current_database", "current_setting", "inet_server_addr", "inet_server_port",
              "pg_control_system", "pg_get_userbyid", "has_database_privilege",
              "pg_database", "pg_auth_members", "pg_roles")
@@ -56,7 +56,22 @@ def test_empty_libpq_environment_does_not_refuse_config(monkeypatch):
 def test_attestation_and_witness_use_catalog_qualified_output_casts():
     conn = FakeConn(GOOD)
     attest_connected_cluster(conn, POLICY)
-    assert "::pg_catalog.int4" in conn.queries[1]
-    for sql in (conn.queries[1], _QUERY):
+    assert "::pg_catalog.int4" in conn.queries[2]
+    for sql in (conn.queries[2], _QUERY):
         assert not re.search(r"::\s*(text|integer)\b", sql)
         assert "::pg_catalog.text" in sql
+
+
+def test_each_identity_and_witness_read_pins_catalog_search_path_before_query():
+    from test_pg_checkpoint_witness import Fake, capture
+    identity = FakeConn(GOOD)
+    attest_connected_cluster(identity, POLICY)
+    assert identity.queries[:2] == ["SET TRANSACTION READ ONLY", "SET LOCAL search_path TO pg_catalog"]
+    assert "pg_control_system()" in identity.queries[2]
+    observation = Fake()
+    assert capture(observation).status == "PENDING"
+    statements = [sql for sql, _ in observation.statements]
+    assert statements[:2] == ["SET TRANSACTION READ ONLY", "SET LOCAL search_path TO pg_catalog"]
+    assert "pg_control_system()" in statements[2]
+    assert statements[3:5] == ["SET TRANSACTION READ ONLY", "SET LOCAL search_path TO pg_catalog"]
+    assert "pg_control_checkpoint()" in statements[5]

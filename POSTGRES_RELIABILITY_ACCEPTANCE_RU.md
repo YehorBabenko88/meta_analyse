@@ -52,3 +52,7 @@
 For each stage: immediately stop on unknown cluster identity, unexpected role/port, transaction inconsistency, infinite UNVERIFIED, detached executor write, data corruption or privacy leak. No automatic stage escalation.
 
 **Final status: SOURCE REVIEW PARTIAL / DISPOSABLE CI EVIDENCE PARTIAL / NATIVE WINDOWS TARGET UNVERIFIED / PHYSICAL ADMINIT NO-GO.** No merge, deployment, production DB access or physical tests.
+
+## Exact SHA follow-up
+
+На source SHA `fe9833a3aa9606b04f98f0f655916b83270dfdb3` GitHub Actions завершились: CI run `40182611622` SUCCESS; Storage `40182611620` SUCCESS; Kernel offline `40182611611` SUCCESS; Public JUnit privacy `40182611664` SUCCESS. CI content security `40182611625` и CI audit synthetic `40182611639` SKIPPED по политике, не засчитываются как PASS. Эти результаты относятся к исходному SHA, а не к данному документальному audit-коммиту. Физическая готовность ADMINIT по-прежнему NO-GO.

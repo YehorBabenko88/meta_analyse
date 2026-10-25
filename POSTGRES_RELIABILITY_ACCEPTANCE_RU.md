@@ -68,3 +68,7 @@ PR #30 moved from `fe9833a3` to `346b9fbfcf293d3745920240e530b76fd03ebb07`, chan
 ## Follow-up CI diagnostic: PR #31
 
 В PR #31 (`da0fb4735d2019e0ffa8b9f796b73725272daa5f`) основной Windows и Linux CI падает при сборе `tests/test_evidence_schema_properties.py`: `ModuleNotFoundError: No module named 'hypothesis'`. До этого 10x67 lifecycle завершились успешно; значит сбой относится к отсутствующей тестовой зависимости, а не к доказанному дефекту PostgreSQL. Отдельный source-only ABI job падает раньше тестов из-за отсутствия `psycopg` в `tests/conftest.py`; Windows ABI matrix cancelled. Требуется поправить dependency installation на PR #31 без изменения тестовых требований и заново проверить exact SHA. PR #30 новый SHA `346b9fbfcf293d3745920240e530b76fd03ebb07`: Kernel offline SUCCESS, Storage/CI/privacy пока QUEUED, два maintenance workflow SKIPPED. Никаких результатов PR #31 нельзя переносить на PR #30.
+
+## Exact-HEAD status update
+
+PR #30 HEAD `346b9fbfcf293d3745920240e530b76fd03ebb07`: Storage 40183321651 SUCCESS, Public JUnit privacy 40183321643 SUCCESS, Kernel offline 40183321682 SUCCESS, main CI 40183321671 QUEUED at review. Two maintenance synthetic workflows SKIPPED. Full exact-HEAD Windows/Linux acceptance remains PENDING; do not promote older 1812/1811 results. PR #31 unchanged `da0fb4735d2019e0ffa8b9f796b73725272daa5f` with full CI FAIL (Hypothesis absent), source-only ABI FAIL (psycopg absent). These are independently scoped and should be fixed by owning agents. No physical DB/ADMINIT checks.

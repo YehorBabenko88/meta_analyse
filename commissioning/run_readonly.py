@@ -38,6 +38,7 @@ def bind_terminal_endpoint(verified,executable):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('manifest','manifest-sha256','expected-sha','expected-computer','enrollment','metascalp-exe','log-dir'):p.add_argument('--'+name,required=True)
+    p.add_argument('--cluster-system-identifier',required=True)
     p.add_argument('--operator-approved-readonly-run',action='store_true',required=True)
     a=p.parse_args()
     # Never accept stale/tampered PASS JSON: rerun all read-only checks now.
@@ -46,7 +47,10 @@ def main():
     dsn=os.environ['META_ANALYSE_COMMISSIONING_DSN']
     from psycopg.conninfo import make_conninfo
     from host_identity import load_private,validate_bound_database
-    os.environ['META_ANALYSE_DSN']=make_conninfo(**validate_bound_database(dsn,load_private(a.enrollment),os.environ))
+    bound_config=validate_bound_database(dsn,load_private(a.enrollment),os.environ)
+    from meta_analyse.pg_cluster_attestation import ExpectedCluster
+    expected_cluster=ExpectedCluster(a.cluster_system_identifier,bound_config['dbname'],bound_config['user'])
+    os.environ['META_ANALYSE_DSN']=make_conninfo(**bound_config)
     install_http_read_guard()
     bind_terminal_endpoint(verified,a.metascalp_exe)
     from PySide6.QtWidgets import QApplication
@@ -57,7 +61,7 @@ def main():
     out=Path(a.log_dir);out.mkdir(parents=True,exist_ok=True)
     logging.basicConfig(filename=out/'application.log',level=logging.INFO,
         format='%(asctime)s %(levelname)s %(name)s %(message)s')
-    app=QApplication(sys.argv[:1]);app.setStyleSheet(TRADER_QSS);window=Window();window.show()
+    app=QApplication(sys.argv[:1]);app.setStyleSheet(TRADER_QSS);window=Window(expected_cluster=expected_cluster);window.show()
     last=time.monotonic();samples=[]
     def heartbeat():
         nonlocal last

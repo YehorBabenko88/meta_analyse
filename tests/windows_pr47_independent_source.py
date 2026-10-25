@@ -28,6 +28,15 @@ class SourceGuard(unittest.TestCase):
  def test_no_forced_bypass_in_g0(self):
   src=read('commissioning/adminit-g0-readonly.ps1')
   self.assertNotIn('-ExecutionPolicy Bypass',src)
+ def test_native_error_and_handle_contracts(self):
+  src=read('commissioning/process-evidence.ps1')
+  for marker in ('QueryFullProcessImageNameW','OpenProcess(0x1000,false,pid)','OpenProcess(0x410,false,pid)','GetProcessTimes','Marshal.GetLastWin32Error()','finally {CloseHandle(h);}','finally {Marshal.FreeHGlobal(buffer);}'):
+   self.assertIn(marker,src)
+ def test_rare_aggregate_has_no_individual_keys(self):
+  src=read('commissioning/native_scm_diagnostic.py')
+  for key in ('BOTH_FAILED','REGISTRY_ONLY_FAILED','SCM_ONLY_FAILED','NEITHER_FAILED','NOT_EVALUATED'):
+   self.assertIn(key,src)
+  self.assertIn("later_implementation_checks='NOT_EVALUATED_BY_ADAPTER'",src)
  def test_no_privilege_escalation_in_diagnostic(self):
   src=read('commissioning/native_scm_diagnostic.py')
   for x in ('SeDebugPrivilege','AdjustTokenPrivileges','WriteProcessMemory','SetServiceStatus'):

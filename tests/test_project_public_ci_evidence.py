@@ -223,3 +223,12 @@ def test_input_inode_substitution_after_read_is_blocked(tmp_path,monkeypatch):
     monkeypatch.setattr(Path,'lstat',replaced)
     with pytest.raises(ValueError):p.read(source)
     assert len(calls)>=3
+
+
+@pytest.mark.parametrize('encoding',['utf-16-le','utf-16-be'])
+@pytest.mark.parametrize('with_dtd',[False,True])
+def test_alternate_encoding_cannot_hide_declarations(encoding,with_dtd):
+    declaration='<!DOCTYPE testsuite [<!ENTITY identity "a">]>' if with_dtd else ''
+    name='&identity;' if with_dtd else 'a'
+    payload=('<?xml version="1.0" encoding="utf-16"?>'+declaration+'<testsuite tests="1"><testcase classname="x" name="'+name+'"/></testsuite>').encode(encoding)
+    with pytest.raises(ValueError):p.project(payload,set())

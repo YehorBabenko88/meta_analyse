@@ -91,11 +91,23 @@ def provenance(source):
         result[key] = value
     return result
 
+class NoDeclarations(ET.TreeBuilder):
+    def doctype(self, *args):
+        need(False)
+
+    def comment(self, *args):
+        need(False)
+
+    def pi(self, *args):
+        need(False)
+
+
 def parse(data):
     # Only UTF-8 XML is accepted, so alternate encodings cannot hide declarations.
     text = data.decode('utf-8-sig')
+    need('\x00' not in text)
     need(not re.search(r'<!|<\?(?!xml\s)', text, re.I))
-    root = ET.fromstring(text)
+    root = ET.fromstring(text, parser=ET.XMLParser(target=NoDeclarations()))
     stack = [(root, 1)]
     while stack:
         node, depth = stack.pop()

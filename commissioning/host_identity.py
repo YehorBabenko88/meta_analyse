@@ -215,6 +215,38 @@ def public_report(facts, salt):
                 status='OBSERVATION_ONLY_NOT_AUTHORIZATION')
 
 
+def inventory_refusal_projection(facts, code):
+    """Project the existing assessment; never reassess or copy raw inventory."""
+    from evidence_schema import validate_public, need, integer
+    from process_identity import PUBLIC_PROCESS_REASONS
+    result=dict(projection_status='NOT_EVALUATED',process_snapshot='NOT_EVALUATED',
+                unknown_process_paths=None,identity_evidence='NOT_EVALUATED',scm_evidence='NOT_EVALUATED',
+                http_sys_ownership='NOT_EVALUATED',reason_counts={})
+    if code in ('PROCESS_INVENTORY_SNAPSHOT_INVALID','PROCESS_SNAPSHOT_BINDING_INVALID'):
+        result['process_snapshot']='INVALID'
+    if facts is None:return result
+    validate_public(facts)
+    grid=facts['grid']
+    if 'process_inventory' in facts:
+        assessment=facts['process_inventory'];need(type(assessment) is dict)
+        counts=assessment['reason_counts'];need(type(counts) is dict)
+        for key,value in counts.items():
+            need(type(key) is str and key in PUBLIC_PROCESS_REASONS);integer(value,minimum=1)
+        for key in ('missing_process_paths','verified_missing_process_paths','unknown_process_paths'):
+            integer(assessment[key]);need(type(grid.get(key)) is int and grid[key]==assessment[key])
+        need(grid.get('reason_counts')==counts)
+        need(sum(counts.values())==assessment['unknown_process_paths'])
+        result.update(projection_status='AVAILABLE',reason_counts=dict(counts),
+                      unknown_process_paths=assessment['unknown_process_paths'],
+                      identity_evidence='NOT_EVALUATED' if 'PROCESS_INVENTORY_SCHEMA_INVALID' in counts else 'UNRESOLVED' if set(counts)-{'PROCESS_INVENTORY_COVERAGE_MISMATCH'} else 'NO_IDENTITY_REFUSAL',
+                      process_snapshot='INCOMPLETE' if set(counts)&{'PROCESS_INVENTORY_SCHEMA_INVALID','PROCESS_INVENTORY_COVERAGE_MISMATCH'} else 'NO_COVERAGE_REFUSAL',
+                      scm_evidence='UNRESOLVED' if any(k.startswith('SERVICE_') for k in counts) else 'NO_SCM_REFUSAL')
+    if 'Process snapshot incomplete' in grid['errors']:result['process_snapshot']='INCOMPLETE'
+    if 'api_listeners' in facts:
+        result['http_sys_ownership']='MATCH_OBSERVED' if facts['api_listeners'] else 'UNRESOLVED'
+    return result
+
+
 def collect_facts():
     if platform.system() != 'Windows':
         raise ValueError('Windows host collection required')
@@ -222,14 +254,15 @@ def collect_facts():
         raise DiagnosticError('ELEVATED_TOKEN_REQUIRED')
     directory = system_directory()
     shell = str(directory / 'WindowsPowerShell/v1.0/powershell.exe')
-    environment=dict(os.environ)
+    # Use persisted/Group Policy, never a forced or inherited process override.
+    environment={k:v for k,v in os.environ.items() if k.casefold()!='psexecutionpolicypreference'}
     # Do not inherit PowerShell7 module paths into the Windows PowerShell child.
     environment['PSModulePath']=str(directory/'WindowsPowerShell/v1.0/Modules')
-    result = subprocess.run([shell, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+    result = subprocess.run([shell, '-NoProfile', '-NonInteractive', '-File',
                              str(Path(__file__).with_name('host-facts.ps1'))],
                             capture_output=True, timeout=90,env=environment)
     if result.returncode:
-        raise ValueError('host facts unavailable; no private output published')
+        raise DiagnosticError('COLLECTOR_CHILD_BLOCKED')
     from evidence_schema import strict_loads
     facts = strict_loads(result.stdout.decode('utf-8-sig'))
     if facts.get('collector_elevated') is not True:
@@ -451,6 +484,7 @@ def main():
     args = parser.parse_args()
     created_private = None
     public_output = None
+    refusal_facts = None
     try:
         if args.command == 'diagnose':
             output, private = Path(args.output), Path(args.private_observation)
@@ -470,6 +504,9 @@ def main():
         if collector != collector_identity(args.expected_sha, manifest=args.manifest, manifest_sha256=args.manifest_sha256):
             raise DiagnosticError('COLLECTOR_SOURCE_CHANGED')
         if args.command == 'diagnose':
+            # Only facts returned by the existing collector and post-bound to
+            # verified source may be used for a refusal projection.
+            refusal_facts = facts
             salt = secrets.token_hex(32)
             reasons=[]
             if facts['grid'].get('coverage_complete') is not True or facts['grid'].get('errors'):reasons.append('INCOMPLETE_INVENTORY')
@@ -525,11 +562,17 @@ def main():
         failure = dict(status='FAIL_CLOSED', diagnostic_status='FAIL_CLOSED',
                        reason_codes=[exc.code if isinstance(exc,DiagnosticError) else 'DIAGNOSTIC_UNAVAILABLE'],
                        detail='private identity/configuration values are not published')
+        if args.command=='diagnose' and isinstance(exc,DiagnosticError) and exc.code in (
+                'INCOMPLETE_INVENTORY','PROCESS_INVENTORY_SNAPSHOT_INVALID','PROCESS_SNAPSHOT_BINDING_INVALID'):
+            try:failure['inventory_refusal']=inventory_refusal_projection(refusal_facts,exc.code)
+            except (KeyError,TypeError,ValueError,AttributeError,OverflowError,RecursionError):
+                failure['inventory_refusal']={'projection_status':'INVALID'}
         if public_output is not None:
             try: public_output.write(json.dumps(failure,indent=2).encode('utf-8'))
             except (OSError, ValueError): pass
         if not isinstance(exc, Exception):raise
-        print(json.dumps(failure))
+        try:print(json.dumps(failure))
+        except (OSError,ValueError):pass
         return 1
     finally:
         for owned in (created_private, public_output):

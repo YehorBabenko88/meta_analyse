@@ -312,9 +312,9 @@ def test_dedicated_ci_is_exact_and_does_not_start_native_or_pg_jobs():
     text=path.read_text()
     assert 'windows-latest' in text and 'ubuntu-latest' in text
     assert 'pytest --noconftest' in text and 'python-version: \'3.12\'' in text
-    assert 'scripts/record_ci_source.py' in text and '--minimum 315' in text
+    assert 'scripts/record_ci_source.py' in text and '--minimum 338' in text
     assert 'path: public-evidence/' in text
-    branch='parallel/adminit-r0-r5-liveness-20261025'
+    branch='parallel/adminit-scm-correlation-20261025'
     assert branch in text
     for filename,count in [('ci.yml',3),('storage-ingestion.yml',1)]:
         assert (ROOT/'.github/workflows'/filename).read_text().count('"'+branch+'"')==count
@@ -383,3 +383,98 @@ def test_query_image_error31_never_uses_native_format_as_identity(native_format_
             native_format_win32_error=0 if native_format_success else 31)
     assert p.classify_missing(row,e,ROOTS)==dict(status='UNRESOLVED',reason_code='IMAGE_PATH_UNAVAILABLE')
     assert 'Synthetic' not in json.dumps(adapter().project(facts(row,e)))
+
+CORRELATION_KEYS={'BOTH_FAILED','REGISTRY_ONLY_FAILED','SCM_ONLY_FAILED','NEITHER_FAILED','NOT_EVALUATED'}
+
+
+def correlation_fixture(registry=(),scm=()):
+    row,e=evidence('KeyIso')
+    _,other=evidence('SamSs')
+    for phase in ('before','after'):
+        e['services_'+phase]+=other['services_'+phase]
+        e['implementation_'+phase].update(other['implementation_'+phase])
+        e['modules_'+phase]['paths']+=other['modules_'+phase]['paths'][1:]
+        e['modules_'+phase].update(complete=False,error_stage='ENUM_MODULES',win32_error=5)
+        for svc in e['services_'+phase]:
+            if svc['name'] in scm:svc['service_type']=16
+        for name in registry:e['implementation_'+phase][name]['service_type']=16
+    e['implementation_signatures'].update(other['implementation_signatures'])
+    # Fixed earlier refusal keeps the diagnostic population independent of member order.
+    e['signature']['status']='Unknown'
+    return facts(row,e)
+
+
+@pytest.mark.parametrize('registry,scm,counts',[
+    (('KeyIso',),('KeyIso',),dict(BOTH_FAILED=1,NEITHER_FAILED=1)),
+    (('KeyIso',),('SamSs',),dict(REGISTRY_ONLY_FAILED=1,SCM_ONLY_FAILED=1)),
+    (('KeyIso',),(),dict(REGISTRY_ONLY_FAILED=1,NEITHER_FAILED=1)),
+    ((),(),dict(NEITHER_FAILED=2)),
+])
+def test_type_cooccurrence_distinguishes_joint_and_separate_refusals(registry,scm,counts):
+    result=adapter().project(correlation_fixture(registry,scm))
+    for phase in ('before','after'):
+        config=result['configuration'][phase];actual=config['type_cooccurrence']
+        assert actual=={key:counts.get(key,0) for key in CORRELATION_KEYS}
+        assert sum(actual.values())==config['member_checks']==2
+
+
+@pytest.mark.parametrize('mode',['missing_config','incomplete_config','incomplete_scm','scm_error'])
+def test_type_cooccurrence_unobserved_is_not_neither(mode):
+    f=correlation_fixture();e=f['private_inventory']['process_evidence'][0]['evidence']
+    for phase in ('before','after'):
+        if mode=='missing_config':e.pop('implementation_'+phase)
+        if mode=='incomplete_config':
+            for c in e['implementation_'+phase].values():c['complete']=False
+        if mode=='incomplete_scm':e['services_'+phase+'_complete']=False
+        if mode=='scm_error':
+            for s in e['services_'+phase]:s.update(error_stage='QUERY_SERVICE_CONFIG',win32_error=5)
+    result=adapter().project(f)
+    for phase in ('before','after'):
+        assert result['configuration'][phase]['type_cooccurrence']=={key:2 if key=='NOT_EVALUATED' else 0 for key in CORRELATION_KEYS}
+
+
+@pytest.mark.parametrize('fault',['bool_type','float_type','none_type','missing_type','missing_coverage','bad_coverage',
+    'duplicate','changed_type','changed_membership','changed_config','one_sided_config'])
+def test_type_cooccurrence_malformed_or_changed_evidence_rejects_whole_projection(fault):
+    a=adapter();f=correlation_fixture();e=f['private_inventory']['process_evidence'][0]['evidence']
+    if fault in ('bool_type','float_type','none_type'):
+        e['implementation_before']['KeyIso']['service_type']={'bool_type':True,'float_type':32.0,'none_type':None}[fault]
+    if fault=='missing_type':e['services_before'][0].pop('service_type')
+    if fault=='missing_coverage':e.pop('services_before_complete')
+    if fault=='bad_coverage':e['services_before_complete']=1
+    if fault=='duplicate':e['services_before'].append(copy.deepcopy(e['services_before'][0]))
+    if fault=='changed_type':e['services_after'][0]['service_type']=16
+    if fault=='changed_membership':e['services_after'].pop()
+    if fault=='changed_config':e['implementation_after']['KeyIso']['account']='PRIVATE_ACCOUNT'
+    if fault=='one_sided_config':e.pop('implementation_after')
+    with pytest.raises(a.AdapterError):a.project(f)
+
+
+@pytest.mark.parametrize('swap',['order','failure_assignment'])
+def test_type_cooccurrence_projection_has_nonunique_member_inverse(swap):
+    f=correlation_fixture(('KeyIso',),('KeyIso',));other=copy.deepcopy(f)
+    if swap=='order':
+        e=other['private_inventory']['process_evidence'][0]['evidence']
+        for phase in ('before','after'):e['services_'+phase].reverse()
+    else:other=correlation_fixture(('SamSs',),('SamSs',))
+    first=json.dumps(adapter().project(f),sort_keys=True);last=json.dumps(adapter().project(other),sort_keys=True)
+    assert first==last
+    for private in ['KeyIso','SamSs','LocalSystem','service_type','lsass.exe','C:']:
+        assert private not in first
+
+@pytest.mark.parametrize('malformed',[False,True])
+def test_type_cooccurrence_host_publication_is_closed_and_all_or_nothing(cli,capsys,malformed):
+    a,m,out=cli;f=correlation_fixture(('KeyIso',),('KeyIso',))
+    if malformed:
+        e=f['private_inventory']['process_evidence'][0]['evidence']
+        for phase in ('before','after'):e['services_'+phase][-1]['win32_error']=False
+    m.setattr(h,'collect_facts',lambda:f)
+    result=run_cli(cli,capsys)
+    assert result['status']=='FAIL_CLOSED' and result['authorization']=='NONE'
+    assert json.loads(out.read_text())==result
+    if malformed:
+        assert result['projection_status']=='UNAVAILABLE' and result['diagnostics'] is None
+        assert 'type_cooccurrence' not in json.dumps(result)
+    else:
+        assert result['projection_status']=='AVAILABLE'
+        assert result['diagnostics']['configuration']['before']['type_cooccurrence']['BOTH_FAILED']==1

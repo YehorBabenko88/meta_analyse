@@ -55,6 +55,16 @@ class SCMOracle(unittest.TestCase):
         self.assertNotIn('def classify_missing(',ADAPTER)
         self.assertIn("type(config.get('service_type')) is int and config.get('service_type')==32",CLASSIFIER)
         self.assertIn("type(svc.get('service_type')) is int and svc.get('service_type')==32",CLASSIFIER)
+    def test_aggregate_privacy_no_member_labels(self):
+        result=model([(16,16,True),(32,16,True),(32,32,False)])
+        self.assertEqual(sum(result.values()),3)
+        for forbidden in ('KeyIso','SamSs','VaultSvc','DoSvc','wscsvc','pid','hostname','path','service_type'):
+            self.assertNotIn(forbidden,repr(result))
+    def test_no_missing_bucket_or_silent_success(self):
+        for item in ([],[(32,32,False)],[(16,32,True)]):
+            result=model(item)
+            self.assertEqual(set(result),set(BUCKETS))
+            self.assertEqual(sum(result.values()),len(item))
     def test_snapshot_binding_guards(self):
         for token in ("LIFETIME_BINDING_INVALID","PROCESS_SNAPSHOT_BINDING_INVALID","source_binding(args.expected_sha,args.expected_tree)"):
             self.assertIn(token,ADAPTER)

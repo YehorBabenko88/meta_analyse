@@ -61,3 +61,7 @@ G0 FAIL_CLOSED, G1 BLOCKED, ADMINIT NO-GO.
 Only after independent confirmation of the NEW cluster's identifier, PID/start time, owner, executable and exact PGDATA may an operator stop that specific process. On any mismatch: STOP, no `pg_ctl`, DROP, directory removal or service changes. Preserve partial new PGDATA for forensic review; deletion needs separate approval. Existing 5432 must never be targeted.
 
 **Verdict: PR #47 PostgreSQL G1 NO-GO.** No physical host, production DB, merge, deployment or G1 operations performed.
+
+## Follow-up 2026-10-25: exact CI and test-scope correction
+
+PR #47 HEAD `59626930a911c0dde330f7760c78ccd99468a1f4` unchanged: synthetic 40203574132 QUEUED, full CI 40203574154 SKIPPED, storage 40203574138 SKIPPED. PR #49 HEAD before this documentation update `d81e70aab4ebfd5f46add051877cc8223f0abf54`: CI 40204950133 QUEUED, ADMINIT synthetic 40204950126 SKIPPED. Newly added `tests/test_pr47_pg_source_contract.py` only checks source text; its presence does not prove execution or database compatibility. No new server-side SQL privilege evidence exists. G1 remains NO-GO.

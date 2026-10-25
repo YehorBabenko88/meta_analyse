@@ -76,3 +76,7 @@ PR #30 HEAD `346b9fbfcf293d3745920240e530b76fd03ebb07`: Storage 40183321651 SUCC
 ## Follow-up exact CI jobs
 
 PR #30 `346b9fbfcf293d3745920240e530b76fd03ebb07`, run 40183321671: Linux job 121138779741 SUCCESS, archive-pinned-contract 121138779778 SUCCESS, Windows job 121138779796 IN_PROGRESS; workflow overall IN_PROGRESS. Thus Windows exact-HEAD acceptance remains PENDING. Storage 40183321651, kernel offline 40183321682 and public privacy 40183321643 SUCCESS. Two synthetic maintenance workflows SKIPPED. PR #31 remains at `da0fb473...` with unresolved dependency collection failures. These states are a timestamped snapshot, not permanent verdicts.
+
+## Follow-up: pending Windows exact SHA
+
+PR #30 exact HEAD `346b9fbfcf293d3745920240e530b76fd03ebb07`: run 40183321671 still IN_PROGRESS, Windows job 121138779796 IN_PROGRESS, Linux and archive jobs SUCCESS. Storage, kernel and public privacy separate runs SUCCESS. No new pass/fail evidence on Windows at this observation. PR #31 remains with CI setup failures and no new SHA. Repeated polling is not a substitute for executable P1 attestation/crash fault tests; the next implementation should be isolated and reviewed, not silently applied to existing production connection paths. ADMINIT NO-GO.

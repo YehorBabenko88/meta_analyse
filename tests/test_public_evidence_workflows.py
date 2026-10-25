@@ -4,6 +4,7 @@ import re
 import xml.etree.ElementTree as ET
 import pytest
 from test_project_public_ci_evidence import p,receipt,raw
+from test_public_junit import m as public_checker
 ROOT=Path(__file__).resolve().parents[1]
 
 def test_every_upload_is_gated_and_staging_only():
@@ -68,3 +69,25 @@ def test_empty_forged_public_xml_is_rejected():
 
 def test_nonfinite_json_rejected():
     with pytest.raises(ValueError):p.decode(b'{"x":NaN}')
+
+def test_dtd_projection_oracle_has_a_valid_positive_body(monkeypatch):
+    good=b'<testsuite tests="1"><testcase classname="x" name="a"/></testsuite>'
+    assert len(ET.fromstring(p.project(good,set()))[0])==1
+    payload=b'<!DOCTYPE testsuite [<!ENTITY identity "a">]>'+good.replace(b'name="a"',b'name="&identity;"')
+    with pytest.raises(ValueError):p.project(payload,set())
+    monkeypatch.setattr(p,'parse',ET.fromstring)
+    def oracle():
+        with pytest.raises(ValueError):p.project(payload,set())
+    with pytest.raises(pytest.fail.Exception):oracle()
+
+def test_dtd_public_checker_oracle_has_a_valid_positive_body(tmp_path,monkeypatch):
+    good=p.project(b'<testsuite><testcase classname="x" name="a"/></testsuite>',set())
+    path=tmp_path/'positive.xml';path.write_bytes(good)
+    assert public_checker.inspect_file(path)
+    head,body=good.split(b'?>',1)
+    identity=ET.fromstring(good)[0][0].get('name').encode()
+    payload=head+b'?>\n<!DOCTYPE testsuites [<!ENTITY identity "'+identity+b'">]>'+body.replace(identity,b'&identity;')
+    path.write_bytes(payload)
+    assert not public_checker.inspect_file(path)
+    monkeypatch.setattr(public_checker,'StrictBuilder',ET.TreeBuilder)
+    with pytest.raises(AssertionError):assert not public_checker.inspect_file(path)

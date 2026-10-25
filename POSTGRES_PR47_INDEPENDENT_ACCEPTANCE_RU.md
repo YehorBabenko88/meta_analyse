@@ -65,3 +65,7 @@ Only after independent confirmation of the NEW cluster's identifier, PID/start t
 ## Follow-up 2026-10-25: exact CI and test-scope correction
 
 PR #47 HEAD `59626930a911c0dde330f7760c78ccd99468a1f4` unchanged: synthetic 40203574132 QUEUED, full CI 40203574154 SKIPPED, storage 40203574138 SKIPPED. PR #49 HEAD before this documentation update `d81e70aab4ebfd5f46add051877cc8223f0abf54`: CI 40204950133 QUEUED, ADMINIT synthetic 40204950126 SKIPPED. Newly added `tests/test_pr47_pg_source_contract.py` only checks source text; its presence does not prove execution or database compatibility. No new server-side SQL privilege evidence exists. G1 remains NO-GO.
+
+## Real PostgreSQL 18.1 disposable probe added
+
+В audit-ветку добавлены `tests/test_pr47_pg18_real_permissions.py` и `.github/workflows/pr47-disposable-pg18.yml` (commit `cfb772e564667ca591627e92613ff56a91a51a96`). Они запускают PostgreSQL 18.1 в изолированном hosted runner и проверяют реальные права минимальной роли на `pg_control_system()` / `pg_control_checkpoint()` без выдачи прав. Тест ожидает отсутствие EXECUTE и должен выявить несоответствие серверной модели прав. До завершения hosted run результат — PENDING. Эти тесты не доказывают корректность аттестации на 55480, crash recovery, G0 или G1. Никаких соединений с ADMINIT.

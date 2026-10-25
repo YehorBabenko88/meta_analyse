@@ -48,3 +48,16 @@ Full CI/Storage and legacy privacy workflow on this integration branch are inten
 (1) Obtain read-only Actions diagnostic banners/admin evidence for queue; (2) leave workflow gates intact; (3) verify terminal jobs by exact run/attempt; (4) download two ZIPs per event via authenticated artifact IDs; (5) compare GitHub digest, local SHA256, manifest and JUnit source identities, privacy; (6) issue PASS only if all contracts pass; otherwise FAIL/BLOCKED. Do not rerun or modify code to skip checks.
 
 This report is independent and published only on a separate audit branch. No merge, deployment, physical/native/PG/Bybit activity performed.
+
+
+## 2026-10-25: repeat read-only verification and scheduling diagnostics
+
+PR API still reports HEAD `59626930a911c0dde330f7760c78ccd99468a1f4`. Fresh authenticated run metadata for push `40203571477` and PR `40203574132` independently confirms identical `head_commit.tree_id=5cff9cedffa5b65f3bfb351e851370ff28d7aca7`, `run_attempt=1`, `status=queued`, `conclusion=null`. Job-list `total_count=2` for each run, labels `ubuntu-latest` and `windows-latest`, `runner_id=0`, empty `runner_name`; artifact-list `total_count=0`. No ZIP digest or hosted JUnit exists to verify.
+
+Repo rulesets endpoint returned `[]`, but Actions permissions, runner inventory and branch protection administrative endpoints are not accessible through this GitHub connector; absence of rulesets does **not** prove that all protections are absent. Official GitHub troubleshooting documentation notes that runner limits, billing restrictions and stuck concurrency/check-suite state are possible categories; **none is demonstrated as the cause of these exact two runs**. The workflow groups are separated by event name (`push` versus `pull_request`), so the two required runs do not share an identical group; other runs/groups and administrative constraints require independent evidence.
+
+Safe escalation: inspect read-only Actions run warnings and Settings > Actions > Runners (active/queued job usage), repository/organization policy and usage; if GitHub shows stuck or inconsistent scheduler/check-suite state, send the two run IDs, job IDs, UTC creation times and runner_id=0 evidence to GitHub Support. Do not retry/cancel/change gates without explicit coordination.
+
+Source review limitation: `integration_synthetic_boundary.py` uses pytest autouse monkeypatches, not OS isolation; `check_final_integration_junit.py` verifies the actual source-collected set, but the expected set is produced within the same pytest collection, so a separate frozen mandatory-case oracle remains desirable. `if: always()` privacy upload is conditional on projector success; this does not independently prove a hosted failure-path witness.
+
+**Updated verdict: BLOCKED / ADMINIT NO-GO.** No hosted test outcomes, artifact digest or privacy runtime acceptance can be claimed. No retry, merge, deployment, native, PostgreSQL or Bybit execution.

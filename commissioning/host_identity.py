@@ -215,7 +215,7 @@ def public_report(facts, salt):
                 status='OBSERVATION_ONLY_NOT_AUTHORIZATION')
 
 
-def collect_facts():
+def collect_facts(*, diagnostics=None):
     if platform.system() != 'Windows':
         raise ValueError('Windows host collection required')
     if not is_elevated():
@@ -223,15 +223,20 @@ def collect_facts():
     directory = system_directory()
     shell = str(directory / 'WindowsPowerShell/v1.0/powershell.exe')
     environment=dict(os.environ)
+    # Do not inherit a parent process-level execution-policy override. Effective
+    # persisted/Group Policy governs the fixed system PowerShell child normally.
+    environment={k:v for k,v in environment.items() if k.casefold()!='psexecutionpolicypreference'}
     # Do not inherit PowerShell7 module paths into the Windows PowerShell child.
     environment['PSModulePath']=str(directory/'WindowsPowerShell/v1.0/Modules')
-    result = subprocess.run([shell, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+    result = subprocess.run([shell, '-NoProfile', '-NonInteractive', '-File',
                              str(Path(__file__).with_name('host-facts.ps1'))],
                             capture_output=True, timeout=90,env=environment)
     if result.returncode:
-        raise ValueError('host facts unavailable; no private output published')
+        raise DiagnosticError('COLLECTOR_CHILD_BLOCKED')
     from evidence_schema import strict_loads
     facts = strict_loads(result.stdout.decode('utf-8-sig'))
+    if diagnostics is not None and not diagnostics.observe_raw(facts):
+        raise DiagnosticError('PROCESS_INVENTORY_SNAPSHOT_INVALID')
     if facts.get('collector_elevated') is not True:
         raise DiagnosticError('ELEVATED_TOKEN_REQUIRED')
     from process_identity import assess_processes
@@ -247,11 +252,13 @@ def collect_facts():
         validate_source_snapshot(original_processes,facts['process_evidence'],facts['process_roots'],directory)
     except (KeyError,TypeError,ValueError,AttributeError,OverflowError):
         raise DiagnosticError('PROCESS_SNAPSHOT_BINDING_INVALID') from None
+    if diagnostics is not None:diagnostics.validated()
     expected_missing=[p['ProcessId'] for p in original_processes if not p.get('ExecutablePath')]
     private = facts['private_inventory']
     private['process_evidence'] = facts.pop('process_evidence')
     private['process_roots'] = facts.pop('process_roots')
     assessment=assess_processes(private['process_evidence'],private['process_roots'],expected_missing)
+    if diagnostics is not None:diagnostics.assessed(assessment)
     facts['process_inventory']=assessment
     facts['grid'].update({k:v for k,v in assessment.items() if k!='results'})
     if assessment['unknown_process_paths']:
@@ -270,6 +277,7 @@ def collect_facts():
         facts['api_listeners'] = []
         facts['grid']['errors'].append('HTTP.sys owner identity incomplete')
         facts['grid']['coverage_complete'] = False
+    if diagnostics is not None:diagnostics.http_observed(bool(facts['api_listeners']))
     return facts
 
 
@@ -429,8 +437,56 @@ def authorize(args, facts=None):
     return root, name, policy, facts
 
 
+def aggregate_main(argv):
+    """A refusal explanation, never an observation receipt or enrollment input."""
+    import argparse
+    from aggregate_diagnostics import AggregateDiagnostics
+    class SafeParser(argparse.ArgumentParser):
+        def error(self,message):raise DiagnosticError('AGGREGATE_ARGUMENTS_INVALID')
+    diagnostics=AggregateDiagnostics()
+    output=None
+    try:
+        parser=SafeParser(add_help=False)
+        for key in ('output','expected-sha'):parser.add_argument('--'+key,required=True)
+        for key in ('manifest','manifest-sha256'):parser.add_argument('--'+key)
+        args=parser.parse_args(argv)
+        output=NewOutput(args.output)
+        if not is_elevated():raise DiagnosticError('ELEVATED_TOKEN_REQUIRED')
+        identity=collector_identity(args.expected_sha,manifest=args.manifest,manifest_sha256=args.manifest_sha256)
+        try:
+            collect_facts(diagnostics=diagnostics)
+        finally:
+            # Bind even a failed/partial collection. Normal dirty-source checks
+            # raise instead of returning a different identity; neither path may
+            # retain observations from an unverified collector.
+            try:
+                after=collector_identity(args.expected_sha,manifest=args.manifest,manifest_sha256=args.manifest_sha256)
+            except BaseException:
+                raise DiagnosticError('COLLECTOR_SOURCE_UNVERIFIED') from None
+            if identity!=after:
+                raise DiagnosticError('COLLECTOR_SOURCE_CHANGED')
+    except BaseException as exc:
+        diagnostics.failure(exc.code if isinstance(exc,DiagnosticError) else 'AGGREGATE_DIAGNOSTIC_UNAVAILABLE')
+    report=diagnostics.report()
+    if output is not None:
+        try:output.write(json.dumps(report,allow_nan=False).encode('utf-8'))
+        except (OSError,ValueError):
+            diagnostics.failure('AGGREGATE_OUTPUT_UNAVAILABLE')
+            report=diagnostics.report()
+        finally:
+            try:output.close()
+            except OSError:
+                diagnostics.failure('AGGREGATE_OUTPUT_UNAVAILABLE')
+                report=diagnostics.report()
+    print(json.dumps(report,allow_nan=False))
+    return 1
+
+
 def main():
     import argparse
+    import sys
+    if len(sys.argv)>1 and sys.argv[1]=='diagnose-aggregate':
+        return aggregate_main(sys.argv[2:])
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
     diagnostic = sub.add_parser('diagnose')

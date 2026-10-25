@@ -52,16 +52,23 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
     last_update = {}
     first_snapshot_epochs = {}
     latest_epoch = 0
+    snapshot_pending = set(symbols)
     async def on_book(symbol, book, timestamp):
         nonlocal latest_epoch
         epoch = stream.connection_epoch
         if epoch != latest_epoch:
             latest_epoch = epoch
             seen.clear()
+            snapshot_pending.clear()
+            snapshot_pending.update(symbols)
         if not book.valid or book.update_id is None or book.sequence is None:
             record["false_valid"] += 1
             return
         if symbol not in seen:
+            if symbol not in snapshot_pending:
+                record["false_valid"] += 1
+                return
+            snapshot_pending.discard(symbol)
             record["snapshots"] += 1
             first_snapshot_epochs[symbol] = epoch
             seen.add(symbol)
@@ -74,6 +81,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
         record["gaps"] += 1
         for symbol in symbols:
             seen.discard(symbol)
+            snapshot_pending.add(symbol)
     stream = OrderBookStream(on_book, on_gap, depth=depth)
     task = asyncio.create_task(stream.run(list(symbols), stop))
     try:

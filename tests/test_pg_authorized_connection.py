@@ -77,14 +77,7 @@ def test_connection_factory_failure_does_not_authorize():
 
 
 def test_attestation_failure_closes_connection_context():
-    conn = FakeConn(("postgres", *GOOD[1:]))
     exited = []
-    original_exit = conn.__exit__
-    def record_exit(*args):
-        exited.append(True)
-        return original_exit(*args)
-    conn.__exit__ = record_exit
-    # Python special-method lookup uses the class, so use a wrapper below.
     class Tracked(FakeConn):
         def __exit__(self, *args):
             exited.append(True)

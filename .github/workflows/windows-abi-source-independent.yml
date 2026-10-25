@@ -1,0 +1,29 @@
+name: Windows ABI source-only independent gate
+on:
+  push:
+    branches: ['audit/windows-adminit-readiness-gpt1-20261025']
+  pull_request:
+    paths:
+      - 'tests/windows_native_abi_unittest.py'
+      - 'tests/test_windows_native_abi_source.py'
+      - 'commissioning/process-evidence.ps1'
+      - '.github/workflows/windows-abi-source-independent.yml'
+permissions:
+  contents: read
+jobs:
+  source-only:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Source-only standard library tests (no pytest conftest)
+        run: python tests/windows_native_abi_unittest.py

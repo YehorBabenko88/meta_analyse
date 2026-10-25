@@ -105,3 +105,17 @@ def test_integration_contract_ci_rejects_skipped_required_identity(tmp_path):
                     "--require-identity", "tests.test_integration_contract_ci.test_required")
     assert result.returncode != 0
     assert "REQUIRED IDENTITY SKIPPED" in result.stderr
+
+
+def test_integration_contract_ci_rejects_doctype(tmp_path):
+    report = tmp_path / "doctype.xml"
+    report.write_text('<!DOCTYPE testsuite [<!ENTITY x "a">]><testsuite tests="1"><testcase classname="x" name="y"/></testsuite>')
+    result = subprocess.run([sys.executable, str(SCRIPT), str(report), "--minimum", "1"], capture_output=True)
+    assert result.returncode != 0
+
+
+def test_integration_contract_ci_rejects_unexpected_xml_root(tmp_path):
+    report = tmp_path / "other.xml"
+    report.write_text('<other tests="1"><testcase classname="x" name="y"/></other>')
+    result = subprocess.run([sys.executable, str(SCRIPT), str(report), "--minimum", "1"], capture_output=True)
+    assert result.returncode != 0

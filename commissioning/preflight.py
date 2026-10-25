@@ -72,17 +72,28 @@ def verify_package_source(root):
 def verify_database_role(conn,policy):
     version=int(conn.execute('SHOW server_version_num').fetchone()[0])
     if version != 180001: raise ValueError('PostgreSQL 18.1 exactly required on target')
-    db=conn.execute("SELECT current_database(),current_user,session_user,pg_get_userbyid(datdba) FROM pg_database WHERE datname=current_database()").fetchone()
+    db=conn.execute("SELECT pg_catalog.current_database(),current_user,session_user,pg_catalog.pg_get_userbyid(datdba) FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()").fetchone()
     bound=policy['database']
     if db!=(bound['dbname'],bound['user'],bound['user'],bound['user']):
         raise ValueError('dedicated database ownership/session identity mismatch')
-    privileges=conn.execute('SELECT rolsuper,rolcreaterole,rolcreatedb,rolreplication,rolbypassrls,rolcanlogin FROM pg_roles WHERE rolname=current_user').fetchone()
+    privileges=conn.execute('SELECT rolsuper,rolcreaterole,rolcreatedb,rolreplication,rolbypassrls,rolcanlogin FROM pg_catalog.pg_roles WHERE rolname=current_user').fetchone()
     if not privileges or any(privileges[:5]) or not privileges[5]: raise ValueError('excessive or unusable test role privileges')
-    if conn.execute('SELECT EXISTS(SELECT 1 FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname=current_user))').fetchone()[0]:
+    if conn.execute('SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_auth_members WHERE member=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname=current_user))').fetchone()[0]:
         raise ValueError('test role memberships are not allowed')
-    if conn.execute("SELECT count(*) FROM pg_database WHERE datallowconn AND datname<>current_database() AND has_database_privilege(current_user,oid,'CONNECT')").fetchone()[0]:
+    if conn.execute("SELECT count(*) FROM pg_catalog.pg_database WHERE datallowconn AND datname<>pg_catalog.current_database() AND pg_catalog.has_database_privilege(current_user,oid,'CONNECT')").fetchone()[0]:
         raise ValueError('test role can connect to other databases via direct/PUBLIC/membership grants')
     return version,db
+
+
+def inspect_database(config, policy, system_identifier):
+    from meta_analyse.pg_cluster_attestation import ExpectedCluster
+    from meta_analyse.pg_authorized_connection import authorized_private_connection, validate_connection_parameters
+    import psycopg
+    expected=ExpectedCluster(system_identifier,config['dbname'],config['user'])
+    validate_connection_parameters(config,expected)
+    with authorized_private_connection(lambda: psycopg.connect(**config),expected) as conn:
+        conn.execute('SET TRANSACTION READ ONLY')
+        return verify_database_role(conn,policy)
 
 
 async def inspect(args):
@@ -102,9 +113,7 @@ async def inspect(args):
         raise ValueError('MetaScalp executable changed after signature check')
     validate_cluster_listener(facts,policy)
     config=validate_bound_database(os.environ['META_ANALYSE_COMMISSIONING_DSN'],policy,os.environ)
-    with psycopg.connect(**config) as conn:
-        conn.execute('SET TRANSACTION READ ONLY')
-        version,db=verify_database_role(conn,policy)
+    version,db=inspect_database(config,policy,args.cluster_system_identifier)
     result=dict(timestamp=datetime.now(timezone.utc).isoformat(),candidate_sha=args.expected_sha,
         status='PASS',computer=name,host_fingerprint=policy['fingerprint'],enrollment_id=policy['enrollment_id'],
         windows=platform.platform(),python=sys.version,pyside6=PySide6.__version__,
@@ -143,6 +152,7 @@ async def inspect(args):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('manifest','manifest-sha256','expected-sha','expected-computer','enrollment','metascalp-exe','output'):p.add_argument('--'+name,required=True)
+    p.add_argument('--cluster-system-identifier',required=True)
     p.add_argument('--probe-public-rest',action='store_true',help='Compatibility option; verified REST probe is always mandatory')
     a=p.parse_args()
     try: result=asyncio.run(inspect(a));code=0

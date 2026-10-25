@@ -38,9 +38,9 @@ class WitnessResult:
 _QUERY = """SELECT EXISTS(
     SELECT 1 FROM meta_analyse.orderbook_observations
     WHERE symbol=%s AND update_id=%s AND sequence=%s),
-    pg_current_wal_insert_lsn()::text, pg_current_wal_flush_lsn()::text,
-    checkpoint_lsn::text, redo_lsn::text, timeline_id
-    FROM pg_control_checkpoint()"""
+    pg_catalog.pg_current_wal_insert_lsn()::pg_catalog.text, pg_catalog.pg_current_wal_flush_lsn()::pg_catalog.text,
+    checkpoint_lsn::pg_catalog.text, redo_lsn::pg_catalog.text, timeline_id
+    FROM pg_catalog.pg_control_checkpoint()"""
 
 
 def _lsn(value):

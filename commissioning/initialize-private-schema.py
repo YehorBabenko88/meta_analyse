@@ -13,12 +13,12 @@ def initialize_new_schema(config, policy, expected_cluster=None):
     validate_connection_parameters(config, expected_cluster)
     with authorized_private_connection(lambda: psycopg.connect(**config), expected_cluster) as conn:
         verify_database_role(conn,policy)
-        conn.execute('SELECT pg_advisory_xact_lock(%s)',(0x4D455441414E414C,))
-        existing=conn.execute("""SELECT EXISTS(SELECT 1 FROM pg_namespace
+        conn.execute('SELECT pg_catalog.pg_advisory_xact_lock(%s)',(0x4D455441414E414C,))
+        existing=conn.execute("""SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_namespace
             WHERE nspname !~ '^pg_' AND nspname NOT IN ('public','information_schema'))
-            OR EXISTS(SELECT 1 FROM pg_class WHERE relnamespace='public'::regnamespace)
-            OR EXISTS(SELECT 1 FROM pg_proc WHERE pronamespace='public'::regnamespace)
-            OR EXISTS(SELECT 1 FROM pg_type WHERE typnamespace='public'::regnamespace)""").fetchone()[0]
+            OR EXISTS(SELECT 1 FROM pg_catalog.pg_class WHERE relnamespace='public'::pg_catalog.regnamespace)
+            OR EXISTS(SELECT 1 FROM pg_catalog.pg_proc WHERE pronamespace='public'::pg_catalog.regnamespace)
+            OR EXISTS(SELECT 1 FROM pg_catalog.pg_type WHERE typnamespace='public'::pg_catalog.regnamespace)""").fetchone()[0]
         if existing:
             raise ValueError('user schema is not empty; refusing initialization')
         conn.execute(SCHEMA)

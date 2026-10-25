@@ -78,7 +78,7 @@ def test_new_schema_check_and_ddl_share_transaction_and_lock(monkeypatch,existin
         module.initialize_new_schema(config, {}, POLICY)
         assert calls[-1]=='commit'
         assert any('CREATE SCHEMA' in s for s in calls)
-    lock=next(i for i,s in enumerate(calls) if s.startswith('SELECT pg_advisory_xact_lock'))
+    lock=next(i for i,s in enumerate(calls) if s.startswith('SELECT pg_catalog.pg_advisory_xact_lock'))
     assert calls[lock-1]=='verify_role'
     assert 'pg_namespace' in calls[lock+1] and 'pg_proc' in calls[lock+1]
     assert 'pg_control_system()' in calls[lock-2]

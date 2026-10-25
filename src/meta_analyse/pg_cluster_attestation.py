@@ -51,17 +51,17 @@ def attest_connected_cluster(conn, expected: ExpectedCluster) -> None:
         with conn.transaction():
             conn.execute("SET TRANSACTION READ ONLY")
             row = conn.execute(
-                """SELECT current_database(), current_user,
-                          current_setting('server_version_num')::integer,
-                          inet_server_addr()::text, inet_server_port(),
-                          (pg_control_system()).system_identifier::text,
+                """SELECT pg_catalog.current_database(), current_user,
+                          pg_catalog.current_setting('server_version_num')::pg_catalog.int4,
+                          pg_catalog.inet_server_addr()::pg_catalog.text, pg_catalog.inet_server_port(),
+                          (pg_catalog.pg_control_system()).system_identifier::pg_catalog.text,
                           (SELECT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb
                                   AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls
                                   AND session_user=current_user
-                                  AND current_user=(SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname=current_database())
-                                  AND NOT EXISTS(SELECT 1 FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname=current_user))
-                                  AND NOT EXISTS(SELECT 1 FROM pg_database WHERE datallowconn AND datname<>current_database() AND has_database_privilege(current_user,oid,'CONNECT'))
-                             FROM pg_roles WHERE rolname=current_user)"""
+                                  AND current_user=(SELECT pg_catalog.pg_get_userbyid(datdba) FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database())
+                                  AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_auth_members WHERE member=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname=current_user))
+                                  AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_database WHERE datallowconn AND datname<>pg_catalog.current_database() AND pg_catalog.has_database_privilege(current_user,oid,'CONNECT'))
+                             FROM pg_catalog.pg_roles WHERE rolname=current_user)"""
             ).fetchone()
     except Exception:
         raise AttestationRefused("CLUSTER_ATTESTATION_UNAVAILABLE") from None

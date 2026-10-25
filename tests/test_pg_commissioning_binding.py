@@ -56,3 +56,18 @@ def test_wrong_dsn_refuses_before_any_connection(monkeypatch,caller):
         if caller=='store':
             with Store('host=127.0.0.1 port=5432 dbname=postgres user=postgres',expected_cluster=POLICY).connect():pass
         else:initializer.initialize_new_schema(dict(host='127.0.0.1',port='5432',dbname='postgres',user='postgres'),{},POLICY)
+
+@pytest.mark.parametrize('wrong',[False,True])
+def test_preflight_database_connection_is_freshly_attested(monkeypatch,wrong):
+    import preflight
+    row=list(GOOD)
+    if wrong:row[5]='111'
+    conn=FakeConn(row);monkeypatch.setattr(initializer.psycopg,'connect',lambda **k:conn)
+    calls=[];monkeypatch.setattr(preflight,'verify_database_role',lambda *a:calls.append('role') or (180001,('synthetic',)))
+    config=dict(host='127.0.0.1',port='55480',dbname=POLICY.database,user=POLICY.role)
+    if wrong:
+        with pytest.raises(AttestationRefused):preflight.inspect_database(config,{},POLICY.system_identifier)
+        assert calls==[]
+    else:
+        assert preflight.inspect_database(config,{},POLICY.system_identifier)[0]==180001
+        assert calls==['role'] and 'pg_control_system()' in conn.queries[1]

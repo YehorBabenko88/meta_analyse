@@ -6,6 +6,7 @@ connection factory and immutable G1 receipt. Attestation precedes any DDL/DML.
 from __future__ import annotations
 
 from contextlib import contextmanager
+import os
 from .pg_cluster_attestation import ExpectedCluster, attest_connected_cluster, AttestationRefused
 
 
@@ -27,9 +28,13 @@ def authorized_private_connection(connect, expected: ExpectedCluster):
 
 
 def validate_connection_parameters(config, expected):
-    """Pure pre-connect rejection; secrets never appear in refusal messages."""
+    """Pre-connect rejection; secrets never appear in refusal messages."""
     if not isinstance(expected, ExpectedCluster):
         raise AttestationRefused("INVALID_EXPECTED_CLUSTER")
+    # libpq can inherit routing, service, startup-option and credential values.
+    # The commissioning connection must depend only on the approved config.
+    if any(name.upper().startswith("PG") and value for name, value in os.environ.items()):
+        raise AttestationRefused("PG_ENVIRONMENT_FORBIDDEN")
     allowed={'host','hostaddr','port','dbname','user','password','connect_timeout'}
     if (type(config) is not dict or set(config)-allowed
             or config.get('host') not in ('127.0.0.1','localhost')

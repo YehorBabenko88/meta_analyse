@@ -72,3 +72,7 @@ PR #30 moved from `fe9833a3` to `346b9fbfcf293d3745920240e530b76fd03ebb07`, chan
 ## Exact-HEAD status update
 
 PR #30 HEAD `346b9fbfcf293d3745920240e530b76fd03ebb07`: Storage 40183321651 SUCCESS, Public JUnit privacy 40183321643 SUCCESS, Kernel offline 40183321682 SUCCESS, main CI 40183321671 QUEUED at review. Two maintenance synthetic workflows SKIPPED. Full exact-HEAD Windows/Linux acceptance remains PENDING; do not promote older 1812/1811 results. PR #31 unchanged `da0fb4735d2019e0ffa8b9f796b73725272daa5f` with full CI FAIL (Hypothesis absent), source-only ABI FAIL (psycopg absent). These are independently scoped and should be fixed by owning agents. No physical DB/ADMINIT checks.
+
+## Follow-up exact CI jobs
+
+PR #30 `346b9fbfcf293d3745920240e530b76fd03ebb07`, run 40183321671: Linux job 121138779741 SUCCESS, archive-pinned-contract 121138779778 SUCCESS, Windows job 121138779796 IN_PROGRESS; workflow overall IN_PROGRESS. Thus Windows exact-HEAD acceptance remains PENDING. Storage 40183321651, kernel offline 40183321682 and public privacy 40183321643 SUCCESS. Two synthetic maintenance workflows SKIPPED. PR #31 remains at `da0fb473...` with unresolved dependency collection failures. These states are a timestamped snapshot, not permanent verdicts.

@@ -202,10 +202,12 @@ class DesktopService:
                     self.error('Flow startup cleanup', cleanup_exc)
 
     async def _flow_execution(self, symbol, footprint, tape):
+        if self.closing or self.flow_state not in ('connecting','connected'):return
         await self.bridge.update(symbol, footprint, tape)
         self.bridge.trade_observed(symbol)
 
     async def _flow_book(self, symbol, summary):
+        if self.closing or self.flow_state not in ('connecting','connected'):return
         self.bridge.book_observed(symbol, summary)
 
     async def _gap(self, symbols, reason):
@@ -224,6 +226,8 @@ class DesktopService:
 
     async def _disconnect_flow(self):
         self.flow_state = 'stopping'
+        self.flow_status = 'Stopping - data marked UNVERIFIED; writes still draining'
+        self.bridge.invalidate([row.symbol for row in self.bridge.snapshot()])
         task, self.flow_task = self.flow_task, None
         if task is not None:
             task.cancel()

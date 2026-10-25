@@ -25,11 +25,18 @@ def parse_public_trade(message: dict) -> list[RawExecution]:
     result = []
     for row in message.get("data", []):
         try:
+            if (not isinstance(row["s"], str) or not row["s"]
+                    or message["topic"] != f'publicTrade.{row["s"]}'
+                    or not isinstance(row["i"], str) or not row["i"]
+                    or type(row["T"]) is not int or row["T"] <= 0
+                    or not isinstance(row["p"], str) or not isinstance(row["v"], str)):
+                raise ValueError("invalid execution identity or field type")
             item = RawExecution(
-                symbol=str(row["s"]), execution_id=str(row["i"]),
-                timestamp_ms=int(row["T"]), price=Decimal(str(row["p"])),
-                quantity=Decimal(str(row["v"])), taker_side=str(row["S"]))
-            if (item.price <= 0 or item.quantity <= 0 or
+                symbol=row["s"], execution_id=row["i"],
+                timestamp_ms=row["T"], price=Decimal(row["p"]),
+                quantity=Decimal(row["v"]), taker_side=row["S"])
+            if (not item.price.is_finite() or not item.quantity.is_finite()
+                or item.price <= 0 or item.quantity <= 0 or
                 item.taker_side not in ("Buy", "Sell") or not item.execution_id):
                 raise ValueError("invalid execution")
             result.append(item)

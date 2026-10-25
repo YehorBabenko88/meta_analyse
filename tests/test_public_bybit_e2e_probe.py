@@ -225,6 +225,20 @@ async def test_probe_rejects_regressing_epoch():
 
 
 @pytest.mark.asyncio
+async def test_probe_rejects_regressing_update_id_with_increasing_sequence():
+    class Stream(ScriptedStream):
+        async def run(self, symbols, stop):
+            await self.on_book(symbols[0], frame(sequence=10), 1)
+            bad_delta = frame("delta", 11)
+            bad_delta.update_id = 9
+            await self.on_book(symbols[0], bad_delta, 1)
+            await stop.wait()
+    result = await module.probe(["BTCUSDT"], 0.01, stream_factory=Stream)
+    assert result["false_valid"] == 1
+    assert result["verdict"] == "FAIL"
+
+
+@pytest.mark.asyncio
 async def test_shutdown_timeout_blocks_and_retains_ownership_until_stream_finishes():
     cancelled, release = asyncio.Event(), asyncio.Event()
     class Stream(ScriptedStream):
@@ -246,3 +260,18 @@ async def test_shutdown_timeout_blocks_and_retains_ownership_until_stream_finish
     result = await asyncio.wait_for(probing, 1)
     assert result["shutdown_budget_exhausted"]
     assert result["verdict"] == "BLOCKED"
+
+@pytest.mark.parametrize('alias',['same','hardlink'])
+def test_public_probe_never_overwrites_existing_output_or_starts_network(monkeypatch,tmp_path,alias):
+    import os,sys,json
+    existing=tmp_path/'existing.json';existing.write_bytes(b'PRIVATE_EXISTING')
+    output=existing
+    if alias=='hardlink':output=tmp_path/'alias.json';os.link(existing,output)
+    calls=[]
+    monkeypatch.delenv('CI',raising=False)
+    monkeypatch.setattr(sys,'argv',['probe','--enable-public-network','--output',str(output)])
+    monkeypatch.setattr(module,'probe',lambda *a,**kw:calls.append(True))
+    monkeypatch.setattr(module.asyncio,'run',lambda value:dict(verdict='TRANSPORT_PASS'))
+    with pytest.raises(SystemExit) as stopped:module.main()
+    assert stopped.value.code!=0 and existing.read_bytes()==b'PRIVATE_EXISTING'
+    assert calls==[]

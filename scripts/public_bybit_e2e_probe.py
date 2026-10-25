@@ -9,6 +9,7 @@ import asyncio
 import json
 import math
 import threading
+import tempfile
 import os
 from pathlib import Path
 import time
@@ -85,7 +86,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000,
         "resource_limits": limits, "resource_peaks": {}, "resource_samples": 0,
     }
     pending = set(symbols)
-    last_update, last_sequence, snapshot_epochs = {}, {}, {}
+    last_update, last_sequence, last_update_id, snapshot_epochs = {}, {}, {}, {}
     latest_epoch = 0
 
     async def on_book(symbol, book, timestamp):
@@ -100,6 +101,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000,
                 latest_epoch = epoch
                 pending.update(symbols)
                 last_sequence.clear()
+                last_update_id.clear()
                 snapshot_epochs.clear()
             kind = getattr(book, "message_type", None)
             if (symbol not in symbols or not book.valid
@@ -107,7 +109,8 @@ async def probe(symbols, duration, *, depth=50, max_events=200000,
                     or type(book.sequence) is not int or book.sequence < 0
                     or kind not in ("snapshot", "delta")
                     or (symbol in pending and kind != "snapshot")
-                    or (kind == "delta" and book.sequence <= last_sequence.get(symbol, -1))):
+                    or (kind == "delta" and (book.sequence <= last_sequence.get(symbol, -1)
+                        or book.update_id <= last_update_id.get(symbol, -1)))):
                 record["false_valid"] += 1
                 if symbol in symbols:
                     pending.add(symbol)
@@ -117,6 +120,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000,
                 snapshot_epochs[symbol] = epoch
                 pending.discard(symbol)
             last_sequence[symbol] = book.sequence
+            last_update_id[symbol] = book.update_id
             record["updates"] += 1
             last_update[symbol] = clock()
             if record["updates"] >= max_events:
@@ -133,6 +137,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000,
             pending.add(symbol)
             snapshot_epochs.pop(symbol, None)
             last_sequence.pop(symbol, None)
+            last_update_id.pop(symbol, None)
 
     async def monitor():
         while not stop.is_set():
@@ -192,6 +197,19 @@ async def probe(symbols, duration, *, depth=50, max_events=200000,
     return record
 
 
+def publish_new_output(output, result):
+    """Publish closed JSON exclusively; never truncate an existing destination."""
+    data=json.dumps(result,indent=2,sort_keys=True,allow_nan=False)
+    output.parent.mkdir(parents=True,exist_ok=True)
+    fd,name=tempfile.mkstemp(prefix='.metaanalyse-probe-',dir=output.parent)
+    try:
+        with os.fdopen(fd,'w',encoding='utf-8') as stream:
+            stream.write(data);stream.flush();os.fsync(stream.fileno())
+        os.link(name,output)
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--enable-public-network", action="store_true")
@@ -208,10 +226,12 @@ def main():
         p.error("minutes must be (0,1440], symbols 1..10")
     if args.max_events < 1 or any(not s.isascii() or not s.isalnum() or len(s) > 20 for s in args.symbols):
         p.error("invalid event budget or symbol")
+    if os.path.lexists(args.output):p.error('Output already exists; refusing before network')
     result = asyncio.run(probe(tuple(args.symbols), args.minutes * 60, max_events=args.max_events))
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
-    print(json.dumps({"verdict": result["verdict"], "output": str(args.output)}))
+    try:publish_new_output(args.output,result)
+    except (OSError,ValueError):
+        print('BLOCKED: public probe output unavailable');raise SystemExit(1)
+    print(json.dumps({'verdict':result['verdict']}))
     raise SystemExit(0 if result["verdict"] == "TRANSPORT_PASS" else 1)
 
 

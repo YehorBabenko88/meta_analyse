@@ -1,0 +1,48 @@
+name: Windows native ABI static audit
+on:
+  push:
+    branches: ['audit/windows-native-abi-readonly-20261025', 'audit/adminit-first-integration-20261025']
+  pull_request:
+    paths:
+      - 'commissioning/process-evidence.ps1'
+      - 'tests/test_windows_native_abi_source.py'
+      - 'tests/test_adminit_preparation_contract.py'
+      - 'commissioning/adminit-g0-readonly.ps1'
+      - '.github/workflows/windows-native-abi-static.yml'
+permissions:
+  contents: read
+jobs:
+  source-only:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pytest only
+        run: python -m pip install -c requirements.lock pytest
+      - name: Bind exact source and tree
+        run: python scripts/record_ci_source.py
+      - name: Source-only tests, no native invocation
+        run: python -m pytest --noconftest -q tests/test_windows_native_abi_source.py tests/test_adminit_preparation_contract.py --junitxml=native-source-tests.xml
+      - name: Project isolated public evidence
+        id: privacy
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit native-source-tests.xml
+          python scripts/project_public_ci_evidence.py --validate public-evidence
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: native-source-${{ matrix.os }}
+          if-no-files-found: error
+          path: public-evidence/

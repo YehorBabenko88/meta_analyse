@@ -68,3 +68,17 @@ Full `ci.yml` и `storage-ingestion.yml` содержат branch exclusion guard
 8. После нового Codex PR начать проверку с нуля на его фактическом HEAD. Не использовать fixtures вместо hosted evidence.
 
 **Финальный вердикт: PR #43 BLOCKED (QUEUED), ADMINIT NO-GO.** Нет доказанного application failure, нет оснований ослаблять gates или применять `skip-ci`.
+
+
+## 7. Повторная независимая проверка PR #43
+
+Exact HEAD неизменен: `a04f132d64db0981ef93de1be8208612de08a194`. Повторно запрошены оба run/job/artifact inventories:
+- Push `40200317121`: `synthetic (windows-latest)` и `synthetic (ubuntu-latest)` — QUEUED; artifacts 0.
+- PR `40200322626`: оба synthetic jobs QUEUED; artifacts 0.
+- Full CI `40200322602` и Storage `40200322669` policy-SKIPPED; это не PASS.
+
+Новых authenticated runner/billing/branch protection diagnostics доступный connector не возвращает. Причина очереди по-прежнему **не доказана**. Прежние локальные 1284 PASS/2 capability BLOCKED из PR description не заменяют hosted evidence. Поскольку новый confirmed CI defect отсутствует, исправлять workflow или создавать corrective Draft PR преждевременно.
+
+Открытый privacy-risk из cross-PR review: пять агрегированных SCM type co-occurrence buckets могут иметь низкую кардинальность; до публичного evidence acceptance проверить, что host-specific малые группы не публикуются, даже если персональные service names исключены.
+
+**Вердикт неизменен: BLOCKED; ADMINIT NO-GO.** Следующий шаг — authenticated Actions scheduling diagnostics и exact-HEAD ZIP/JUnit custody после завершения jobs.

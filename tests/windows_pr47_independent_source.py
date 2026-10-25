@@ -29,6 +29,10 @@ class SourceGuard(unittest.TestCase):
   src=read('commissioning/process_identity.py')
   for marker in ('SERVICE_MODULE_LIFETIME_MISMATCH','SERVICE_MODULES_CHANGED','SERVICE_IMPLEMENTATION_CHANGED','SERVICE_DLL_SIGNATURE_UNVERIFIED','SERVICE_HOST_CONFIGURATION_UNREVIEWED'):
    self.assertIn(marker,src)
+ def test_query_service_config_and_cleanup(self):
+  src=read('commissioning/process-evidence.ps1')
+  for marker in ('configError!=122','sizeQuerySucceeded||configError!=122||size<=0||size>65536','finally {CloseServiceHandle(service);}','finally {CloseServiceHandle(manager);}'):
+   self.assertIn(marker,src)
  def test_no_forced_bypass_in_g0(self):
   src=read('commissioning/adminit-g0-readonly.ps1')
   self.assertNotIn('-ExecutionPolicy Bypass',src)

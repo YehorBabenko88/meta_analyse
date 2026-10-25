@@ -134,3 +134,4 @@ async def test_database_write_exception_does_not_increment_gapless_health():
     with pytest.raises(RuntimeError, match="transaction rolled back"):
         await collector._book("BTCUSDT", SimpleNamespace(valid=True), 1)
     assert telemetry.events == 0
+    assert telemetry.gaps == 0

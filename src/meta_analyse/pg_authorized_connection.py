@@ -21,9 +21,6 @@ def authorized_private_connection(connect, expected: ExpectedCluster):
         raise AttestationRefused("INVALID_EXPECTED_CLUSTER")
     if not callable(connect):
         raise AttestationRefused("INVALID_CONNECTION_FACTORY")
-    try:
-        with connect() as conn:
-            attest_connected_cluster(conn, expected)
-            yield conn
-    except AttestationRefused:
-        raise
+    with connect() as conn:
+        attest_connected_cluster(conn, expected)
+        yield conn

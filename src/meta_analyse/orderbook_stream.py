@@ -109,12 +109,11 @@ class OrderBookStream:
                             await self.on_gap([symbol], "invalid orderbook snapshot or delta")
                             # Never accept a later delta in this connection/epoch.
                             raise _ResubscribeRequired("invalid orderbook; fresh snapshot required")
-                        try:
-                            timestamp_ms = int(msg.get("ts", 0))
-                        except (TypeError, ValueError, OverflowError) as exc:
+                        timestamp_ms = msg.get("ts")
+                        if type(timestamp_ms) is not int or timestamp_ms <= 0:
                             book.reset()
                             await self.on_gap([symbol], "invalid orderbook timestamp")
-                            raise _ResubscribeRequired("malformed orderbook timestamp") from exc
+                            raise _ResubscribeRequired("malformed orderbook timestamp")
                         last_message[symbol] = time.monotonic()
                         await self.on_book(symbol, BookSnapshot.from_book(book, msg.get("type")), timestamp_ms)
                         # Reset backoff only after a verified snapshot, not merely

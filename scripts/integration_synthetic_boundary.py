@@ -9,12 +9,20 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'commissioning'))
 
 @pytest.fixture(autouse=True)
-def synthetic_only(monkeypatch):
+def synthetic_only(monkeypatch,request):
     import psycopg
     import host_identity
     def blocked(*args,**kwargs):raise AssertionError('SYNTHETIC_ONLY_BOUNDARY')
     for name in ('dpapi','is_elevated','system_directory'):monkeypatch.setattr(host_identity,name,blocked)
     monkeypatch.setattr(psycopg,'connect',blocked)
+    import httpx
+    original_http=httpx.AsyncHTTPTransport.handle_async_request
+    loopback_test=request.node.name.split('[',1)[0]=='test_close_drains_real_loopback_http_and_refuses_late_requests'
+    async def http(transport,http_request):
+        if not loopback_test or http_request.url.host not in ('127.0.0.1','::1','localhost'):blocked()
+        return await original_http(transport,http_request)
+    monkeypatch.setattr(httpx.AsyncHTTPTransport,'handle_async_request',http)
+
     original_popen=subprocess.Popen
     def popen(command,*args,**kwargs):
         executable=Path(command[0]).name.lower() if isinstance(command,(list,tuple)) and command else ''
@@ -43,3 +51,20 @@ def pytest_collection_finish(session):
     def git(arg):return subprocess.check_output(['git','rev-parse',arg],text=True).strip()
     manifest=dict(schema=1,sha=git('HEAD'),tree=git('HEAD^{tree}'),identities=sorted(rows),allowed_skips=sorted(skips))
     Path(output).write_text(json.dumps(manifest,sort_keys=True)+'\n',encoding='utf-8')
+
+
+@pytest.fixture(scope='session')
+def app():
+    """Offscreen-only Qt fixture; no physical window, user settings or database."""
+    import os,gc
+    if os.environ.get('QT_QPA_PLATFORM')!='offscreen':pytest.fail('OFFSCREEN_QT_REQUIRED')
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import QCoreApplication,QEvent
+    application=QApplication.instance() or QApplication([])
+    yield application
+    for widget in application.topLevelWidgets():
+        widget.close();widget.deleteLater()
+    QCoreApplication.sendPostedEvents(None,QEvent.Type.DeferredDelete)
+    application.processEvents();gc.collect()
+    import shiboken6
+    shiboken6.delete(application)

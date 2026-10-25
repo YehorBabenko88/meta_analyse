@@ -73,5 +73,29 @@ def test_each_identity_and_witness_read_pins_catalog_search_path_before_query():
     statements = [sql for sql, _ in observation.statements]
     assert statements[:2] == ["SET TRANSACTION READ ONLY", "SET LOCAL search_path TO pg_catalog"]
     assert "pg_control_system()" in statements[2]
-    assert statements[3:5] == ["SET TRANSACTION READ ONLY", "SET LOCAL search_path TO pg_catalog"]
-    assert "pg_control_checkpoint()" in statements[5]
+    assert statements[3] == "SET search_path TO pg_catalog"
+    assert statements[4:6] == ["SET TRANSACTION READ ONLY", "SET LOCAL search_path TO pg_catalog"]
+    assert "pg_control_checkpoint()" in statements[6]
+
+
+def test_ipv4_host_projection_does_not_refuse_documented_inet_text_netmask():
+    # PostgreSQL18 text(inet) includes /32; host(inet) intentionally omits it.
+    # Model only that documented projection; actual SQL remains a hosted gate.
+    from test_pg_cluster_connection import FakeResult
+    class InetConnection(FakeConn):
+        def execute(self,query):
+            self.queries.append(query)
+            row=list(GOOD)
+            if 'pg_control_system()' in query and 'pg_catalog.host(pg_catalog.inet_server_addr())' not in query:
+                row[3]='127.0.0.1/32'
+            return FakeResult(row)
+    attest_connected_cluster(InetConnection(GOOD),POLICY)
+
+
+@pytest.mark.parametrize('path',['src/meta_analyse/pg_cluster_attestation.py','scripts/run_pg18_disposable_ci.py','tests/test_pg18_disposable_acceptance.py'])
+def test_all_server_identity_paths_project_ip_without_cidr_suffix(path):
+    from pathlib import Path
+    root=Path(__file__).resolve().parents[1]
+    text=(root/path).read_text(encoding='utf-8-sig')
+    assert 'pg_catalog.host(pg_catalog.inet_server_addr())' in text
+    assert 'inet_server_addr()::pg_catalog.text' not in text

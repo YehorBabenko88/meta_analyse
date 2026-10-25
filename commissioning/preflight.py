@@ -91,8 +91,12 @@ def inspect_database(config, policy, system_identifier):
     import psycopg
     expected=ExpectedCluster(system_identifier,config['dbname'],config['user'])
     validate_connection_parameters(config,expected)
-    with authorized_private_connection(lambda: psycopg.connect(**config),expected) as conn:
+    # Trusted fixed bounds override caller timeout without accepting startup options.
+    bounded_config = dict(config, connect_timeout=5,
+        options="-c statement_timeout=5000 -c lock_timeout=5000")
+    with authorized_private_connection(lambda: psycopg.connect(**bounded_config),expected) as conn:
         conn.execute('SET TRANSACTION READ ONLY')
+        conn.execute('SET LOCAL search_path TO pg_catalog')
         return verify_database_role(conn,policy)
 
 

@@ -90,3 +90,30 @@ async def test_shutdown_drains_inflight_book_write_without_late_callback():
     assert store.committed.is_set()
     assert task.cancelled() and not collector.tasks and not seen
     assert collector.telemetry.snapshot().events == ()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_rollback_drains_and_logs_original_failure(caplog):
+    # Select PR50's useful failure-during-cancellation witness, using the real
+    # MarketStore transaction boundary rather than replacing db.book itself.
+    store = Store(block=True, fail=True)
+    published = []
+    async def on_book(*args):
+        published.append(args)
+    collector = MarketCollector(store, None, on_book=on_book)
+    task = asyncio.create_task(collector._book("BTCUSDT", snapshot(), 1000))
+    assert await asyncio.to_thread(store.started.wait, 1)
+    try:
+        task.cancel()
+        await asyncio.sleep(0)
+        task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done(), "rollback worker lost ownership under repeated cancellation"
+    finally:
+        store.release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(task, 2)
+    assert not store.committed.is_set()
+    assert not published
+    assert collector.telemetry.snapshot().events == ()
+    assert "simulated rollback" in caplog.text

@@ -35,6 +35,39 @@ async def test_pipeline_gap_invalidates_minute():
     assert not p.aggregators["BTCUSDT"].quality["BTCUSDT"].contiguous
     assert "BTCUSDT" not in p.aggregators["BTCUSDT"].minutes
 
+
+@pytest.mark.asyncio
+async def test_pipeline_rejects_duplicate_start_without_spawning_extra_stream(monkeypatch):
+    class Stream:
+        def __init__(self, *_):
+            pass
+        async def run(self, symbols, stop):
+            await stop.wait()
+    monkeypatch.setattr("meta_analyse.pipeline.RawTradeStream", Stream)
+    pipeline = RawPipeline(None, {"BTCUSDT": D("0.1")})
+    pipeline.db = DB()
+    await pipeline.start()
+    try:
+        with pytest.raises(RuntimeError, match="already started"):
+            await pipeline.start()
+        assert len(pipeline.tasks) == 1
+    finally:
+        await pipeline.stop()
+
+
+@pytest.mark.asyncio
+async def test_pipeline_database_failure_records_health_gap_before_propagating():
+    class FailingDB(DB):
+        def save(self, event):
+            raise OSError("synthetic rollback")
+    pipeline = RawPipeline(None, {"BTCUSDT": D("0.1")})
+    pipeline.db = FailingDB()
+    with pytest.raises(OSError, match="synthetic rollback"):
+        await pipeline.execution(RawExecution("BTCUSDT", "1", 60000, D("100"), D("1"), "Buy"))
+    health = pipeline.health.snapshot("BTCUSDT")
+    assert health.gap_count == 1
+    assert health.received == 0
+
 @pytest.mark.asyncio
 async def test_instrument_cursor_and_tick_size():
     class API:

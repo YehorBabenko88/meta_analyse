@@ -6,7 +6,7 @@ permissions:
   contents: read
 jobs:
   windows:
-    if: ${{ !contains(fromJSON('["integration/adminit-final-20261025","parallel/adminit-scm-correlation-20261025","parallel/adminit-r0-r5-liveness-20261025","parallel/adminit-r0-r5-adapter-20261025","parallel/adminit-minimal-refusal-20261025","parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023","maintenance/pr27-content-review-20261023"]'), github.head_ref || github.ref_name) }}
+    if: ${{ !contains(fromJSON('["integration/adminit-security-readiness-20261025","integration/adminit-final-20261025","parallel/adminit-scm-correlation-20261025","parallel/adminit-r0-r5-liveness-20261025","parallel/adminit-r0-r5-adapter-20261025","parallel/adminit-minimal-refusal-20261025","parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023","maintenance/pr27-content-review-20261023"]'), github.head_ref || github.ref_name) }}
     runs-on: windows-latest
     timeout-minutes: 20
     env:
@@ -71,7 +71,7 @@ jobs:
           if-no-files-found: error
           path: public-evidence/
   linux:
-    if: ${{ !contains(fromJSON('["integration/adminit-final-20261025","parallel/adminit-scm-correlation-20261025","parallel/adminit-r0-r5-liveness-20261025","parallel/adminit-r0-r5-adapter-20261025","parallel/adminit-minimal-refusal-20261025","parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023","maintenance/pr27-content-review-20261023"]'), github.head_ref || github.ref_name) }}
+    if: ${{ !contains(fromJSON('["integration/adminit-security-readiness-20261025","integration/adminit-final-20261025","parallel/adminit-scm-correlation-20261025","parallel/adminit-r0-r5-liveness-20261025","parallel/adminit-r0-r5-adapter-20261025","parallel/adminit-minimal-refusal-20261025","parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023","maintenance/pr27-content-review-20261023"]'), github.head_ref || github.ref_name) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -141,7 +141,7 @@ jobs:
           path: public-evidence/
 
   archive-pinned-contract:
-    if: ${{ !contains(fromJSON('["integration/adminit-final-20261025","parallel/adminit-scm-correlation-20261025","parallel/adminit-r0-r5-liveness-20261025","parallel/adminit-r0-r5-adapter-20261025","parallel/adminit-minimal-refusal-20261025","parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023","maintenance/pr27-content-review-20261023"]'), github.head_ref || github.ref_name) }}
+    if: ${{ !contains(fromJSON('["integration/adminit-security-readiness-20261025","integration/adminit-final-20261025","parallel/adminit-scm-correlation-20261025","parallel/adminit-r0-r5-liveness-20261025","parallel/adminit-r0-r5-adapter-20261025","parallel/adminit-minimal-refusal-20261025","parallel/adminit-kernel-identity-evidence","parallel/adminit-identity-integration-20261021","parallel/adminit-identity-acceptance-fix-20261022","parallel/adminit-pr20-security-fix-20261022","parallel/adminit-pr21-evidence-schema-20261022","parallel/adminit-pr22-boundary-review-20261022","parallel/adminit-pr23-output-transaction-20261023","maintenance/repository-ci-hygiene-20261023","maintenance/actions-audit-hardening-20261023","maintenance/pr27-content-review-20261023"]'), github.head_ref || github.ref_name) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

@@ -1,7 +1,7 @@
 name: ADMINIT final integration synthetic
 on:
   push:
-    branches: ['integration/adminit-final-20261025']
+    branches: ['integration/adminit-final-20261025', 'integration/adminit-security-readiness-20261025']
   pull_request:
     paths:
       - 'src/**'
@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   synthetic:
-    if: (github.head_ref || github.ref_name) == 'integration/adminit-final-20261025'
+    if: contains(fromJSON('["integration/adminit-final-20261025","integration/adminit-security-readiness-20261025"]'), github.head_ref || github.ref_name)
     strategy:
       fail-fast: false
       matrix:
@@ -39,15 +39,23 @@ jobs:
       - name: Synthetic integration without native collection or external services
         env:
           META_ANALYSE_SYNTHETIC_IDENTITIES: ${{ runner.temp }}/integration-identities.json
-        run: python -m pytest --noconftest -q -p no:cacheprovider -p scripts.integration_synthetic_boundary tests/test_kernel_identity_evidence.py tests/test_process_inventory_identity.py tests/test_host_identity_authorization.py tests/test_diagnostic_hardening.py tests/test_windows_service_contracts.py tests/test_service_host_fallback.py tests/test_process_identity_acceptance.py tests/test_pr20_security.py tests/test_evidence_schema_properties.py tests/test_synthetic_artifact_projection.py tests/test_pr22_boundary.py tests/test_pr23_transaction.py tests/test_native_scm_adapter.py tests/test_scm_cooccurrence_independent.py tests/test_windows_native_abi_source.py tests/test_inventory_refusal_projection.py tests/test_public_junit.py tests/test_project_public_ci_evidence.py tests/test_public_evidence_workflows.py tests/test_pg_cluster_attestation.py tests/test_pg_cluster_plan.py tests/test_pg_cluster_connection.py tests/test_pg_commissioning_binding.py tests/test_public_bybit_e2e_probe.py tests/test_bybit_stream_witness.py tests/test_bybit_collector_witness.py tests/test_stage_acceptance.py tests/test_orderbook_recovery.py tests/test_orderbook_autonomous_recovery.py tests/test_market_collector.py tests/test_market_health.py tests/test_pipeline.py tests/test_pipeline_callbacks.py tests/test_integration_contract_shutdown.py tests/test_desktop_service.py tests/test_desktop_telemetry.py tests/test_adminit_commissioning.py tests/test_adminit_preparation_contract.py tests/test_pg_checkpoint_witness.py tests/test_final_integration_workflow.py tests/test_final_integration_junit.py tests/test_pg_catalog_binding.py -k 'not test_private_evidence_real_dpapi_roundtrip_or_platform_refusal and not test_windows_dpapi_tamper_or_other_platform_fails_closed' --junitxml=integration-tests.xml
+        run: python -m pytest --noconftest -q -p no:cacheprovider -p scripts.integration_synthetic_boundary tests/test_kernel_identity_evidence.py tests/test_process_inventory_identity.py tests/test_host_identity_authorization.py tests/test_diagnostic_hardening.py tests/test_windows_service_contracts.py tests/test_service_host_fallback.py tests/test_process_identity_acceptance.py tests/test_pr20_security.py tests/test_evidence_schema_properties.py tests/test_synthetic_artifact_projection.py tests/test_pr22_boundary.py tests/test_pr23_transaction.py tests/test_native_scm_adapter.py tests/test_scm_cooccurrence_independent.py tests/test_windows_native_abi_source.py tests/test_inventory_refusal_projection.py tests/test_public_junit.py tests/test_project_public_ci_evidence.py tests/test_public_evidence_workflows.py tests/test_pg_cluster_attestation.py tests/test_pg_cluster_plan.py tests/test_pg_cluster_connection.py tests/test_pg_commissioning_binding.py tests/test_public_bybit_e2e_probe.py tests/test_bybit_stream_witness.py tests/test_bybit_collector_witness.py tests/test_stage_acceptance.py tests/test_orderbook_recovery.py tests/test_orderbook_autonomous_recovery.py tests/test_market_collector.py tests/test_market_health.py tests/test_pipeline.py tests/test_pipeline_callbacks.py tests/test_integration_contract_shutdown.py tests/test_desktop_service.py tests/test_desktop_telemetry.py tests/test_adminit_commissioning.py tests/test_adminit_preparation_contract.py tests/test_pg_checkpoint_witness.py tests/test_final_integration_workflow.py tests/test_final_integration_junit.py tests/test_pg_catalog_binding.py tests/test_bybit_trade_validation.py tests/test_pg_provisioning_regressions.py tests/test_readiness_desktop_health.py tests/test_feed_watchdog.py tests/test_pg18_disposable_driver.py tests/test_analysis_session.py tests/test_session_lifecycle.py tests/test_feed_freshness.py tests/test_readiness_commit_failures.py tests/test_desktop_lifecycle.py tests/test_qt_diagnostics.py -k 'not test_private_evidence_real_dpapi_roundtrip_or_platform_refusal and not test_windows_dpapi_tamper_or_other_platform_fails_closed' --junitxml=integration-tests.xml
+      - name: Pure Windows serialization contract with synthetic providers
+        if: runner.os == 'Windows'
+        env:
+          PYTHONOPTIMIZE: '0'
+        run: python -B scripts/check_powershell_serialization_contract.py --shell powershell
       - name: Exact complete source-collected JUnit identity and status gate
         run: python scripts/check_final_integration_junit.py integration-tests.xml "${{ runner.temp }}/integration-identities.json"
       - name: Fail closed on missing failures or unexpected skips
-        run: python scripts/check_integration_junit.py integration-tests.xml --minimum 1620 --allow-skip test_symlink_is_rejected --allow-skip test_existing_private_survives_static_alias_spellings --require-exact test_independent_oracle_matches_real_aggregate --require-exact test_wrong_dsn_refuses_before_any_connection --require-exact test_commissioning_store_attests_every_fresh_connection --require-exact test_real_callback_queue_overflow_invalidates_epoch_and_requires_snapshot --require-exact test_capture_then_later_checkpoint_and_flush_observed_read_only --require-exact test_stage_source_checks_survive_optimized_python --require-exact test_final_active_boundary_denies_live_database --require-exact test_final_active_boundary_denies_native_child
-      - run: git diff --exit-code
+        run: python scripts/check_integration_junit.py integration-tests.xml --minimum 1740 --allow-skip test_symlink_is_rejected --allow-skip test_existing_private_survives_static_alias_spellings --require-exact test_independent_oracle_matches_real_aggregate --require-exact test_wrong_dsn_refuses_before_any_connection --require-exact test_commissioning_store_attests_every_fresh_connection --require-exact test_real_callback_queue_overflow_invalidates_epoch_and_requires_snapshot --require-exact test_capture_then_later_checkpoint_and_flush_observed_read_only --require-exact test_stage_source_checks_survive_optimized_python --require-exact test_final_active_boundary_denies_live_database --require-exact test_final_active_boundary_denies_native_child
+      - name: Verify tracked source before publication
+        id: source_clean
+        if: always()
+        run: git diff --exit-code HEAD
       - name: Project isolated public evidence
         id: privacy
-        if: always()
+        if: always() && steps.source_clean.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
@@ -57,5 +65,44 @@ jobs:
         if: always() && steps.privacy.outcome == 'success'
         with:
           name: adminit-final-${{ matrix.os }}
+          if-no-files-found: error
+          path: public-evidence/
+  disposable-postgres18:
+    if: (github.head_ref || github.ref_name) == 'integration/adminit-security-readiness-20261025'
+    needs: synthetic
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      META_ANALYSE_DISPOSABLE_PG18: '1'
+      META_ANALYSE_TEST_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/record_ci_source.py
+      - run: python -m pip install -c requirements.lock -e .[test]
+      - name: Isolated hosted PostgreSQL 18.1 with verified ownership
+        run: python scripts/run_pg18_disposable_ci.py disposable-pg-tests.xml "${{ runner.temp }}/private-disposable-pg.log"
+      - name: Require all real disposable cases without skips
+        run: python scripts/check_integration_junit.py disposable-pg-tests.xml --minimum 4 --require-exact test_default_control_permissions_and_normal_attestation --require-exact test_initializer_and_read_only_witness_are_viable --require-exact test_wrong_receipt_and_database_refuse_before_ddl --require-exact test_read_only_and_failed_ddl_transactions_rollback
+      - name: Verify tracked source before publication
+        id: source_clean
+        if: always()
+        run: git diff --exit-code HEAD
+      - name: Project isolated public evidence
+        id: privacy
+        if: always() && steps.source_clean.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit disposable-pg-tests.xml --postgres-version disposable-pg-tests.postgres.json
+          python scripts/project_public_ci_evidence.py --validate public-evidence
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: adminit-disposable-pg18-linux
           if-no-files-found: error
           path: public-evidence/

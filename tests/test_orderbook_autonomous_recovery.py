@@ -194,9 +194,10 @@ async def test_other_symbol_traffic_does_not_hide_silent_book(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_malformed_timestamp_never_publishes_valid_book(monkeypatch):
+@pytest.mark.parametrize("timestamp", ["not-a-timestamp", None, True, 0, -1, 1.5, "1"])
+async def test_malformed_timestamp_never_publishes_valid_book(monkeypatch, timestamp):
     malformed = json.loads(packet("snapshot", 1, 1))
-    malformed["ts"] = "not-a-timestamp"
+    malformed["ts"] = timestamp
     sockets = [
         FakeSocket([json.dumps(malformed), packet("delta", 2, 2)]),
         FakeSocket([packet("snapshot", 10, 10)])

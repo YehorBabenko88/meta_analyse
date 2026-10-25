@@ -38,8 +38,11 @@ def plan_only(plan: ClusterPlan, *, localappdata: str, existing_data_directories
         return str(p).casefold().rstrip("\\")
     root_key, data_key = key(root), key(data)
     if (not root.is_absolute() or not data.is_absolute()
+            or len(root.drive) != 2 or root.drive[1] != ":"
+            or len(data.drive) != 2 or data.drive[1] != ":"
             or not data_key.startswith(root_key + "\\")
             or ".." in data.parts or ":" in str(data)[2:]
+            or any(any(ord(c) < 32 or c in '<>"|?*' for c in part) for part in data.parts)
             or any(PureWindowsPath(part).is_reserved() for part in data.parts)
             or any(part.endswith((".", " ")) for part in data.parts)
             or any(key(PureWindowsPath(x)) == data_key

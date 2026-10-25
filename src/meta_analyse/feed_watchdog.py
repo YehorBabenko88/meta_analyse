@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from threading import Lock
 from time import monotonic
+import math
 
 @dataclass(frozen=True)
 class Telemetry:
@@ -12,7 +13,7 @@ class Telemetry:
 
 class FeedWatchdog:
     def __init__(self, stale_after_seconds: float = 8.0):
-        if stale_after_seconds <= 0:
+        if type(stale_after_seconds) not in (int,float) or not math.isfinite(stale_after_seconds) or stale_after_seconds <= 0:
             raise ValueError("stale_after_seconds must be positive")
         self.stale_after_seconds = stale_after_seconds
         self._lock = Lock()

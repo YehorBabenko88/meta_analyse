@@ -35,6 +35,7 @@ class RawPipeline:
                 inserted = await drain_thread_write(self.db.save, event)
             except Exception:
                 aggregator.gap([event.symbol], "database_error")
+                self.health.gap(event.symbol)
                 if self.on_gap:
                     await self.on_gap([event.symbol], "database_error")
                 raise
@@ -63,6 +64,8 @@ class RawPipeline:
         await drain_thread_write(self.db.gap, symbols, reason)
 
     async def start(self):
+        if self.tasks:
+            raise RuntimeError("pipeline already started")
         await drain_thread_write(self.db.initialize)
         symbols = list(self.aggregators)
         if not symbols:

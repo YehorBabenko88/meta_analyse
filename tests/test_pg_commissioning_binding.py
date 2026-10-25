@@ -43,7 +43,8 @@ def test_commissioning_store_attests_every_fresh_connection(monkeypatch):
         assert conn.queries[0]=='SET TRANSACTION READ ONLY'
         assert conn.queries[1]=='SET LOCAL search_path TO pg_catalog'
         assert 'pg_control_system' in conn.queries[2]
-        assert conn.queries[3].startswith('INSERT')
+        assert conn.queries[3] == 'SET search_path TO pg_catalog'
+        assert conn.queries[4].startswith('INSERT')
 
 def test_system_identifier_result_requires_exact_text():
     from meta_analyse.pg_cluster_attestation import attest_connected_cluster

@@ -1,0 +1,10 @@
+# PR47 independent security/readiness plan
+
+Base exact59626930a911c0dde330f7760c78ccd99468a1f4, tree5cff9cedffa5b65f3bfb351e851370ff28d7aca7. Review all36diff paths using independent PG, Bybit and CI/Windows reviewers; originalPR47 remains unchanged. New integration/adminit-security-readiness-20261025 worktree.
+
+1. Recheck sourcePRheads/trees/mergebases, oldruns40203571477/40203574132, attempts/jobs/assignment/artifacts. RecordqueuecauseUNKNOWN unlessAPI provesit. Select independent48/49/50 evidence only after source/repro; reject unsupportedPGpermissionassertions.
+2. RED/GREEN confirmed PGbootstrap optimizedPythonbinding, independentfilecontrolidentity beforeCREATE, cleanupownership/path/rolebounds/transactionsearchpath/timeouts. PreservePG5432 and actualADMINIT prohibition. Prepare explicit GitHub-hosted Linux disposablePG18.1 acceptance withidentitymatched isolatedtmpfs/container/nohostmount. Do notrunlocalPG/Docker.
+3. RED/GREEN malformed publictrade/book timestamps andnonfinitefields, probeupdateIDregression, duplicatepipeline startup, rollbackhealthgap. RootUIinvalidateatdisconnect andlatecallbacks, strictstale threshold, exclusivepublicoutput. Preservetransport!=DB!=Desktop!=fullE2E.
+4. Run full selected source/synthetic suite andcomplete JUnitidentitygate with2knowncapabilityskips/2liveDPAPIdeselections. Reviewallworkflows, addnewbranch exclusions/synthetic trigger andseparatehosteddisposablejob. Testcontrollerwithfakeslocally. NoactualBybit/nativecollection/Windowschanges.
+5. Independentre-reviewfinalfixes; prepare fullread-onlyG0runbook withsource/host/SCM/MetaScalp/PGisolation/port/filesystem/policy/env/CI/privacy/resources checklists andSTOP rules. NoautoG0/G1. KeepdiagnosticFAIL_CLOSED/NONE/exit1.
+6. Commit stagedisolated changes, freeze exactcandidate, freshlocalJUnit/privacy/sourceproof, newDraftPR andactualCI/API/ZIPvalidationwhenavailable. Publish META_ANALYSE_FINAL_INTEGRATION_ACCEPTANCE_RU.md withallPASSbounded; hosted/physicalmissing=>BLOCKED/NOT_RUN.

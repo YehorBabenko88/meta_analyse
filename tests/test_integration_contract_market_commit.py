@@ -135,3 +135,21 @@ async def test_database_write_exception_does_not_increment_gapless_health():
         await collector._book("BTCUSDT", SimpleNamespace(valid=True), 1)
     assert telemetry.events == 0
     assert telemetry.gaps == 0
+
+
+@pytest.mark.asyncio
+async def test_gap_invalidates_telemetry_without_persisted_success():
+    order = []
+    class Telemetry:
+        def gap(self, source, symbol):
+            order.append(("gap", source, symbol))
+        def observe(self, *_):
+            raise AssertionError("gap must not be counted as successful observation")
+    async def on_gap(symbols, reason):
+        order.append(("callback", tuple(symbols), reason))
+    collector = MarketCollector(None, None, telemetry=Telemetry(), on_gap=on_gap)
+    await collector._gap(["BTCUSDT"], "synthetic sequence regression")
+    assert order == [
+        ("gap", "orderbook", "BTCUSDT"),
+        ("callback", ("BTCUSDT",), "synthetic sequence regression"),
+    ]

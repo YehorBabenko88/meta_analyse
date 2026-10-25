@@ -1,0 +1,50 @@
+name: PR47 disposable PostgreSQL 18.1 privilege audit
+on:
+  push:
+    branches:
+      - audit/pr47-postgres-independent-20261025
+  pull_request:
+    paths:
+      - tests/test_pr47_pg18_real_permissions.py
+      - .github/workflows/pr47-disposable-pg18.yml
+permissions:
+  contents: read
+jobs:
+  pg18-real-permissions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:18.1
+        env:
+          POSTGRES_USER: disposable_admin
+          POSTGRES_PASSWORD: disposable_test_only
+          POSTGRES_DB: postgres
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U disposable_admin -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      META_ANALYSE_DISPOSABLE_ONLY: '1'
+      META_ANALYSE_DISPOSABLE_PG18_DSN: postgresql://disposable_admin:disposable_test_only@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install constrained test dependencies
+        run: python -m pip install -c requirements.lock -e '.[test]'
+      - name: Verify exact source
+        run: python scripts/record_ci_source.py
+      - name: Execute real server privilege probe
+        run: python -m pytest -q tests/test_pr47_pg18_real_permissions.py --junitxml=pg18-permissions.xml
+      - name: Reject skipped/failed JUnit
+        run: python scripts/check_integration_junit.py pg18-permissions.xml --minimum 1 --require-exact test_pg18_real_catalog_permissions_and_fail_closed
+      - name: Privacy gate
+        if: always()
+        run: python scripts/check_public_diagnostic_artifacts.py source-sha.json pg18-permissions.xml

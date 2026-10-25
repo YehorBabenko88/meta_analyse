@@ -24,6 +24,18 @@ jobs:
         run: python -m pytest -q tests --junitxml=integration-gate.xml
       - name: Verify baseline suite ran without skips
         run: python scripts/check_integration_junit.py integration-gate.xml --minimum 100 --require-identity tests.test_integration_contract_shutdown.test_shutdown_waits_for_thread_write_before_cancelled_task_finishes --require-identity tests.test_integration_contract_shutdown.test_repeated_cancellation_does_not_abandon_write --require-identity tests.test_integration_contract_shutdown.test_failed_write_after_cancellation_waits_for_rollback --allow-skip test_fifty_connect_disconnect_cycles_drain_collectors --allow-skip test_close_with_twenty_active_instruments_and_pending_db_write --allow-skip test_windows_qt_mock_network_postgres_disconnect_restart --allow-skip test_database_operations_have_bounded_timeouts
+      - name: Discover PostgreSQL 18 binaries on hosted Windows runner
+        shell: pwsh
+        run: |
+          $roots = @('C:\Program Files\PostgreSQL', 'C:\hostedtoolcache\windows\PostgreSQL')
+          foreach ($root in $roots) {
+            if (Test-Path $root) {
+              Get-ChildItem $root -Recurse -Filter postgres.exe -ErrorAction SilentlyContinue |
+                ForEach-Object { Write-Host "Candidate: $($_.FullName)"; & $_.FullName --version }
+            }
+          }
+          $cmd = Get-Command postgres.exe -ErrorAction SilentlyContinue
+          if ($cmd) { Write-Host "PATH postgres: $($cmd.Source)"; & $cmd.Source --version }
       - name: Windows Qt and disposable PostgreSQL integration
         shell: pwsh
         run: ./scripts/test-windows.ps1

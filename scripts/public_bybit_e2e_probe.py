@@ -52,6 +52,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
     last_update = {}
     first_snapshot_epochs = {}
     latest_epoch = 0
+    last_sequence = {}
     snapshot_pending = set(symbols)
     async def on_book(symbol, book, timestamp):
         nonlocal latest_epoch
@@ -64,6 +65,11 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
         if not book.valid or book.update_id is None or book.sequence is None:
             record["false_valid"] += 1
             return
+        previous = last_sequence.get(symbol)
+        if previous is not None and epoch == previous[0] and book.sequence <= previous[1]:
+            record["false_valid"] += 1
+            return
+        last_sequence[symbol] = (epoch, book.sequence)
         if symbol not in seen:
             if symbol not in snapshot_pending:
                 record["false_valid"] += 1

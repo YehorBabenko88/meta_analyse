@@ -19,7 +19,7 @@ def record(**updates):
 
 
 def test_good_snapshot_proof():
-    assert module.evaluate(record()) == "PASS"
+    assert module.evaluate(record()) == "TRANSPORT_PASS"
 
 
 def test_no_snapshot_is_blocked():

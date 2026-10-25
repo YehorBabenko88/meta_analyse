@@ -112,7 +112,7 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
     print(json.dumps({"verdict": result["verdict"], "output": str(args.output)}))
-    raise SystemExit(0 if result["verdict"] == "PASS" else 1)
+    raise SystemExit(0 if result["verdict"] == "TRANSPORT_PASS" else 1)
 
 
 if __name__ == "__main__":

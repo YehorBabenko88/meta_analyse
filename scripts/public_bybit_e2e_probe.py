@@ -48,12 +48,20 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
     }
     seen = set()
     last_update = {}
+    first_snapshot_epochs = {}
+    latest_epoch = 0
     async def on_book(symbol, book, timestamp):
+        nonlocal latest_epoch
+        epoch = stream.connection_epoch
+        if epoch != latest_epoch:
+            latest_epoch = epoch
+            seen.clear()
         if not book.valid or book.update_id is None or book.sequence is None:
             record["false_valid"] += 1
             return
         if symbol not in seen:
             record["snapshots"] += 1
+            first_snapshot_epochs[symbol] = epoch
             seen.add(symbol)
         record["updates"] += 1
         last_update[symbol] = time.monotonic()
@@ -82,6 +90,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
         except Exception:
             record["unexpected_exits"] += 1
     record["connection_epochs"] = stream.connection_epoch
+    record["snapshot_epoch_by_symbol"] = first_snapshot_epochs
     if time.monotonic() - now < duration * 0.95:
         record["unexpected_exits"] += 1
     record["pending_symbols"] = sorted(set(symbols) - set(last_update))

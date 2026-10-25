@@ -122,3 +122,15 @@ Exact HEAD по-прежнему `fe9833a3aa9606b04f98f0f655916b83270dfdb3`; tre
 На момент проверки: `CI #1287` (run `40183321671`) и `Storage #247` (run `40183321651`) queued; `Public JUnit #12` queued; `Kernel offline #40` in_progress; `CI content synthetic #11` и `CI audit synthetic #9` policy-skipped. Нельзя переносить успешные результаты предыдущего HEAD `fe9833a3` на этот коммит.
 
 Независимая приёмка **BLOCKED**, ADMINIT **NO-GO**. Повторить ZIP digest, manifest, provenance, JUnit counts/statuses/identities и privacy gate на всех artifacts нового HEAD после завершения запусков. Проверить также encoding cases `utf-16`, `utf-32`, BOM, XML declaration с иным charset и NUL в payload.
+
+
+## 9. Независимая проверка Kernel offline #40 на новом HEAD
+
+Для `346b9fbfcf293d3745920240e530b76fd03ebb07` run `40183321682` terminal SUCCESS: jobs `synthetic (windows-latest)` и `synthetic (ubuntu-latest)` оба completed/success. Скачаны два оригинальных ZIP:
+
+- Windows artifact ID `12595072716`: SHA256 `3f1274efb3d65d22d74f1235f97df78e4ca8a59da136399f0b70e3e35eb1377d`.
+- Linux artifact ID `12594683290`: SHA256 `41f0d3f3cdfefc0d253e22599972bf42a3fedc6cc8d30439689847ade839ca6d`.
+
+Оба ZIP digest совпали с GitHub API; внутренние manifest hashes и source provenance сверены с новым HEAD/run/job/attempt. В каждом JUnit 948 testcase, 0 failures/errors/skips. Наличие двух успешных offline jobs не заменяет full CI, Storage и Public JUnit privacy acceptance.
+
+На момент проверки `CI #1287`, `Storage #247` и `Public JUnit #12` оставались queued; content/audit synthetic policy-skipped. **Итог PR #30: BLOCKED**, ADMINIT NO-GO.

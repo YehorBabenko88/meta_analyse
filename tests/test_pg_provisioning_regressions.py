@@ -157,6 +157,8 @@ import importlib.util,sys,os,json
 from pathlib import Path
 root=Path(sys.argv[1]);sys.path.insert(0,str(root/'src'))
 import psycopg
+for name in tuple(os.environ):
+    if name.upper().startswith('PG'):os.environ.pop(name)
 seen=[]
 def connect(**kwargs):
     seen.append(True);raise RuntimeError('NO_REAL_CONNECTION')

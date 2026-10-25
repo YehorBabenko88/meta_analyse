@@ -16,7 +16,7 @@ from meta_analyse.orderbook_stream import OrderBookStream
 
 def evaluate(record, *, min_snapshots=1):
     """Fail closed: a successful transport connection is not an E2E PASS."""
-    if record["snapshots"] < min_snapshots:
+    if record.get("event_budget_exhausted") or record["snapshots"] < min_snapshots:
         return "BLOCKED"
     if record["false_valid"] or record["callback_errors"] or record["unexpected_exits"]:
         return "FAIL"
@@ -34,6 +34,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
         "callback_errors": 0, "unexpected_exits": 0,
         "stale_symbols": [], "pending_symbols": list(symbols),
         "connection_epochs": 0, "event_limit": max_events,
+        "event_budget_exhausted": False,
     }
     seen = set()
     last_update = {}
@@ -47,6 +48,7 @@ async def probe(symbols, duration, *, depth=50, max_events=200000):
         record["updates"] += 1
         last_update[symbol] = time.monotonic()
         if record["updates"] >= max_events:
+            record["event_budget_exhausted"] = True
             stop.set()
     async def on_gap(symbols, reason):
         record["gaps"] += 1

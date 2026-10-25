@@ -148,3 +148,16 @@ Exact HEAD по-прежнему `fe9833a3aa9606b04f98f0f655916b83270dfdb3`; tre
 На момент проверки `CI #1287` (run `40183321671`) остаётся queued, поэтому full Windows/Linux/PG18 evidence на новом HEAD ещё отсутствует. Policy-skipped synthetic workflows не считать PASS.
 
 **Вердикт:** подтверждённые Storage/Public JUnit/Kernel artifacts PASS в пределах custody и projected content; **PR #30 overall BLOCKED**, ADMINIT NO-GO.
+
+
+## 11. Full CI #1287: Linux и archive jobs завершены, Windows ещё выполняется
+
+Для HEAD `346b9fbfcf293d3745920240e530b76fd03ebb07`, run `40183321671`: jobs `linux` и `archive-pinned-contract` terminal SUCCESS; job `windows` in_progress, следовательно **workflow не PASS**.
+
+Скачаны и сверены два оригинальных ZIP:
+- Archive artifact `12595002893`, ZIP SHA256 `df0354e27bfd933a91041d641ca13e693364128fb16015b97b1b46248fc8ea10`, 8 JUnit testcase, 0 failures/errors/skips.
+- Linux artifact `12594768683`, ZIP SHA256 `21bd4676b29b70bc8abe00f0520a5fb348dd89825149258b0196a2b2bfafbd5c`, 12 JUnit: 400 diagnostic, 1817 full, 10×67 lifecycle; PG server_version `180001`.
+
+ZIP SHA256 совпали с GitHub API; manifest hashes и source SHA/tree/run/job/attempt соответствуют. В опубликованном Linux full JUnit по-прежнему один skipped testcase с хешированным именем; без raw-to-public identity oracle он остаётся предметом отдельной проверки.
+
+Windows job ещё не terminal, Windows artifact отсутствует. **Overall BLOCKED**, ADMINIT NO-GO. Ни один pending/skipped job не повышен до PASS.

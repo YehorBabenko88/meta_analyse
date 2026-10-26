@@ -50,3 +50,8 @@ Bybit public REST/WS → validated orderbook/trades → collector → PostgreSQL
 Перед G2 нужно закрепить конкретные лимиты CPU/RSS/queue/disk для ADMINIT и методику измерения; отсутствующие метрики = BLOCKED. Ни один synthetic benchmark не выдаёт G2–G5 PASS.
 
 **Не выполнялись:** live Bybit, физический ADMINIT, G1–G5, production PostgreSQL, deployment, merge, торговые операции.
+
+
+## Дополнительный P1 — неподтверждённые boolean witnesses
+
+В независимом admission-классификаторе обнаружен обход: пять аргументов `*_verified=True` ранее позволяли вернуть `E2E_EVIDENCE_COMPLETE` без фактических файлов доказательств. Это не подтверждение существования физического E2E. Исправлено fail-closed: до реализации верификатора source-bound PostgreSQL/Bybit/Qt/resource receipts классификатор возвращает `BLOCKED`, даже если все пять флагов истинны. Добавлены два negative regression tests. Для будущего допуска нужен отдельный парсер с exact source SHA/tree, JUnit, digest каждого witness, source timestamps и сверкой с реальным состоянием, а не доверие к булевым флагам.

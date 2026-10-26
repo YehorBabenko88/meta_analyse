@@ -12,8 +12,8 @@ import time
 
 LIMIT=1024*1024
 COMMON=frozenset(('PYTHON_EXE','PYTHON_DLL','PYTHON_STDLIB','PYTHON_LOADER','CRT',
-                  'POWERSHELL','GIT','GIT_RUNTIME','NETSH'))
-NATIVE=frozenset(('DOTNET_RUNTIME','CSHARP_COMPILER','NATIVE_DLLS'))
+                  'POWERSHELL','GIT','GIT_RUNTIME','NETSH','DOTNET_RUNTIME','NATIVE_DLLS'))
+NATIVE=frozenset(('CSHARP_COMPILER',))
 CHECKS=frozenset(('host_context','elevation','tool_loader','postgres_5432_isolated',
                   'metascalp_read_only_plan','ci_exact','resources_reviewed','operator_scope'))
 NAMESPACE=frozenset(('absolute_local','outside_source_and_runtime','leaf_absent',

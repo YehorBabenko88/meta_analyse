@@ -31,3 +31,5 @@
 ## Review ledger
 
 Independent reviewer found P2 numeric 0/0.0 source signature flags comparing equal to False. Eight RED cases reproduced readiness promotion; exact-bool fix yields 95 GREEN module cases. Additional RED case for malformed unused baseline group also fixed. Re-review: no remaining actionable findings. No authorization bypass was claimed; all reports remained FAIL_CLOSED/NONE.
+
+Ruling: CLR and native DLL provenance are COMMON to format-only and R0 because format uses token/system-directory ctypes and PowerShell CLR. Two source-derived RED controls reproduced missing coverage; both now BLOCKED. Only C# compiler remains R0-only. Final module97 GREEN; independent re-review clean. Superseded own control9af1b5d CI is cancelled rather than treated as current evidence. PR60 and other branches untouched.

@@ -45,6 +45,11 @@ Windows PowerShell. Если такого корня доверия нет — B
 | Native DLL chain | System32/KnownDLLs kernel32/kernelbase/ntdll/advapi32/psapi и dependencies | Approved OS servicing catalog и загрузочный namespace |
 | Target source | HEAD/tree, clean source, actual bytes до/после | Independently reviewed immutable Git commit/tree + source-manifest digest; заранее approved LF/CRLF variants |
 
+CLR и native DLL provenance обязательны **в обоих** mode: format-only использует
+ctypes token/elevation и system-directory helpers, а PowerShell работает на .NET.
+Только CSHARP_COMPILER/Add-Type/temp approval являются дополнительными для R0.
+Отсутствие native process inventory не означает отсутствие native API/DLL loading.
+
 `Get-FileHash` показывает наблюдаемый digest, а не approval. Authenticode `Valid`
 не равен approved publisher/build; strong name не заменяет signature/catalog.
 Для unsigned component допустим только **заранее одобренный authenticated signed
@@ -66,6 +71,11 @@ $observedHash = Get-FileHash -LiteralPath $approvedTool -Algorithm SHA256
 Все paths/certificate details/hash inventories остаются private; не выводить эти
 объекты в чат/Actions/transcript. Signature chain/revocation/cache/network scope
 должны быть одобрены; unknown/offline-incomplete не превращать в Valid.
+
+До этих metadata queries проверить approved PowerShell command/module resolution,
+отсутствие shadow functions/aliases и unreviewed PSModulePath. `-NoProfile` сам по
+себе не отключает module autoload. Нельзя доверять signature/policy ответу,
+полученному через ещё не проверенный loader либо подменённый cmdlet.
 
 ### Python и executable/DLL loader
 

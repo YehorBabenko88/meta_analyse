@@ -62,6 +62,16 @@ def test_format_mode_rejects_malformed_unused_baseline_group():
     assert 'PRIVATE_UNREVIEWED_VALUE' not in json.dumps(result)
 
 
+@pytest.mark.parametrize('role',['DOTNET_RUNTIME','NATIVE_DLLS'])
+def test_format_mode_still_requires_token_api_dlls_and_powershell_clr(role):
+    # Format-only avoids C# compilation/process inventory, but its elevation/
+    # system-directory helpers use ctypes WinAPI and PowerShell itself uses CLR.
+    e,b,d=control('HTTP_SYS_FORMAT');baseline=json.loads(b)
+    e['tools'].pop(role,None);baseline['tools'].pop(role,None)
+    b=json.dumps(baseline).encode();d=hashlib.sha256(b).hexdigest()
+    assert assess(e,b,d)['readiness']=='BLOCKED'
+
+
 @pytest.mark.parametrize('failure',['baseline_digest','source','source_clean','source_after','old',
     'future','session','tool_hash','tool_authority','unsigned','unconfirmed','missing_tool',
     'python32','python_bool','python_version','ps_version','bypass','override','process_policy',

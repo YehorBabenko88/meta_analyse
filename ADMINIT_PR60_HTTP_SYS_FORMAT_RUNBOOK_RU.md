@@ -25,6 +25,8 @@ Internal `http-sys-format.ps1` отдельно не вызывать и raw std
 
 - Exact clean target + source hashes до запуска и approved Git executable search.
 - Approved base Python 3.12 x64, loader, PowerShell5.1/System32 netsh; no aliases.
+- Approved CLR/native DLL chain: elevation/system-directory WinAPI и PowerShell
+  CLR остаются в этом route; отсутствие Add-Type не освобождает от их provenance.
 - Existing scripts разрешены policy/MOTW, Process Undefined, no Bypass/override;
   AllSigned + unsigned target source → STOP, не inline copy/Unblock/shell switch.
 - Private console, без transcript/debug/automatic log upload. Capture в private

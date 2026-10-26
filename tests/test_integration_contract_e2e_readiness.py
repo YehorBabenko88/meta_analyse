@@ -80,3 +80,21 @@ def test_unexpected_skips_are_blocked():
         frozen_object_present=True, postgres_attested=True,
         full_e2e_witness=True, exact_source_bound=True,
         unexpected_skips=1, artifact_inventory_verified=True) == "BLOCKED"
+
+
+def test_cancelled_ci_is_failure():
+    assert classify(general_ci="cancelled", synthetic_ci="success",
+        frozen_object_present=True, postgres_attested=True,
+        full_e2e_witness=True) == "FAIL"
+
+
+def test_timed_out_ci_is_failure():
+    assert classify(general_ci="success", synthetic_ci="timed_out",
+        frozen_object_present=True, postgres_attested=True,
+        full_e2e_witness=True) == "FAIL"
+
+
+def test_action_required_ci_is_failure():
+    assert classify(general_ci="action_required", synthetic_ci="success",
+        frozen_object_present=True, postgres_attested=True,
+        full_e2e_witness=True) == "FAIL"

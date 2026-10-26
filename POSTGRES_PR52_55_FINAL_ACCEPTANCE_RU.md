@@ -62,3 +62,7 @@ These tests must run only with explicitly installed synthetic-boundary plugin an
 **Source review PARTIAL; PR52 hosted synthetic + disposable PG18.1 PASS (four cases only); PR53 full CI FAIL (synthetic fixture failures); PR54/55 hosted qualification PENDING/other job failures not transferred; physical G0/G1 NO-GO.**
 
 No production DB, ADMINIT cluster, merge, deployment, rerun or commissioning performed.
+
+## Follow-up exact GitHub state
+
+PR #54 exact HEAD `0883a979ba364a778a3ca78d0dc4fdc5026e46d7`: ADMINIT final synthetic 40304103792 SUCCESS; Kernel identity offline 40304103756 FAILURE. Linux kernel job 121508826628 had **948 passed / 2 deselected**, but mutation evidence returned `baseline gaps=0 killed=6 defended=8 survived=0 inapplicable=1` and exit1, followed by privacy projection `BLOCKED: public CI evidence rejected`; Windows counterpart cancelled. This is not a PostgreSQL server failure and must not be relabeled PASS. PR #55 exact HEAD `edc8e831c202e3597e27532359ab9c47a9f29a88`: synthetic 40305960447 IN_PROGRESS, full CI/storage SKIPPED. PR #58 previous exact HEAD `6d4c1a0615ee7742baf631a63fd55f5b4c4ce8bf`: full CI 40307496664 QUEUED, synthetic 40307496576 SKIPPED. New audit commits require new exact-SHA confirmation. Physical G1 NO-GO.

@@ -7,7 +7,9 @@ def sample():
     return dict(status="PASS", reason="NONE", worker_stopped=True,
                 loop_closed=True, render_samples=10, render_fps=10.0,
                 render_p95_ms=2.0, snapshot_to_render_p95_ms=4.0,
-                heartbeat_p95_ms=12.0, process_cpu_percent_one_core=50.0)
+                heartbeat_p95_ms=12.0, process_cpu_percent_one_core=50.0,
+                close_event_ms=2.0, diagnostics=dict(async_errors=0, ui_errors=0,
+                    thread_violations=0, stamp_overflow=0))
 
 
 def test_synthetic_pass_is_not_physical_e2e():
@@ -42,3 +44,20 @@ def test_fail_closed_benchmark_is_failure():
     value["status"] = "FAIL_CLOSED"
     value["reason"] = "NO_RENDER_SAMPLES"
     assert classify_ui_e2e(benchmark=value) == "FAIL"
+
+
+@pytest.mark.parametrize("key,bad", [
+    ("render_fps", 0), ("render_samples", True), ("render_samples", 0),
+    ("close_event_ms", None), ("close_event_ms", float("nan")),
+])
+def test_invalid_delivery_or_shutdown_measurements_block(key, bad):
+    value = sample()
+    value[key] = bad
+    assert classify_ui_e2e(benchmark=value) == "BLOCKED"
+
+
+@pytest.mark.parametrize("counter", ["async_errors", "ui_errors", "thread_violations", "stamp_overflow"])
+def test_nonzero_ui_or_worker_fault_blocks(counter):
+    value = sample()
+    value["diagnostics"][counter] = 1
+    assert classify_ui_e2e(benchmark=value) == "BLOCKED"

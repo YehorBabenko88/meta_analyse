@@ -84,6 +84,9 @@ MUTATIONS = [
 ]
 
 
+CURRENT_TARGETS = {'host-arguments': ("REGISTRY_ARGS_MATCH=command_arguments(config.get('expanded_image_path'))==args,\n        SCM_ARGS_MATCH=command_arguments(svc.get('binary_path'))==args", 'REGISTRY_ARGS_MATCH=True,\n        SCM_ARGS_MATCH=True')}
+
+
 def load(text):
     module = types.ModuleType('synthetic_mutated_classifier')
     exec(compile(text, '<synthetic-classifier>', 'exec'), module.__dict__)
@@ -111,6 +114,8 @@ def main():
             for name in CONTRACTS if not probe(baseline, tag, name)]
     results = []
     for tag, old, new in MUTATIONS:
+        if source.count(old)==0 and tag in CURRENT_TARGETS:
+            old,new=CURRENT_TARGETS[tag]
         count = source.count(old)
         if count == 0:
             results.append(dict(predicate=tag, result='INAPPLICABLE'))

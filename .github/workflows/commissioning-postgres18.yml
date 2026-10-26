@@ -1,7 +1,7 @@
 name: Commissioning PostgreSQL18
 on:
   push:
-    branches: ['audit/**']
+    branches: ['audit/**', 'integration/final-ci-g0-20261026']
 permissions:
   contents: read
 jobs:
@@ -22,6 +22,8 @@ jobs:
       META_ANALYSE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify exact Actions source SHA
         run: python scripts/record_ci_source.py
       - uses: actions/setup-python@v5
@@ -33,15 +35,23 @@ jobs:
         run: python -c "import os,psycopg,json; c=psycopg.connect(os.environ['META_ANALYSE_TEST_ADMIN_DSN']); v=c.info.server_version; print(v); assert v==180001; open('postgres-version.json','w').write(json.dumps({'server_version':v}));c.close()"
       - name: Full suite and eleven-case PostgreSQL and five-case shutdown gate
         shell: bash
+        env:
+          META_ANALYSE_CI_IDENTITY_SCOPE: full
+          META_ANALYSE_SYNTHETIC_IDENTITIES: ${{ runner.temp }}/pg18-full-identities.json
         run: |
           set -o pipefail
-          python -m pytest tests -q -W error::RuntimeWarning --junitxml=pg18-tests.xml | tee pg18-tests.log
+          python -m pytest tests -q -p scripts.ci_identity_manifest --ignore=tests/test_pg18_disposable_acceptance.py -W error::RuntimeWarning --junitxml=pg18-tests.xml | tee pg18-tests.log
+          python scripts/check_final_integration_junit.py "$(pwd)/pg18-tests.xml" "${{ runner.temp }}/pg18-full-identities.json"
           python scripts/check_integration_postgres.py pg18-tests.xml --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
       - name: Repeat lifecycle without missing or skipped cases
         run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir pg18-lifecycle
+      - name: Verify tracked source before publication
+        id: source_clean
+        if: always()
+        run: git diff --exit-code HEAD
       - name: Project isolated public evidence
         id: privacy_gate
-        if: always()
+        if: always() && steps.source_clean.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail

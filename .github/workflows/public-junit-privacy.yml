@@ -1,7 +1,7 @@
 name: Public JUnit privacy synthetic
 on:
   push:
-    branches: ['maintenance/junit-privacy-publication-20261023', 'audit/public-evidence-transaction-20261023', 'audit/adminit-first-integration-20261025']
+    branches: ['maintenance/junit-privacy-publication-20261023', 'audit/public-evidence-transaction-20261023', 'audit/adminit-first-integration-20261025', 'integration/final-ci-g0-20261026']
   pull_request:
     paths:
       - 'scripts/check_public_junit.py'
@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   offline:
-    if: contains(fromJSON('["maintenance/junit-privacy-publication-20261023","audit/public-evidence-transaction-20261023","audit/adminit-first-integration-20261025"]'), github.head_ref || github.ref_name)
+    if: contains(fromJSON('["maintenance/junit-privacy-publication-20261023","audit/public-evidence-transaction-20261023","audit/adminit-first-integration-20261025","integration/final-ci-g0-20261026"]'), github.head_ref || github.ref_name)
     strategy:
       fail-fast: false
       matrix:
@@ -34,9 +34,13 @@ jobs:
       - run: python scripts/record_ci_source.py
       - run: python -m pip install -c requirements.lock pytest
       - run: python -m pytest --noconftest -q tests/test_public_junit.py tests/test_project_public_ci_evidence.py tests/test_public_evidence_workflows.py --junitxml=public-junit-tests.xml
+      - name: Verify tracked source before publication
+        id: source_clean
+        if: always()
+        run: git diff --exit-code HEAD
       - name: Project isolated public evidence
         id: privacy
-        if: always()
+        if: always() && steps.source_clean.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail

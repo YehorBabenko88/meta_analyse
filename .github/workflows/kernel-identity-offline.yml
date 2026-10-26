@@ -1,7 +1,7 @@
 name: Kernel identity offline
 on:
   push:
-    branches: ['parallel/adminit-kernel-identity-evidence', 'parallel/adminit-identity-integration-20261021', 'parallel/adminit-identity-acceptance-fix-20261022', 'parallel/adminit-pr20-security-fix-20261022', 'parallel/adminit-pr21-evidence-schema-20261022', 'parallel/adminit-pr22-boundary-review-20261022', 'parallel/adminit-pr23-output-transaction-20261023']
+    branches: ['parallel/adminit-kernel-identity-evidence', 'parallel/adminit-identity-integration-20261021', 'parallel/adminit-identity-acceptance-fix-20261022', 'parallel/adminit-pr20-security-fix-20261022', 'parallel/adminit-pr21-evidence-schema-20261022', 'parallel/adminit-pr22-boundary-review-20261022', 'parallel/adminit-pr23-output-transaction-20261023', 'integration/final-ci-g0-20261026']
   pull_request:
     paths:
       - 'commissioning/process_identity.py'
@@ -59,9 +59,13 @@ jobs:
           "$PY" scripts/check_pr20_adversarial_mutations.py --output security-mutations.json
           "$PY" scripts/check_evidence_schema_mutations.py --output schema-mutations.json
           "$PY" scripts/project_synthetic_artifacts.py --junit kernel-tests.xml --source source-sha.json --mutations identity-mutations.json --mutations security-mutations.json --mutations schema-mutations.json
+      - name: Verify tracked source before publication
+        id: source_clean
+        if: always()
+        run: git diff --exit-code HEAD
       - name: Project isolated public evidence
         id: privacy
-        if: always()
+        if: always() && steps.source_clean.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail

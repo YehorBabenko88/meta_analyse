@@ -181,7 +181,8 @@ def test_raw_identifiers_and_exception_fields_never_leave_projection():
 
 def test_shared_predicate_refactor_is_equivalent_to_frozen_pr39():
     helper=getattr(p,'service_host_configuration_checks',None);assert callable(helper)
-    raw=subprocess.check_output(['git','-C',str(ROOT),'show','4a92643c00a7e4d113025e1df427d8f4850f0981:commissioning/process_identity.py'])
+    from scripts.frozen_pr39_oracle import load_bytes
+    raw=load_bytes()
     node=next(n for n in ast.parse(raw).body if isinstance(n,ast.FunctionDef) and n.name=='service_implementation_refusal')
     node.name='frozen';scope=dict(vars(p));exec(compile(ast.Module(body=[node],type_ignores=[]),'<frozen PR39>','exec'),scope)
     for name in CONTRACTS:

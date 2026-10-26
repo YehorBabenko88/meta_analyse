@@ -66,3 +66,21 @@ Ubuntu job `121508826628`: 948 tests passed / 2 deliberately deselected; mutatio
 4. Do not count policy-SKIPPED legacy workflows as PASS. Do not rerun without diagnosed cause, mass cancel or merge.
 
 **Verdict: #52 bounded hosted PASS; #53 FAIL; #54 mixed SUCCESS/FAIL/BLOCKED; #55 BLOCKED. Overall integration acceptance BLOCKED.**
+
+
+## Update: PR #54/#55 hosted runs and real artifacts (2026-10-26)
+
+Exact HEADs unchanged: #54 `0883a979ba364a778a3ca78d0dc4fdc5026e46d7`; #55 `edc8e831c202e3597e27532359ab9c47a9f29a88`.
+
+PR #54 final synthetic PR run `40304103792` is now **terminal SUCCESS**, attempt 1, three jobs SUCCESS (Windows, Ubuntu, disposable PG18). Three ZIPs downloaded and independently SHA256-matched against GitHub API:
+- Ubuntu artifact `12643456155`: `ad715e8494195d810422ebfc5614ff822f60a9f55e6b1c87942f5801379b84b3`
+- Windows artifact `12643286858`: `db5399757391b146235dcb542ee702c866c40d28cc542fb7dab1750fa87573e9`
+- PG18 artifact `12642609349`: `d0889e84b338f71b8d7b0efeae0064fe9b38e4e01610902318ac21d3da1a2fde`
+
+PR #55 push run `40305948528` and PR run `40305960447` are still **not terminal**: each has Windows and Ubuntu synthetic jobs SUCCESS, disposable PG18 job in_progress / queued respectively, attempt 1. Four synthetic ZIPs downloaded and independently SHA256-matched:
+- Push Windows `12643197822`: `ccd3cc4af8cc3e723fa3ac62033151473293ec3e11cbbab9094d936567ef21b6`
+- Push Ubuntu `12642204531`: `aa5c7e98e0a9067c2226ae4600651638ac4376f44865e4678434dc6de21570f2`
+- PR Ubuntu `12642363516`: `791adb46e7a4bf2c38be77c1d34f656e5de1e37df8a6c806e95ea7615821191f`
+- PR Windows `12642259869`: `d2560eeeb852e454add3e4d2cbbbfe8715289e2f85d8ae4746d8d0c0d19df87d`
+
+The downloaded ZIPs' manifest/file hashes and exact source/run/attempt/job bindings were checked, and projected JUnit status counts/privacy were reviewed. These results are **bounded evidence for those seven artifacts**, not whole-run acceptance while dependent PG jobs are unfinished. The #54 independent Kernel workflow `40304103756` still FAIL (mutation inapplicable=1, Windows cancelled); no success reclassification. The #53 full CI remains FAIL. Policy-SKIPPED legacy workflows are not PASS. ADMINIT physical G1 remains NO-GO.

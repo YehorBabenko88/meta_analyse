@@ -80,3 +80,23 @@ def test_valid_connection_is_yielded_only_after_read_only_probe():
         assert "search_path" in connection.queries[1]
         assert "pg_control_system" in connection.queries[2]
     assert connection.closed
+
+
+def test_factory_exception_never_enters_mutation_scope():
+    called = []
+    def broken():
+        called.append("factory")
+        raise ConnectionError("PRIVATE_CONNECTION")
+    with pytest.raises(ConnectionError):
+        with authorized_private_connection(broken, POLICY):
+            pytest.fail("unconnected scope yielded")
+    assert called == ["factory"]
+
+
+def test_attestation_result_none_fails_closed():
+    connection = FakeConnection(None)
+    with pytest.raises(AttestationRefused, match="CLUSTER_IDENTITY_MISMATCH"):
+        with authorized_private_connection(lambda: connection, POLICY):
+            pytest.fail("empty server identity yielded")
+    assert connection.closed
+    assert len(connection.queries) == 3

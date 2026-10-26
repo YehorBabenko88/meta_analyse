@@ -66,3 +66,7 @@ No production DB, ADMINIT cluster, merge, deployment, rerun or commissioning per
 ## Follow-up exact GitHub state
 
 PR #54 exact HEAD `0883a979ba364a778a3ca78d0dc4fdc5026e46d7`: ADMINIT final synthetic 40304103792 SUCCESS; Kernel identity offline 40304103756 FAILURE. Linux kernel job 121508826628 had **948 passed / 2 deselected**, but mutation evidence returned `baseline gaps=0 killed=6 defended=8 survived=0 inapplicable=1` and exit1, followed by privacy projection `BLOCKED: public CI evidence rejected`; Windows counterpart cancelled. This is not a PostgreSQL server failure and must not be relabeled PASS. PR #55 exact HEAD `edc8e831c202e3597e27532359ab9c47a9f29a88`: synthetic 40305960447 IN_PROGRESS, full CI/storage SKIPPED. PR #58 previous exact HEAD `6d4c1a0615ee7742baf631a63fd55f5b4c4ce8bf`: full CI 40307496664 QUEUED, synthetic 40307496576 SKIPPED. New audit commits require new exact-SHA confirmation. Physical G1 NO-GO.
+
+## 2026-10-26 exact-SHA follow-up
+
+PR #58 current source SHA `bf8123b04d1f1916b89d2a3630f9afe50260c321`: CI run 40308100196 QUEUED; ADMINIT synthetic 40308100180 SKIPPED. Added offline negative cases for malformed catalog tuple, connection-factory failure, empty identity and type confusion; none constitute real PG18.1 SQL compatibility. No new server-side PostgreSQL failure established. Stop extending fake cases as a substitute for a real disposable privilege/transaction/crash gate. P0 system_identifier receipt and full commissioning caller coverage remain open; G1 NO-GO.

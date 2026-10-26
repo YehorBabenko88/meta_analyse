@@ -92,19 +92,40 @@ def collector_identity(expected_sha, *, root=None, manifest=None, manifest_sha25
 
 
 def http_sys_owner(text, port):
-    """Fail closed on unknown/localized netsh format or shared/ambiguous queue."""
+    """Narrow English verbose profile only; unknown/ambiguous input refuses.
+
+    This is not a localization parser or a general netsh grammar. Never infer
+    application ownership from a TCP listener or an HTTP response.
+    """
+    if (type(text) is not str or len(text) > 1024 * 1024 or
+            type(port) is not int or not 1 <= port <= 65535 or
+            any(ord(c) < 32 and c not in '\r\n\t' for c in text)):
+        raise ValueError('HTTP.sys format unsupported')
     owners = []
     for block in re.split(r'(?m)^Request queue name:', text)[1:]:
-        urls = re.findall(r'(?im)^\s+(HTTP://\S+)', block)
+        urls = []
+        for line in block.splitlines():
+            if re.search(r'https?://', line, re.I):
+                match = re.fullmatch(r'[ \t]+(https?://[^ \t\r\n]+)[ \t]*', line, re.I)
+                if not match:
+                    raise ValueError('HTTP.sys URL evidence malformed')
+                urls.append(match[1])
         if not any(re.search(rf':{port}(?::|/)', url) for url in urls):
             continue
         if any(not re.fullmatch(rf'HTTP://127\.0\.0\.1:{port}(?::127\.0\.0\.1)?/', url, re.I) for url in urls):
             raise ValueError('HTTP.sys endpoint is not exclusive loopback')
-        count = re.search(r'Number of active processes attached:\s*(\d+)', block)
-        ids = re.findall(r'(?m)^\s+ID:\s*(\d+), image:', block)
-        if not count or count[1] != '1' or len(ids) != 1:
+        counts = re.findall(r'(?m)^[ \t]*Number of active processes attached:[ \t]*([0-9]+)[ \t]*\r?$', block)
+        count_labels = re.findall(r'(?im)^[ \t]*Number of active processes attached:', block)
+        process_lines = [line for line in block.splitlines() if re.match(r'^[ \t]*ID:', line, re.I)]
+        ids = []
+        for line in process_lines:
+            match = re.fullmatch(r'[ \t]+ID:[ \t]*([0-9]+), image:[ \t]*([^\r\n]+)', line)
+            if not match or not match[2].strip():
+                raise ValueError('HTTP.sys process evidence malformed')
+            ids.append(int(match[1]))
+        if counts != ['1'] or len(count_labels) != 1 or len(ids) != 1 or not 1 <= ids[0] <= 0x7fffffff:
             raise ValueError('HTTP.sys queue ownership is ambiguous')
-        owners.append(int(ids[0]))
+        owners.append(ids[0])
     if len(owners) != 1:
         raise ValueError('exact HTTP.sys API queue not established')
     return owners[0]

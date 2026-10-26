@@ -84,3 +84,10 @@ PR #55 push run `40305948528` and PR run `40305960447` are still **not terminal*
 - PR Windows `12642259869`: `d2560eeeb852e454add3e4d2cbbbfe8715289e2f85d8ae4746d8d0c0d19df87d`
 
 The downloaded ZIPs' manifest/file hashes and exact source/run/attempt/job bindings were checked, and projected JUnit status counts/privacy were reviewed. These results are **bounded evidence for those seven artifacts**, not whole-run acceptance while dependent PG jobs are unfinished. The #54 independent Kernel workflow `40304103756` still FAIL (mutation inapplicable=1, Windows cancelled); no success reclassification. The #53 full CI remains FAIL. Policy-SKIPPED legacy workflows are not PASS. ADMINIT physical G1 remains NO-GO.
+
+
+## Update: PR #55 push PostgreSQL completed
+
+Exact HEAD `edc8e831c202e3597e27532359ab9c47a9f29a88`. Push run `40305948528`: Windows synthetic, Ubuntu synthetic and disposable-postgres18 jobs now all terminal SUCCESS. New PostgreSQL artifact `12642848453` downloaded; ZIP SHA256 `7ba2bdc6d29ec7f6ce6163a6827a97e31f1622fb29adfe15c0c31ac4436ad03c` matches GitHub API. Its manifest/file hashes and source/run/attempt/job binding were inspected; projected JUnit contains 4 PASS, 0 failures/errors/skips, typed PG18.1 version receipt.
+
+PR run `40305960447` remains nonterminal: both synthetic Windows/Ubuntu SUCCESS, disposable-postgres18 QUEUED and no PG artifact. Thus #55 **push bounded hosted PASS**, PR **BLOCKED**, overall #55 not accepted. PR #54 Kernel mutation FAIL and PR #53 CI FAIL remain independent blockers. No legacy SKIPPED counted as PASS; ADMINIT physical G1 NO-GO.

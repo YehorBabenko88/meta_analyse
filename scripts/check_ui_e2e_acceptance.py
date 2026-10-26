@@ -37,4 +37,4 @@ def classify_ui_e2e(*, benchmark, public_feed_verified=False,
         resource_budget_verified, exact_source_verified
     )):
         return "BLOCKED"
-    return "E2E_EVIDENCE_COMPLETE"
+    # Boolean declarations cannot authenticate public feed, PostgreSQL receipts,\n    # Qt frames or exact-source provenance. No full-E2E witness parser exists.\n    return "BLOCKED"

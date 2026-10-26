@@ -113,3 +113,17 @@ def test_malformed_catalog_result_fails_closed(bad):
         with authorized_private_connection(lambda: connection, POLICY):
             pytest.fail("malformed catalog result yielded")
     assert connection.closed
+
+
+@pytest.mark.parametrize("field,bad", [
+    (2, True), (2, "180001"), (4, True), (4, "55480"),
+    (5, 12345678901234567890), (6, 1), (6, "true"),
+])
+def test_catalog_type_confusion_fails_closed(field, bad):
+    row = list(GOOD)
+    row[field] = bad
+    connection = FakeConnection(tuple(row))
+    with pytest.raises(AttestationRefused, match="CLUSTER_IDENTITY_MISMATCH"):
+        with authorized_private_connection(lambda: connection, POLICY):
+            pytest.fail("type-confused catalog identity yielded")
+    assert connection.closed

@@ -44,3 +44,6 @@ Wrong HEAD/tree, dirty worktree, changed collector identity, non-approved token/
 
 ## Follow-up CI review (2026-10-26)
 PR54 kernel identity workflow run 40304103756: Ubuntu synthetic job FAILURE after 948 passed / 2 deselected, due to `project_public_ci_evidence.py` returning `BLOCKED: public CI evidence rejected`; Windows job CANCELLED. This is a publication/provenance gate failure, **not** a parser or kernel unit-test PASS for the whole workflow. No relaxation of publisher is authorized. PR55 synthetic run 40305960447 was IN_PROGRESS at review; PR57 CI 40307440535 QUEUED. Do not transfer earlier-head results.
+
+## Additional exact PR55 hosted job inspection
+Run 40305960447: synthetic ubuntu-latest and windows-latest jobs are both completed SUCCESS; dependent disposable-postgres18 is QUEUED. Two artifacts are listed by GitHub API, but ZIP bytes, SHA256, JUnit identities and provenance have not been independently inspected in this audit. Whole run is not yet an accepted PASS. PR57 CI run 40307702974 was QUEUED at inspection. Physical HTTP.sys ownership remains UNRESOLVED.

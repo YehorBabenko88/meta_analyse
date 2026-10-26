@@ -78,3 +78,25 @@ def test_missing_twenty_row_delivery_blocks():
     value = sample()
     value["diagnostics"]["bridge_rows"] = 19
     assert classify_ui_e2e(benchmark=value) == "BLOCKED"
+
+
+def test_all_boolean_witness_claims_cannot_forge_full_e2e():
+    assert classify_ui_e2e(
+        benchmark=sample(),
+        public_feed_verified=True,
+        postgres_commit_readback=True,
+        ui_freshness_verified=True,
+        resource_budget_verified=True,
+        exact_source_verified=True,
+    ) == "BLOCKED"
+
+
+def test_truthy_strings_cannot_forge_witnesses():
+    assert classify_ui_e2e(
+        benchmark=sample(),
+        public_feed_verified="true",
+        postgres_commit_readback="PASS",
+        ui_freshness_verified=True,
+        resource_budget_verified=True,
+        exact_source_verified=True,
+    ) == "BLOCKED"

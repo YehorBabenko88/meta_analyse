@@ -41,3 +41,6 @@ P0: no confirmed new VERIFIED bypass in reviewed delta. P1: actual netsh format 
 
 ## Mandatory STOP
 Wrong HEAD/tree, dirty worktree, changed collector identity, non-approved token/host, ExecutionPolicy block, unexpected raw output, UTF8 decode/JSON duplicate/malformed Unicode, nonzero netsh child, oversized output, multiple/ambiguous queues, spoofed labels/URLs, unknown format, source drift, private output failure, or any attempt to promote UNRESOLVED to VERIFIED. On any STOP, preserve fail-closed and do not change Norton/Defender, Windows locale, code page, HTTP.sys, ACL, registry or services. No G1.
+
+## Follow-up CI review (2026-10-26)
+PR54 kernel identity workflow run 40304103756: Ubuntu synthetic job FAILURE after 948 passed / 2 deselected, due to `project_public_ci_evidence.py` returning `BLOCKED: public CI evidence rejected`; Windows job CANCELLED. This is a publication/provenance gate failure, **not** a parser or kernel unit-test PASS for the whole workflow. No relaxation of publisher is authorized. PR55 synthetic run 40305960447 was IN_PROGRESS at review; PR57 CI 40307440535 QUEUED. Do not transfer earlier-head results.

@@ -2,6 +2,7 @@
 from pathlib import Path
 import re
 import pytest
+from pg_synthetic_environment import isolated_pg_environment
 from meta_analyse.pg_cluster_plan import ClusterPlan, PlanRefused, plan_only
 
 ROOT = Path(__file__).resolve().parents[1]

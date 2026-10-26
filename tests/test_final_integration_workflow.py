@@ -8,9 +8,12 @@ BRANCH='integration/adminit-security-readiness-20261025'
 def test_final_workflow_checks_exact_candidate_and_synthetic_bounds():
     s=(ROOT/'.github/workflows/adminit-final-synthetic.yml').read_text()
     assert BRANCH in s and 'ubuntu-latest' in s and 'windows-latest' in s
+    assert 'fix/pr51-hosted-isolation-20261026' in s
+    assert "if: runner.os == 'Linux'" in s and 'libegl1' in s
+    assert s.index('libegl1') < s.index('pytest --noconftest')
     assert 'github.event.pull_request.head.sha || github.sha' in s
     assert 'pytest --noconftest' in s and '-p scripts.integration_synthetic_boundary' in s
-    assert '--minimum 1740' in s and 'scripts/record_ci_source.py' in s
+    assert '--minimum 1744' in s and 'scripts/record_ci_source.py' in s
     synthetic=s.split('  disposable-postgres18:',1)[0]
     for forbidden in ('services:','initdb','pg_ctl','run_readonly.py','--enable-public-network','collect-host.ps1','Add-Type'):
         assert forbidden not in synthetic

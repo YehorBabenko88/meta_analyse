@@ -3,6 +3,7 @@ import importlib.util
 from pathlib import Path
 import sys
 import pytest
+from pg_synthetic_environment import isolated_pg_environment
 from meta_analyse.storage import Store
 from meta_analyse.pg_cluster_attestation import AttestationRefused
 from test_pg_cluster_connection import FakeConn,GOOD,POLICY

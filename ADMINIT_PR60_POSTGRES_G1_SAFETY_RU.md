@@ -57,3 +57,7 @@ PR #60 HEAD `0cc8c44d...`: CI run 40399605883 SUCCESS (Windows, Linux, archive);
 | Physical G1 | **NO-GO** |
 
 Никаких физических подключений, создания кластера, merge или deployment не выполнялось.
+
+## Follow-up exact SHA 2026-10-26
+
+PR #60 source SHA `0cc8c44d57514de6808fbbb6fdc7b9d9fd20ce30` unchanged. Five exact-HEAD workflows SUCCESS (CI, ADMINIT synthetic, Kernel offline, Native SCM, Public JUnit privacy). PR #62 audit HEAD `e86f7c145fb5107cfddebde2b815eca7079cd9a8` has CI run 40403652158 QUEUED. No new disposable PG18.1 receipt, G0 ownership or G1 authorization was obtained. This is an evidence status update, not an implementation of the P0 receipt gate. G1 remains NO-GO.

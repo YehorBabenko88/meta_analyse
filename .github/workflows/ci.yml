@@ -48,6 +48,7 @@ jobs:
         shell: pwsh
         run: python scripts/check_integration_postgres.py "$env:RUNNER_TEMP/meta-analyse-ci/tests.xml"
       - name: Measure synthetic 20-instrument UI load
+        id: benchmark
         shell: pwsh
         run: python scripts/benchmark_flow_ui.py --seconds 3 --output "$env:RUNNER_TEMP/meta-analyse-ci/ui-performance.json"
       - name: Verify repeated installation
@@ -68,6 +69,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Public projection blocked' }
           python scripts/project_public_ci_evidence.py --validate public-evidence
           if ($LASTEXITCODE -ne 0) { throw 'Public inventory blocked' }
+      - name: Project bounded UI benchmark evidence (including refusal)
+        id: benchmark_projection
+        if: ${{ always() && steps.source_clean.outcome == 'success' }}
+        shell: pwsh
+        run: python scripts/project_ui_benchmark.py --output public-benchmark --source source-sha.json --benchmark "$env:RUNNER_TEMP/meta-analyse-ci/ui-performance.json" --expected-outcome "${{ steps.benchmark.outcome }}"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.benchmark_projection.outcome == 'success'
+        with:
+          name: windows-ui-benchmark
+          if-no-files-found: error
+          path: public-benchmark/
       - uses: actions/upload-artifact@v4
         if: always() && steps.privacy_gate.outcome == 'success'
         with:
@@ -132,7 +144,9 @@ jobs:
           python scripts/check_final_integration_junit.py "$(pwd)/tests.xml" "${{ runner.temp }}/full-identities.json"
       - name: Verify eleven PostgreSQL and five shutdown integration cases executed without skips
         run: python scripts/check_integration_postgres.py tests.xml --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
-      - run: python scripts/benchmark_flow_ui.py --seconds 3 --output ui-performance.json
+      - name: Measure synthetic 20-instrument UI load
+        id: benchmark
+        run: python scripts/benchmark_flow_ui.py --seconds 3 --output ui-performance.json
       - name: Verify tracked source before publication
         id: source_clean
         if: always()
@@ -145,6 +159,17 @@ jobs:
           set -euo pipefail
           python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit diagnostic-tests.xml --junit tests.xml --junit-glob "repeat-lifecycle/*/tests.xml" --postgres-version postgres-version.json
           python scripts/project_public_ci_evidence.py --validate public-evidence
+      - name: Project bounded UI benchmark evidence (including refusal)
+        id: benchmark_projection
+        if: ${{ always() && steps.source_clean.outcome == 'success' }}
+        shell: bash
+        run: python scripts/project_ui_benchmark.py --output public-benchmark --source source-sha.json --benchmark ui-performance.json --expected-outcome "${{ steps.benchmark.outcome }}"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.benchmark_projection.outcome == 'success'
+        with:
+          name: linux-ui-benchmark
+          if-no-files-found: error
+          path: public-benchmark/
       - uses: actions/upload-artifact@v4
         if: always() && steps.privacy_gate.outcome == 'success'
         with:

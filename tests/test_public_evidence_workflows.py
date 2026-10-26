@@ -17,10 +17,17 @@ def test_every_upload_is_gated_and_staging_only():
             block=re.split(r'\n  [a-zA-Z0-9_-]+:\n',block)[0]
             uploads+=1
             assert "if: always() && steps." in block and ".outcome == 'success'" in block
-            assert 'if-no-files-found: error' in block and 'path: public-evidence/' in block
+            assert 'if-no-files-found: error' in block
+            if 'path: public-benchmark/' in block:
+                assert path.name=='ci.yml'
+                assert "steps.benchmark_projection.outcome == 'success'" in block
+                assert 'name: windows-ui-benchmark' in block or 'name: linux-ui-benchmark' in block
+                assert '--expected-outcome "${{ steps.benchmark.outcome }}"' in text
+            else:
+                assert 'path: public-evidence/' in block
             assert block.count('path:')==1
         assert 'scripts/project_public_ci_evidence.py --validate public-evidence' in text
-    assert uploads==14
+    assert uploads==16
 
 def test_projection_commands_stop_on_first_failure():
     for path in (ROOT/'.github/workflows').glob('*.yml'):

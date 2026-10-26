@@ -26,7 +26,12 @@ class FakeConnection:
         return False
 
     def transaction(self):
-        return self
+        class Transaction:
+            def __enter__(self):
+                return None
+            def __exit__(self, *args):
+                return False
+        return Transaction()
 
     def execute(self, query):
         self.queries.append(query)

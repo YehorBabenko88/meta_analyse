@@ -14,7 +14,7 @@ def test_final_workflow_checks_exact_candidate_and_synthetic_bounds():
     assert s.index('libegl1') < s.index('pytest --noconftest')
     assert 'github.event.pull_request.head.sha || github.sha' in s
     assert 'pytest --noconftest' in s and '-p scripts.integration_synthetic_boundary' in s
-    assert '--minimum 1854' in s and 'scripts/record_ci_source.py' in s
+    assert '--minimum 1877' in s and 'scripts/record_ci_source.py' in s
     synthetic=s.split('  disposable-postgres18:',1)[0]
     for forbidden in ('services:','initdb','pg_ctl','run_readonly.py','--enable-public-network','collect-host.ps1','Add-Type'):
         assert forbidden not in synthetic

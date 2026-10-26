@@ -63,3 +63,6 @@ def test_full_failure_publication_requires_clean_tracked_source():
         assert s.count('id: source_clean')==count
         assert s.count("if: always() && steps.source_clean.outcome == 'success'")==count
         assert s.count('path: public-evidence/')==count
+
+    privacy=(ROOT/'.github/workflows/public-junit-privacy.yml').read_text().split('  offline:',1)[1]
+    assert BRANCH in privacy.split('strategy:',1)[0], 'mandatory privacy job must be enabled, not merely triggered'

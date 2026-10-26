@@ -5,7 +5,8 @@ from scripts.check_e2e_readiness_contract import classify
 def test_all_verified_sources_can_pass():
     assert classify(general_ci="success", synthetic_ci="success",
         frozen_object_present=True, postgres_attested=True,
-        full_e2e_witness=True) == "PASS"
+        full_e2e_witness=True, exact_source_bound=True,
+        unexpected_skips=0, artifact_inventory_verified=True) == "PASS"
 
 
 def test_queued_ci_is_blocked():
@@ -60,3 +61,22 @@ def test_unknown_ci_state_is_blocked():
     assert classify(general_ci="completed", synthetic_ci="success",
         frozen_object_present=True, postgres_attested=True,
         full_e2e_witness=True) == "BLOCKED"
+
+
+def test_missing_exact_source_binding_is_blocked():
+    assert classify(general_ci="success", synthetic_ci="success",
+        frozen_object_present=True, postgres_attested=True,
+        full_e2e_witness=True, artifact_inventory_verified=True) == "BLOCKED"
+
+
+def test_missing_artifact_inventory_is_blocked():
+    assert classify(general_ci="success", synthetic_ci="success",
+        frozen_object_present=True, postgres_attested=True,
+        full_e2e_witness=True, exact_source_bound=True) == "BLOCKED"
+
+
+def test_unexpected_skips_are_blocked():
+    assert classify(general_ci="success", synthetic_ci="success",
+        frozen_object_present=True, postgres_attested=True,
+        full_e2e_witness=True, exact_source_bound=True,
+        unexpected_skips=1, artifact_inventory_verified=True) == "BLOCKED"

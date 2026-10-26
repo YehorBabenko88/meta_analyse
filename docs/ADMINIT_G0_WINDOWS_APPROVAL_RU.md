@@ -53,3 +53,6 @@ Source/lifetime: требуются точный SHA/tree и collector identity 
 
 ## P0/P1/P2
 P0 подтверждённых новых обходов не выявлено на уровне source/blob сравнения. P1: физический PR52 G0 не выполнен; hosted ZIP/JUnit content не перепроверен этим аудитом; редкие агрегаты требуют privacy acceptance. P2: root cause Win3231/5 неизвестен; остаточный TOCTOU и source/runtime environment binding требуют физической оценки. **Final: G0 conditional operator-only; G1 NO-GO.**
+
+## Независимая повторная проверка CI (2026-10-26)
+На exact PR53 HEAD `047174046a5d9d32fa1b3dc4038cb34dc1845db3` workflow CI run 40300503050 при проверке имел Linux job IN_PROGRESS, Windows и archive-pinned-contract QUEUED. Это не PASS и не новая физическая приёмка. Изменение документа после этой проверки требует нового exact-head CI; исторические run conclusions не переносятся.

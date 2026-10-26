@@ -4,12 +4,13 @@ from scripts.check_ui_e2e_acceptance import classify_ui_e2e
 
 
 def sample():
-    return dict(status="PASS", reason="NONE", worker_stopped=True,
+    return dict(status="PASS", reason="NONE", instruments=20, publication_hz=10,
+                worker_stopped=True,
                 loop_closed=True, render_samples=10, render_fps=10.0,
                 render_p95_ms=2.0, snapshot_to_render_p95_ms=4.0,
                 heartbeat_p95_ms=12.0, process_cpu_percent_one_core=50.0,
                 close_event_ms=2.0, diagnostics=dict(async_errors=0, ui_errors=0,
-                    thread_violations=0, stamp_overflow=0))
+                    thread_violations=0, stamp_overflow=0, bridge_rows=20))
 
 
 def test_synthetic_pass_is_not_physical_e2e():
@@ -60,4 +61,20 @@ def test_invalid_delivery_or_shutdown_measurements_block(key, bad):
 def test_nonzero_ui_or_worker_fault_blocks(counter):
     value = sample()
     value["diagnostics"][counter] = 1
+    assert classify_ui_e2e(benchmark=value) == "BLOCKED"
+
+
+@pytest.mark.parametrize("key,bad", [
+    ("instruments", 1), ("instruments", None),
+    ("publication_hz", 0), ("publication_hz", 100),
+])
+def test_wrong_benchmark_workload_blocks(key, bad):
+    value = sample()
+    value[key] = bad
+    assert classify_ui_e2e(benchmark=value) == "BLOCKED"
+
+
+def test_missing_twenty_row_delivery_blocks():
+    value = sample()
+    value["diagnostics"]["bridge_rows"] = 19
     assert classify_ui_e2e(benchmark=value) == "BLOCKED"

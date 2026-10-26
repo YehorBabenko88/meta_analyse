@@ -34,7 +34,8 @@ def test_checkpoint_sql_does_not_resolve_control_functions_through_caller_search
 
 @pytest.mark.parametrize("name,value", [("PGOPTIONS", "-c search_path=public,pg_catalog"),
     ("PGHOSTADDR", "192.0.2.1"), ("PGPASSWORD", "private-fixture-value"),
-    ("PGSERVICE", "untrusted"), ("pgoptions", "-c search_path=public,pg_catalog")])
+    ("PGSERVICE", "untrusted"), ("PGROOT", "synthetic"),
+    ("PGBIN", "synthetic"), ("PGDATA", "synthetic"), ("PGUSER", "synthetic"), ("pgoptions", "-c search_path=public,pg_catalog")])
 def test_libpq_environment_refuses_before_optin_store_connect(monkeypatch, name, value):
     monkeypatch.setenv(name, value)
     monkeypatch.setattr("meta_analyse.storage.psycopg.connect", lambda *a, **kw: pytest.fail("UNTRUSTED_ENV_CONNECTED"))

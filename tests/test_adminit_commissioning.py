@@ -2,6 +2,7 @@ import copy
 import sys
 from pathlib import Path
 import pytest
+from pg_synthetic_environment import isolated_pg_environment
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'commissioning'))
 import host_identity as h
 

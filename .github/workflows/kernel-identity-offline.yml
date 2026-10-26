@@ -1,7 +1,7 @@
 name: Kernel identity offline
 on:
   push:
-    branches: ['parallel/adminit-kernel-identity-evidence', 'parallel/adminit-identity-integration-20261021', 'parallel/adminit-identity-acceptance-fix-20261022', 'parallel/adminit-pr20-security-fix-20261022', 'parallel/adminit-pr21-evidence-schema-20261022', 'parallel/adminit-pr22-boundary-review-20261022', 'parallel/adminit-pr23-output-transaction-20261023', 'integration/final-ci-g0-20261026', 'fix/ui-benchmark-render-samples-20261026']
+    branches: ['parallel/adminit-kernel-identity-evidence', 'parallel/adminit-identity-integration-20261021', 'parallel/adminit-identity-acceptance-fix-20261022', 'parallel/adminit-pr20-security-fix-20261022', 'parallel/adminit-pr21-evidence-schema-20261022', 'parallel/adminit-pr22-boundary-review-20261022', 'parallel/adminit-pr23-output-transaction-20261023', 'integration/final-ci-g0-20261026', 'fix/ui-benchmark-render-samples-20261026', 'audit/pr60-g0-preflight-20261026']
   pull_request:
     paths:
       - 'commissioning/process_identity.py'

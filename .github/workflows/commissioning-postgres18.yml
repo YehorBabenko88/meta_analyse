@@ -1,7 +1,7 @@
 name: Commissioning PostgreSQL18
 on:
   push:
-    branches: ['audit/**', 'integration/final-ci-g0-20261026', 'fix/ui-benchmark-render-samples-20261026']
+    branches: ['audit/**', 'integration/final-ci-g0-20261026', 'fix/ui-benchmark-render-samples-20261026', 'audit/pr60-g0-preflight-20261026']
 permissions:
   contents: read
 jobs:

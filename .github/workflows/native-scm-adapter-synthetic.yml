@@ -1,7 +1,7 @@
 name: Native SCM diagnostic adapter synthetic
 on:
   push:
-    branches: ['parallel/adminit-r0-r5-adapter-20261025', 'parallel/adminit-r0-r5-liveness-20261025', 'parallel/adminit-scm-correlation-20261025', 'integration/final-ci-g0-20261026', 'fix/ui-benchmark-render-samples-20261026']
+    branches: ['parallel/adminit-r0-r5-adapter-20261025', 'parallel/adminit-r0-r5-liveness-20261025', 'parallel/adminit-scm-correlation-20261025', 'integration/final-ci-g0-20261026', 'fix/ui-benchmark-render-samples-20261026', 'audit/pr60-g0-preflight-20261026']
   pull_request:
     paths:
       - 'commissioning/native_scm_diagnostic.py'

@@ -2,3 +2,6 @@
 docs/commissioning_evidence_v3/** -text
 
 docs/ls5_commissioning_evidence/** -text
+
+# Frozen PR39 oracle must retain canonical Git blob bytes.
+tests/fixtures/pr39_process_identity.py.txt -text

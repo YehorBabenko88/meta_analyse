@@ -59,6 +59,9 @@ MUTATIONS=[
 ]
 
 
+CURRENT_TARGETS = {'contract-account': ("REGISTRY_ACCOUNT_MATCH=str(config.get('account','')).casefold()==account,\n        SCM_ACCOUNT_MATCH=str(svc.get('start_name','')).casefold()==account", 'REGISTRY_ACCOUNT_MATCH=True,\n        SCM_ACCOUNT_MATCH=True')}
+
+
 def load(source):
     m=types.ModuleType('pure_security_mutant');exec(compile(source,'<pure-security-mutant>','exec'),m.__dict__);return m
 
@@ -82,6 +85,8 @@ def main():
     source=args.source.read_text(encoding='utf-8-sig');baseline=load(source);controls(baseline)
     results=[];gaps=[]
     for tag,old,new in MUTATIONS:
+        if source.count(old)==0 and tag in CURRENT_TARGETS:
+            old,new=CURRENT_TARGETS[tag]
         names=['SamSs'] if tag=='integrated-empty-string' else list(CONTRACTS)
         for name in names:
             row,e=altered(name,tag)

@@ -62,19 +62,10 @@ def no_unmocked_external_http(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def identity_synthetic_tripwires(monkeypatch):
-    if os.environ.get('META_ANALYSE_IDENTITY_SYNTHETIC_ONLY')!='1':return
-    import sys,subprocess
-    from pathlib import Path
-    import host_identity as identity
-    def blocked(*a,**k):raise AssertionError('SYNTHETIC_ONLY_BOUNDARY')
-    monkeypatch.setattr(identity,'dpapi',blocked)
-    monkeypatch.setattr(identity,'is_elevated',blocked)
-    monkeypatch.setattr(identity,'system_directory',blocked)
-    monkeypatch.setattr(psycopg,'connect',blocked)
-    original=subprocess.Popen
-    def popen(command,*a,**k):
-        executable=Path(command[0]).name.lower() if isinstance(command,(list,tuple)) and command else ''
-        if executable not in ('git','git.exe',Path(sys.executable).name.lower()):blocked()
-        return original(command,*a,**k)
-    monkeypatch.setattr(subprocess,'Popen',popen)
+def identity_synthetic_tripwires(monkeypatch,request):
+    if os.environ.get('META_ANALYSE_IDENTITY_SYNTHETIC_ONLY')!='1':
+        yield
+        return
+    from scripts.synthetic_boundary import boundary
+    with boundary(monkeypatch,root=request.node.name.split('[',1)[0]):
+        yield

@@ -55,9 +55,13 @@ jobs:
         run: |
           ./install.ps1 -Python (Get-Command python).Source -InstallRoot "$env:RUNNER_TEMP\installer target"
           ./install.ps1 -Python (Get-Command python).Source -InstallRoot "$env:RUNNER_TEMP\installer target"
+      - name: Verify tracked source before publication
+        id: source_clean
+        if: always()
+        run: git diff --exit-code HEAD
       - name: Project isolated public evidence
         id: privacy_gate
-        if: always()
+        if: always() && steps.source_clean.outcome == 'success'
         shell: pwsh
         run: |
           python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit diagnostic-tests.xml --junit "$env:RUNNER_TEMP/meta-analyse-ci/tests.xml" --junit-glob "$env:RUNNER_TEMP/meta-analyse-ci/repeat-lifecycle/*/tests.xml" --postgres-version "$env:RUNNER_TEMP/meta-analyse-pg18/provenance.json"
@@ -119,15 +123,23 @@ jobs:
           python -m pytest -q tests/test_archive_http_server.py tests/test_archive_resumable_faults.py
       - name: Linux regressions (preserve pytest failure through tee)
         shell: bash
+        env:
+          META_ANALYSE_CI_IDENTITY_SCOPE: full
+          META_ANALYSE_SYNTHETIC_IDENTITIES: ${{ runner.temp }}/full-identities.json
         run: |
           set -o pipefail
-          python -m pytest -q -W error::RuntimeWarning --junitxml=tests.xml | tee tests.log
+          python -m pytest -q -p scripts.ci_identity_manifest --ignore=tests/test_pg18_disposable_acceptance.py -W error::RuntimeWarning --junitxml=tests.xml | tee tests.log
+          python scripts/check_final_integration_junit.py "$(pwd)/tests.xml" "${{ runner.temp }}/full-identities.json"
       - name: Verify eleven PostgreSQL and five shutdown integration cases executed without skips
         run: python scripts/check_integration_postgres.py tests.xml --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
       - run: python scripts/benchmark_flow_ui.py --seconds 3 --output ui-performance.json
+      - name: Verify tracked source before publication
+        id: source_clean
+        if: always()
+        run: git diff --exit-code HEAD
       - name: Project isolated public evidence
         id: privacy_gate
-        if: always()
+        if: always() && steps.source_clean.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
@@ -156,9 +168,13 @@ jobs:
       - run: python -m pytest tests/test_archive_http_server.py tests/test_archive_resumable_faults.py -q --junitxml=archive-contract.xml
       - name: Reject archive skips and empty report
         run: python -c "import xml.etree.ElementTree as E; c=list(E.parse('archive-contract.xml').getroot().iter('testcase')); assert c and all(all(x.find(t) is None for t in ('skipped','error','failure')) for x in c)"
+      - name: Verify tracked source before publication
+        id: source_clean
+        if: always()
+        run: git diff --exit-code HEAD
       - name: Project isolated public evidence
         id: privacy_gate
-        if: always()
+        if: always() && steps.source_clean.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail

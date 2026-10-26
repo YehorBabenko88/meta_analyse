@@ -100,3 +100,16 @@ def test_attestation_result_none_fails_closed():
             pytest.fail("empty server identity yielded")
     assert connection.closed
     assert len(connection.queries) == 3
+
+
+@pytest.mark.parametrize("bad", [
+    (), ("meta_commission_test",),
+    ("meta_commission_test", "meta_commission_test", 180001,
+     "127.0.0.1", 55480, "12345678901234567890", True, "unexpected"),
+])
+def test_malformed_catalog_result_fails_closed(bad):
+    connection = FakeConnection(bad)
+    with pytest.raises(AttestationRefused, match="CLUSTER_IDENTITY_MISMATCH"):
+        with authorized_private_connection(lambda: connection, POLICY):
+            pytest.fail("malformed catalog result yielded")
+    assert connection.closed

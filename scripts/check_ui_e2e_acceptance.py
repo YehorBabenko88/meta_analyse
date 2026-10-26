@@ -19,7 +19,14 @@ def classify_ui_e2e(*, benchmark, public_feed_verified=False,
     if any(type(benchmark.get(key)) not in (int, float)
            or not math.isfinite(benchmark[key]) or benchmark[key] < 0 for key in metrics):
         return "BLOCKED"
-    if benchmark.get("render_samples", 0) < 1:
+    if type(benchmark.get("render_samples")) is not int or benchmark["render_samples"] < 1:
+        return "BLOCKED"
+    if benchmark["render_fps"] <= 0:
+        return "BLOCKED"
+    if type(benchmark.get("close_event_ms")) not in (int, float) or not math.isfinite(benchmark["close_event_ms"]) or benchmark["close_event_ms"] < 0:
+        return "BLOCKED"
+    diagnostics = benchmark.get("diagnostics")
+    if not isinstance(diagnostics, dict) or any(type(diagnostics.get(key)) is not int or diagnostics[key] != 0 for key in ("async_errors", "ui_errors", "thread_violations", "stamp_overflow")):
         return "BLOCKED"
     if any(value is not True for value in (
         public_feed_verified, postgres_commit_readback, ui_freshness_verified,

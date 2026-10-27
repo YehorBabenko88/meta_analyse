@@ -31,7 +31,7 @@ def verify(value=None, digest=None, read=reader):
 
 def test_actual_bytes_match_is_only_baseline_consistency():
     result=verify()
-    assert result['provenance']=='APPROVED_MANIFEST_BYTES_MATCH'
+    assert result['provenance']=='PINNED_MANIFEST_BYTES_MATCH'
     assert result['status']=='FAIL_CLOSED' and result['authorization']=='NONE'
     assert result['readiness']=='BLOCKED'
     assert result['loader_scope']=='INDEPENDENT_REVIEW_REQUIRED'
@@ -173,7 +173,7 @@ def test_only_approved_catalog_manifest_can_allow_servicing_links(monkeypatch):
         calls.append(allow_servicing_links);return reader(path)
     monkeypatch.setattr(gate,'hash_regular_file',hashed)
     raw=json.dumps(v).encode()
-    assert gate.verify_manifest(raw,hashlib.sha256(raw).hexdigest())['provenance']=='APPROVED_MANIFEST_BYTES_MATCH'
+    assert gate.verify_manifest(raw,hashlib.sha256(raw).hexdigest())['provenance']=='PINNED_MANIFEST_BYTES_MATCH'
     assert calls==[True]+[False]*(len(ROLES)-1)
 
 @pytest.mark.parametrize('changing',[False,True],ids=['stable','handle_mutation'])

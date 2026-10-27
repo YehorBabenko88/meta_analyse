@@ -80,8 +80,9 @@ def hash_regular_file(path,*,allow_servicing_links=False):
         require(stat.S_ISDIR(info.st_mode) and not getattr(info,'st_file_attributes',0)&0x400)
     return digest.hexdigest()
 
-def verify_manifest(raw,approved_digest,*,read=None):
-    result=base();result.update(provenance='UNAVAILABLE',loader_scope='INDEPENDENT_REVIEW_REQUIRED')
+def verify_manifest(raw,approved_digest,*,read=None,authority_raw=None,approved_authority_digest=None):
+    result=base();result.update(provenance='UNAVAILABLE',loader_scope='INDEPENDENT_REVIEW_REQUIRED',
+        authority_reference='NOT_BOUND',approval_authenticity='EXTERNAL_REVIEW_REQUIRED')
     try:
         require(type(raw) is bytes and hex64(approved_digest) and
                 hmac.compare_digest(hashlib.sha256(raw).hexdigest(),approved_digest))
@@ -101,11 +102,19 @@ def verify_manifest(raw,approved_digest,*,read=None):
             path=ntpath.normcase(item['path']);require(path not in paths)
             paths.add(path);roles.add(item['role'])
         require(ROLES<=roles)
+        reference=False
+        if authority_raw is not None or approved_authority_digest is not None:
+            require(type(authority_raw) is bytes and 0<len(authority_raw)<=1024*1024)
+            require(hex64(approved_authority_digest) and
+                    hmac.compare_digest(hashlib.sha256(authority_raw).hexdigest(),approved_authority_digest))
+            require(all(item['authority_sha256']==approved_authority_digest for item in files))
+            reference=True
         for item in files:
             actual=(read(item['path']) if read is not None else
                     hash_regular_file(item['path'],allow_servicing_links=item['basis']=='CATALOG'))
             require(hex64(actual) and hmac.compare_digest(actual,item['sha256']))
-        result['provenance']='APPROVED_MANIFEST_BYTES_MATCH'
+        result['provenance']='PINNED_MANIFEST_BYTES_MATCH'
+        if reference:result['authority_reference']='PINNED_PACKET_MATCH'
     except Exception:
         pass  # No input strings, exception details, paths or hashes in public projection.
     return result
@@ -155,13 +164,22 @@ def main(argv=None):
     parser=PrivateParser(description=__doc__)
     parser.add_argument('--manifest',required=True)
     parser.add_argument('--approved-manifest-sha256',required=True)
+    parser.add_argument('--authority-packet')
+    parser.add_argument('--approved-authority-sha256')
     parser.add_argument('--current-token',action='store_true',help='Explicit Windows read-only API call; no other subjects')
     try:
         args=parser.parse_args(argv)
         with open(args.manifest,'rb') as stream:raw=stream.read(1024*1024+1)
-        result=verify_manifest(raw,args.approved_manifest_sha256)
-        if args.current_token and result['provenance']=='APPROVED_MANIFEST_BYTES_MATCH':
+        authority_raw=None
+        if args.authority_packet:
+            with open(args.authority_packet,'rb') as stream:authority_raw=stream.read(1024*1024+1)
+        result=verify_manifest(raw,args.approved_manifest_sha256,authority_raw=authority_raw,
+                               approved_authority_digest=args.approved_authority_sha256)
+        if (args.current_token and result['provenance']=='PINNED_MANIFEST_BYTES_MATCH' and
+            result['authority_reference']=='PINNED_PACKET_MATCH'):
             result.update(collect_access())
+        elif args.current_token:
+            result.update(project_access(None))
     except Exception:
         result=base();result['provenance']='UNAVAILABLE'
     print(json.dumps(result,sort_keys=True,allow_nan=False))

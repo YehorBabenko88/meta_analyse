@@ -1,9 +1,9 @@
 name: G0 access and provenance synthetic
 on:
   push:
-    branches: [audit/pr60-effective-access-20261027]
+    branches: [audit/pr60-effective-access-20261027, audit/pr66-adversarial-20261027]
   pull_request:
-    branches: [audit/pr60-g0-preflight-20261026]
+    branches: [audit/pr60-g0-preflight-20261026, audit/pr60-effective-access-20261027]
 permissions:
   contents: read
 concurrency:
@@ -29,11 +29,11 @@ jobs:
       - run: python scripts/record_ci_source.py
       - run: python -m pip install -c requirements.lock pytest
       - name: Offline contract and fake WinAPI only
-        run: python -m pytest --noconftest -p scripts.ci_identity_manifest tests/test_g0_access_review.py tests/test_g0_windows_access_synthetic.py tests/test_g0_preflight_contract.py tests/test_public_evidence_workflows.py -q --junitxml=access-tests.xml
+        run: python -m pytest --noconftest -p scripts.ci_identity_manifest tests/test_g0_access_review.py tests/test_g0_windows_access_synthetic.py tests/test_pr66_provenance_adversarial.py tests/test_g0_preflight_contract.py tests/test_public_evidence_workflows.py -q --junitxml=access-tests.xml
       - name: Exact source-collected identities
         run: python scripts/check_final_integration_junit.py access-tests.xml access-identities.json
       - name: No missing tests, failures or skips
-        run: python scripts/check_integration_junit.py access-tests.xml --minimum 208 --require-exact test_current_token_rights_never_imply_other_subject_or_namespace_safety --require-exact test_unapproved_digest_cannot_trigger_file_reads --require-exact test_malformed_cli_does_not_echo_private_arguments --require-exact test_every_upload_is_gated_and_staging_only
+        run: python scripts/check_integration_junit.py access-tests.xml --minimum 252 --require-exact test_current_token_rights_never_imply_other_subject_or_namespace_safety --require-exact test_unapproved_digest_cannot_trigger_file_reads --require-exact test_malformed_cli_does_not_echo_private_arguments --require-exact test_every_upload_is_gated_and_staging_only --require-exact test_current_token_cli_without_authority_cannot_start_collection --require-exact test_shipped_template_is_not_an_approved_baseline
       - name: Tracked source unchanged
         id: clean
         if: always()

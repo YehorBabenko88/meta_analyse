@@ -1,0 +1,12 @@
+{
+  "template_status": "DRAFT_NOT_APPROVED",
+  "manifest_sha256": "REQUIRES_EXTERNAL_APPROVAL",
+  "authority_packet_sha256": "REQUIRES_AUTHENTICATED_EXTERNAL_AUTHORITY",
+  "control_sha": "REQUIRES_FINAL_REVIEWED_CONTROL_SHA",
+  "control_tree": "REQUIRES_FINAL_REVIEWED_CONTROL_TREE",
+  "production_sha": "0cc8c44d57514de6808fbbb6fdc7b9d9fd20ce30",
+  "production_tree": "a85846d46df6e95f3d757e25399d991ee1db872b",
+  "scope": "READ_ONLY_REVIEW_ONLY_NO_LAUNCH_AUTHORIZATION",
+  "independent_authentication_method": "NOT_PROVIDED",
+  "validity": "NOT_APPROVED"
+}

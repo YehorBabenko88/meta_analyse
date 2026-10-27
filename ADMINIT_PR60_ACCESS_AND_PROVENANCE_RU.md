@@ -1,9 +1,9 @@
 # PR60: read-only effective-access / independent provenance
 
 Production target: PR60 HEAD `0cc8c44d57514de6808fbbb6fdc7b9d9fd20ce30`,
-tree `a85846d46df6e95f3d757e25399d991ee1db872b`. Control base: PR64
-`d45d9a0d21aa99cffb820c1247d45551b747c289`, tree
-`ccad14fd76ba4d2a0d1f44fb3c5856f025e66eb4`. Exact new control HEAD/tree
+tree `a85846d46df6e95f3d757e25399d991ee1db872b`. Control base: immutable PR66
+`419d336480d9ec3b40a8bc96a402874f434cc3c5`, tree
+`8df68ea118c45f9aa7f8f85770e0196f98d646c0`. Exact new control HEAD/tree
 фиксируются в отдельном review receipt / PR, не подменяют production target.
 
 **Физически NOT RUN. G0 FAIL_CLOSED, authorization NONE, G1 NO-GO.**
@@ -18,13 +18,20 @@ PowerShell/netsh/Git/compiler/PG/MetaScalp или другие дочерние 
 1. По умолчанию сверяет фактические байты явно перечисленных файлов с externally
    approved manifest. Native DLL не загружаются этим режимом явно; сам Python
    и его стандартная библиотека уже используют свой runtime/OS APIs.
-2. Только `--current-token`, только после совпадения всех manifest files:
+2. Только `--current-token`, только после совпадения всех manifest files и
+   separately pinned authority reference packet:
    `scripts/g0_windows_access.py` читает security descriptor `C:\` и
    `C:\ProgramData` через held handles и выполняет Windows `AccessCheck`.
 
 Запросы: CreateDirectories, CreateFiles, DeleteChild, DELETE, WRITE_DAC,
 WRITE_OWNER, WRITE_ATTRIBUTES. Реальный process token дублируется с
-SecurityImpersonation; существующая thread impersonation отвергается.
+SecurityImpersonation; thread impersonation отвергается на начальной и финальной
+границе. Это не доказывает отсутствие transient impersonation между ними или
+hostile writers. Fixed-width ABI sizeof/offsetof проверяется до DLL load;
+native runtime qualification не заявляется. Primary/duplicate token type,
+level, authentication и identity проверяются раздельно. Противоречивые API
+status/mask/privilege replies отвергаются. Ошибка CloseHandle/LocalFree делает
+sample UNAVAILABLE; остальные owned resources всё равно получают cleanup attempt.
 Нет AdjustTokenPrivileges, arbitrary SID/group simulation, logon/S4U/AD lookup
 или тестового create/delete. Обе фазы и обе цели должны иметь один TokenId /
 AuthenticationId / ModifiedId; file identity, descriptor digest и rights
@@ -108,7 +115,11 @@ hardlinks допускаются ТОЛЬКО для записи CATALOG из �
 только из-за поля CATALOG. File hash одинаков для всех hardlink names; path-based
 проверка не доказывает отсутствие concurrent writer или полный alias census.
 
-`APPROVED_MANIFEST_BYTES_MATCH` означает только byte match с переданным pin.
+`PINNED_MANIFEST_BYTES_MATCH` означает только byte match с переданным pin.
+Без отдельного authority packet: `authority_reference: NOT_BOUND`. Packet bytes
+должны совпасть с отдельным approved pin и каждым authority_sha256 в manifest:
+только тогда `PINNED_PACKET_MATCH`. Это reference binding, не аутентификация
+approval: `approval_authenticity: EXTERNAL_REVIEW_REQUIRED` сохраняется всегда.
 Здесь нет независимой проверки signing authority, catalog membership, revocation,
 actual loaded module set или полноты manifest. Signature verification выполняет
 upstream approved reviewer. `loader_scope: INDEPENDENT_REVIEW_REQUIRED`, общий
@@ -132,6 +143,8 @@ $ApprovedPython = 'C:\REPLACE_WITH_EXTERNALLY_APPROVED_PYTHON\python.exe'
 $ControlRepo = 'C:\REPLACE_WITH_REVIEWED_CONTROL_CHECKOUT'
 $ApprovedManifest = 'C:\REPLACE_WITH_PRIVATE_APPROVED_MANIFEST.json'
 $ApprovedManifestSHA256 = 'REPLACE_WITH_EXTERNAL_APPROVED_64HEX'
+$AuthorityPacket = 'C:\REPLACE_WITH_PRIVATE_EXTERNAL_AUTHORITY_PACKET'
+$ApprovedAuthoritySHA256 = 'REPLACE_WITH_SEPARATE_EXTERNAL_APPROVED_64HEX'
 $ControlExpectedSHA = 'REPLACE_WITH_REVIEWED_CONTROL_40HEX'
 $ControlExpectedTree = 'REPLACE_WITH_REVIEWED_CONTROL_TREE_40HEX'
 # Exact source/tool provenance must already be independently checked before Python.
@@ -156,7 +169,8 @@ Only after separate positive provenance review AND explicit read-only access
 decision, one additional operator-invoked command (no observer):
 
 ```powershell
-$AccessStdout = @(& $ApprovedPython -B -E -s -S (Join-Path $ControlRepo 'scripts\g0_access_review.py') --manifest $ApprovedManifest --approved-manifest-sha256 $ApprovedManifestSHA256 --current-token 2>$null)
+if ($ApprovedAuthoritySHA256 -cnotmatch '^[0-9a-f]{64}$') { throw 'BLOCKED_AUTHORITY_INPUT' }
+$AccessStdout = @(& $ApprovedPython -B -E -s -S (Join-Path $ControlRepo 'scripts\g0_access_review.py') --manifest $ApprovedManifest --approved-manifest-sha256 $ApprovedManifestSHA256 --authority-packet $AuthorityPacket --approved-authority-sha256 $ApprovedAuthoritySHA256 --current-token 2>$null)
 $AccessExit = $LASTEXITCODE
 # STOP. No retry, directory creation, HTTP.sys/R0, enrollment or G1.
 ```

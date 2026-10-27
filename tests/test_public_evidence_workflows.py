@@ -27,7 +27,7 @@ def test_every_upload_is_gated_and_staging_only():
                 assert 'path: public-evidence/' in block
             assert block.count('path:')==1
         assert 'scripts/project_public_ci_evidence.py --validate public-evidence' in text
-    assert uploads==16
+    assert uploads==17  # Original sixteen plus the isolated G0 access control job.
 
 def test_projection_commands_stop_on_first_failure():
     for path in (ROOT/'.github/workflows').glob('*.yml'):

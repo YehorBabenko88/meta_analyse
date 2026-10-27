@@ -47,8 +47,9 @@ class FakeWindows:
         if name=='GetTokenInformation':
             if self.fault==name:return False
             stats=args[2]._obj
-            stats.token.low=1;stats.authentication.low=2;stats.modified.low=3
             is_duplicate=getattr(args[0],'value',args[0])==self.duplicate
+            stats.token.low=4 if is_duplicate else 1
+            stats.authentication.low=2;stats.modified.low=7 if is_duplicate else 3
             stats.type=2 if is_duplicate else 1;stats.level=2
             if self.fault=='primary_type' and not is_duplicate:stats.type=2
             if self.fault=='duplicate_type' and is_duplicate:stats.type=1
@@ -107,6 +108,10 @@ def test_windows_adapter_uses_real_token_shape_and_read_only_fixed_handles(monke
     assert sorted(api.handles)==sorted(api.closed)
     assert sum(name=='AccessCheck' for name,_ in api.calls)==14
     assert next(args for name,args in api.calls if name=='DuplicateToken')[1]==2
+    stats=[args[2]._obj for name,args in api.calls if name=='GetTokenInformation']
+    assert {s.token.low for s in stats}=={1,4}
+    assert {s.modified.low for s in stats}=={3,7}
+    assert pair[0]['token_identity']==[1,0,2,0,3,0]
 
 @pytest.mark.parametrize('fault',['impersonation','thread_error','OpenProcessToken','DuplicateToken',
     'CreateFileW','GetFileInformationByHandle','reparse','GetSecurityInfo',

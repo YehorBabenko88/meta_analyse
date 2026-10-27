@@ -12,7 +12,7 @@ from scripts import g0_access_review as review
 class Contracts(unittest.TestCase):
  def test_authority_field_is_not_verified_by_current_manifest_gate(self):
   roles=sorted(review.ROLES)
-  files=[dict(role=role,path='C:\\\\approved\\\\'+role+'.bin',sha256='a'*64,authority_sha256='b'*64,basis='SIGNED_DISTRIBUTION') for role in roles]
+  files=[dict(role=role,path='C:\\approved\\'+role+'.bin',sha256='a'*64,authority_sha256='b'*64,basis='SIGNED_DISTRIBUTION') for role in roles]
   def assess():
    raw=json.dumps(dict(schema=1,target_sha=review.TARGET_SHA,target_tree=review.TARGET_TREE,files=files)).encode()
    return review.verify_manifest(raw,hashlib.sha256(raw).hexdigest(),read=lambda _: 'a'*64)

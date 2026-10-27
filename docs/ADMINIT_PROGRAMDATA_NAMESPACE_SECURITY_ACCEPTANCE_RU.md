@@ -36,3 +36,6 @@ Offline RED cases: attacker precreates directory with hostile owner/DACL; parent
 
 ## Safe next step
 Only read-only evidence collection after separate operator approval, using an independently pinned toolchain, with local private retention of full ACL/token/object identity. Public output should contain only fixed verdicts; no SID, paths, ACL dumps, usernames, hashes or exact object IDs. Stop on missing evidence, source mismatch, uncertain effective access, reparse/ancestor drift, existing child, unexpected privileges, or any request to change ACL/services/Defender/Norton. No private namespace creation until independent P0 closure and explicit separate authorization.
+
+## Follow-up GitHub verification
+PR60 remains at exact HEAD `0cc8c44d57514de6808fbbb6fdc7b9d9fd20ce30` with five completed SUCCESS workflow conclusions. PR65 initial HEAD `f0b56cad44001dd73dcbfbb95968f3fe2e4dfdf2` had zero discoverable associated workflow runs when checked; this is **NOT_RUN/UNKNOWN**, not PASS. Documentation changes do not establish effective ACL, file-object identity or authorization. The private namespace remains NOT_AUTHORIZED.

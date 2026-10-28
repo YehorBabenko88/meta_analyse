@@ -21,6 +21,8 @@ class Runner:
         if self.fault=='timeout':raise subprocess.TimeoutExpired('PRIVATE',1,output=SECRET.encode())
         if self.fault=='exception':raise OSError(SECRET)
         if argv[0]==GIT:
+            if '--get-regexp' in argv:
+                return subprocess.CompletedProcess(argv,1,b'')
             output=SHA if argv[-1]=='HEAD' else TREE if argv[-1]=='HEAD^{tree}' else ''
             if self.fault=='wrong_sha' and argv[-1]=='HEAD':output='f'*40
             if self.fault=='dirty' and 'status' in argv:output=SECRET
@@ -122,3 +124,89 @@ def test_real_synthetic_checkout_and_child(monkeypatch,tmp_path):
         expected_tree=call('rev-parse','HEAD^{tree}'),repo=str(tmp_path),python=PYTHON,
         git=str(Path(git).resolve()),operator_approved=True)
     assert r['outcome']=='PASS_SMOKE_ONLY' and r['source_bound'] is True and r['attempts']==1
+
+@pytest.mark.parametrize('scope,macro,location,process',[
+    *[(s,m,'info',False) for s in ('system','global','local','worktree','gitdir','onbranch','hasconfig') for m in (False,True)],
+    ('local',False,'nested',False),('local',True,'nested',False),
+    ('local',True,'root',False),('local',True,'global',False),('local',True,'info',True)])
+def test_clean_status_filter_cannot_execute_during_s0(monkeypatch,tmp_path,macro,scope,location,process):
+    git=shutil.which('git');assert git
+    for key in list(os.environ):
+        if key.startswith('GIT_'):monkeypatch.delenv(key)
+    monkeypatch.setenv('GIT_CONFIG_NOSYSTEM','1');monkeypatch.setenv('GIT_CONFIG_GLOBAL',os.devnull)
+    repo=tmp_path/'repo';repo.mkdir();marker=tmp_path/'marker';script=tmp_path/'filter.py'
+    script.write_text('import pathlib,sys\npathlib.Path('+repr(str(marker))+').write_text("SYNTHETIC")\nsys.stdout.buffer.write(sys.stdin.buffer.read())\n')
+    def call(*args):
+        return subprocess.check_output([git,'-c','core.hooksPath='+os.devnull,'-c','commit.gpgsign=false',
+            '-C',str(repo),*args],stderr=subprocess.DEVNULL).decode().strip()
+    call('init','-q');call('config','user.name','Synthetic');call('config','user.email','synthetic@example.invalid')
+    cmd='"'+PYTHON.replace('\\','/')+'" -I -S -B "'+str(script).replace('\\','/')+'"'
+    include=tmp_path/'include.cfg';include.write_text('[filter "lfs"]\n\tclean = '+json.dumps(cmd)+'\n')
+    if scope=='system':
+        monkeypatch.delenv('GIT_CONFIG_NOSYSTEM');monkeypatch.setenv('GIT_CONFIG_SYSTEM',str(include))
+    elif scope=='global':monkeypatch.setenv('GIT_CONFIG_GLOBAL',str(include))
+    elif scope=='local':call('config','include.path',str(include))
+    elif scope=='worktree':
+        call('config','extensions.worktreeConfig','true');call('config','--worktree','include.path',str(include))
+    elif scope=='gitdir':call('config','includeIf.gitdir/i:'+str(repo).replace('\\','/')+'/.git.path',str(include))
+    elif scope=='onbranch':
+        branch=call('branch','--show-current');call('config','includeIf.onbranch:'+branch+'.path',str(include))
+    else:
+        call('config','remote.origin.url','https://example.invalid/synthetic')
+        call('config','includeIf.hasconfig:remote.*.url:https://example.invalid/**.path',str(include))
+    assert call('config','--includes','--get','filter.lfs.clean')==cmd
+    attrs='[attr]s0macro filter=lfs\nsource.txt s0macro\n' if macro else 'source.txt filter=lfs\n'
+    if location=='info':(repo/'.git/info/attributes').write_text(attrs)
+    elif location=='root':(repo/'.gitattributes').write_text(attrs)
+    elif location=='global':
+        attribute_file=tmp_path/'global-attributes';attribute_file.write_text(attrs)
+        call('config','core.attributesFile',str(attribute_file))
+    else:
+        (repo/'nested').mkdir()
+        if macro:(repo/'.gitattributes').write_text('[attr]s0macro filter=lfs\n')
+        (repo/'nested/.gitattributes').write_text('source.txt s0macro\n' if macro else 'source.txt filter=lfs\n')
+    file=repo/('nested/source.txt' if location=='nested' else 'source.txt')
+    file.write_text('synthetic unchanged content\n')
+    call('add','.');call('commit','-qm','synthetic')
+    assert marker.exists();marker.unlink() # own exact synthetic marker only
+    if process:
+        process_script=tmp_path/'process.py'
+        process_script.write_text('import pathlib,sys\npathlib.Path('+repr(str(marker))+').write_text("SYNTHETIC_PROCESS")\nsys.exit(1)\n')
+        command='"'+PYTHON.replace('\\','/')+'" -I -S -B "'+str(process_script).replace('\\','/')+'"'
+        with include.open('a') as stream:stream.write('\tprocess = '+json.dumps(command)+'\n\trequired = true\n')
+    old=file.stat();os.utime(file,ns=(old.st_atime_ns,old.st_mtime_ns+2000000000))
+    r=smoke.run_smoke(stage='S0',expected_sha=call('rev-parse','HEAD'),expected_tree=call('rev-parse','HEAD^{tree}'),
+        repo=str(repo),python=PYTHON,git=str(Path(git).resolve()),operator_approved=True)
+    assert not marker.exists(), 'S0 invoked an external filter despite isolated child contract'
+    assert r['outcome']=='PASS_SMOKE_ONLY'
+
+@pytest.mark.parametrize('code,raw',[(2,b''),(0,b'filter.bad=key.clean\0'),(0,b'filter.lfs.clean'),
+    (1,b'PRIVATE_TOKEN_HOST_PATH'),(0,b'filter.lfs.process\0'*500)],
+    ids=['query_error','bad_driver','truncated','unexpected_exit','oversize'])
+def test_incomplete_or_unsafe_filter_query_blocks_before_status_or_python(code,raw):
+    class BadQuery(Runner):
+        def __call__(self,argv,**kw):
+            if '--get-regexp' in argv:
+                self.calls.append(argv);return subprocess.CompletedProcess(argv,code,raw)
+            return super().__call__(argv,**kw)
+    runner=BadQuery();r=execute(runner,operator_approved=True)
+    assert r['outcome']=='BLOCKED' and not any('status' in c or c[0]==PYTHON for c in runner.calls)
+    assert SECRET not in json.dumps(r)
+
+def test_configured_lfs_drivers_are_disabled_not_rejected_merely_for_presence():
+    class Lfs(Runner):
+        def __call__(self,argv,**kw):
+            if '--get-regexp' in argv:
+                self.calls.append(argv);return subprocess.CompletedProcess(argv,0,
+                    b'filter.lfs.clean\0filter.lfs.smudge\0filter.lfs.process\0filter.lfs.required\0')
+            if 'status' in argv:
+                assert all('filter.lfs.'+setting+'='+value in argv for setting,value in
+                    [('clean',''),('smudge',''),('process',''),('required','false')])
+            return super().__call__(argv,**kw)
+    assert execute(Lfs(),operator_approved=True)['outcome']=='PASS_SMOKE_ONLY'
+
+def test_config_query_only_file_override_blocks_before_any_command(monkeypatch):
+    monkeypatch.setenv('GIT_CONFIG','SYNTHETIC_PRIVATE_CONFIG')
+    runner=Runner();r=execute(runner,operator_approved=True)
+    assert r['outcome']=='BLOCKED' and runner.calls==[]
+    assert 'SYNTHETIC_PRIVATE_CONFIG' not in json.dumps(r)

@@ -1,5 +1,7 @@
 """One-shot S0 import smoke. No stage chaining, authorization or baseline creation."""
 import argparse
+import hashlib
+import stat
 import json
 import os
 from pathlib import Path
@@ -41,8 +43,9 @@ def run_smoke(*,stage,expected_sha,expected_tree,repo,python,git,operator_approv
     try:
         if stage!='S0' or operator_approved is not True or not all(hex40(v) for v in (expected_sha,expected_tree)):
             return r
-        # GIT_CONFIG can redirect `git config` alone, unlike ordinary commands.
-        if any(k.casefold()=='git_config' for k in os.environ):return r
+        # Inherited Git overrides may redirect repository/config or persist trace data.
+        if any(k.upper().startswith('GIT_') and k.upper() not in
+               {'GIT_CONFIG_SYSTEM','GIT_CONFIG_GLOBAL','GIT_CONFIG_NOSYSTEM'} for k in os.environ):return r
         if not all(type(p) is str and Path(p).is_absolute() for p in (repo,python,git)):
             return r
         def call(argv,limit):
@@ -52,14 +55,13 @@ def run_smoke(*,stage,expected_sha,expected_tree,repo,python,git,operator_approv
             if type(value.returncode) is not int or not -(2**31)<=value.returncode<2**32:
                 raise ValueError()
             if argv[0]==python:r['child_exit_code']=value.returncode
-            if type(value.stdout) is not bytes or len(value.stdout)>4096:raise ValueError()
+            if type(value.stdout) is not bytes or len(value.stdout)>(4*1024*1024 if 'ls-tree' in argv or 'ls-files' in argv else 4096):raise ValueError()
             if clock()>deadline:raise TimeoutError()
             return value
-        prefix=[git,'--no-pager','--no-optional-locks','-c','core.fsmonitor=false','-c','core.hooksPath='+os.devnull,
-                '-C',repo]
+        prefix=[git,'--no-pager','--no-lazy-fetch','--no-replace-objects','--no-optional-locks','-c','core.fsmonitor=false','-c','core.hooksPath='+os.devnull,
+                '--work-tree='+repo,'-C',repo]
         checks=((['rev-parse','HEAD'],expected_sha),
-                              (['rev-parse','HEAD^{tree}'],expected_tree),
-                              (['status','--porcelain=v1','--untracked-files=all'],''))
+                              (['rev-parse','HEAD^{tree}'],expected_tree))
         def bound():
             # Read effective active includes/scopes, never filter command values.
             filters=call(prefix+['config','--includes','--null','--name-only','--get-regexp',
@@ -82,6 +84,43 @@ def run_smoke(*,stage,expected_sha,expected_tree,repo,python,git,operator_approv
             for args,expected in checks:
                 value=call(prefix+overrides+args,2)
                 if value.returncode!=0 or value.stdout.decode('ascii').strip()!=expected:return False
+            # Do not ask status/diff to convert worktree data: those execute filters.
+            tree=call(prefix+['ls-tree','-r','-z','--full-tree',expected_tree],2)
+            index=call(prefix+['ls-files','--stage','-z'],2)
+            others=call(prefix+['ls-files','--others','--exclude-standard','-z'],2)
+            if any(v.returncode!=0 for v in (tree,index,others)) or others.stdout:return False
+            def entries(raw,tree_format):
+                if not raw or not raw.endswith(b'\0'):raise ValueError()
+                result={};folded=set()
+                for row in raw[:-1].split(b'\0'):
+                    head,name=row.split(b'\t',1);mode,second,third=head.split(b' ')
+                    oid=third if tree_format else second
+                    if (mode not in (b'100644',b'100755') or
+                        (second!=b'blob' if tree_format else third!=b'0') or
+                        not re.fullmatch(b'[0-9a-f]{40}',oid)):raise ValueError()
+                    name=name.decode('utf-8');parts=name.split('/')
+                    if any(part in ('','.','..') or any(c in part for c in '\\:') for part in parts):raise ValueError()
+                    if name.casefold() in folded:raise ValueError()
+                    folded.add(name.casefold());result[name]=(mode,oid.decode('ascii'))
+                return result
+            files=entries(tree.stdout,True)
+            if files!=entries(index.stdout,False):return False
+            total=0;root=Path(repo)
+            root_stat=root.lstat()
+            if root.is_symlink() or getattr(root_stat,'st_file_attributes',0)&0x400:return False
+            for name,(_mode,oid) in files.items():
+                if clock()>deadline:raise TimeoutError()
+                path=root
+                for part in name.split('/'):
+                    path=path/part;st=path.lstat()
+                    if stat.S_ISLNK(st.st_mode) or getattr(st,'st_file_attributes',0)&0x400:return False
+                if not stat.S_ISREG(st.st_mode) or st.st_nlink!=1:return False
+                total+=st.st_size
+                if st.st_size>16*1024*1024 or total>128*1024*1024:return False
+                with path.open('rb') as stream:data=stream.read(16*1024*1024+1)
+                if len(data)!=st.st_size or len(data)>16*1024*1024:return False
+                digest=hashlib.sha1(b'blob '+str(len(data)).encode('ascii')+b'\0'+data).hexdigest()
+                if digest!=oid:return False
             return True
         if not bound():r['reason']='SOURCE_UNAVAILABLE';return r
         r['attempts']=1;r['outcome']='FAIL';r['exit_code']=1

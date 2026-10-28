@@ -1,7 +1,6 @@
 """Offline, synthetic-only S0 command contract. Does not launch Python on ADMINIT."""
 import json
 import re
-import sys
 
 FLAGS=('-B','-E','-s','-S')
 def check(argv):
@@ -11,6 +10,8 @@ def check(argv):
     if not re.fullmatch(r'[A-Za-z]:\\(?:[^\\/:*?"<>|]+\\)+python(?:3(?:\.12)?)?\.exe',executable,re.I):
         return 'BLOCKED'
     if tuple(flags)!=FLAGS:return 'BLOCKED'
+    if executable.casefold().startswith(('c:\\windows\\','c:\\programdata\\')):
+        return 'BLOCKED'
     return 'COMMAND_SHAPE_ONLY'
 
 def main():

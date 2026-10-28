@@ -1,5 +1,7 @@
 """Synthetic harness boundaries; physical stages never execute here."""
 import json
+import hashlib
+import re
 import os
 import shutil
 import subprocess
@@ -14,6 +16,11 @@ ROOT=str(Path.cwd().resolve());PYTHON=str(Path(sys.executable).resolve())
 GIT=str((Path.cwd()/'synthetic-git.exe').resolve())
 GOOD=dict(schema=1,isolated=True,no_site=True,bytecode_disabled=True,python312=True,bits64=True,imports_ok=True)
 
+@pytest.fixture(autouse=True)
+def isolated_git_environment(monkeypatch):
+    for key in list(os.environ):
+        if key.upper().startswith('GIT_'):monkeypatch.delenv(key)
+
 class Runner:
     def __init__(self,fault=None):self.calls=[];self.fault=fault
     def __call__(self,argv,**kw):
@@ -23,6 +30,13 @@ class Runner:
         if argv[0]==GIT:
             if '--get-regexp' in argv:
                 return subprocess.CompletedProcess(argv,1,b'')
+            if 'ls-tree' in argv or ('ls-files' in argv and '--stage' in argv):
+                data=(Path(ROOT)/'scripts/local_smoke.py').read_bytes()
+                oid=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest().encode()
+                raw=b'100644 '+(b'blob '+oid if 'ls-tree' in argv else oid+b' 0')+b'\tscripts/local_smoke.py\0'
+                return subprocess.CompletedProcess(argv,0,raw)
+            if 'ls-files' in argv:
+                return subprocess.CompletedProcess(argv,0,SECRET.encode() if self.fault=='dirty' else b'')
             output=SHA if argv[-1]=='HEAD' else TREE if argv[-1]=='HEAD^{tree}' else ''
             if self.fault=='wrong_sha' and argv[-1]=='HEAD':output='f'*40
             if self.fault=='dirty' and 'status' in argv:output=SECRET
@@ -117,7 +131,7 @@ def test_real_synthetic_checkout_and_child(monkeypatch,tmp_path):
     def call(*args):
         return subprocess.check_output([git,'-c','core.hooksPath='+os.devnull,
             '-c','commit.gpgsign=false','-C',str(tmp_path),*args],stderr=subprocess.DEVNULL).decode().strip()
-    call('init','-q');call('config','user.name','Synthetic');call('config','user.email','synthetic@example.invalid')
+    call('init','-q');call('config','core.autocrlf','false');call('config','user.name','Synthetic');call('config','user.email','synthetic@example.invalid')
     (tmp_path/'source.txt').write_text('synthetic only')
     call('add','source.txt');call('commit','-qm','synthetic')
     r=smoke.run_smoke(stage='S0',expected_sha=call('rev-parse','HEAD'),
@@ -139,7 +153,7 @@ def test_clean_status_filter_cannot_execute_during_s0(monkeypatch,tmp_path,macro
     def call(*args):
         return subprocess.check_output([git,'-c','core.hooksPath='+os.devnull,'-c','commit.gpgsign=false',
             '-C',str(repo),*args],stderr=subprocess.DEVNULL).decode().strip()
-    call('init','-q');call('config','user.name','Synthetic');call('config','user.email','synthetic@example.invalid')
+    call('init','-q');call('config','core.autocrlf','false');call('config','user.name','Synthetic');call('config','user.email','synthetic@example.invalid')
     cmd='"'+PYTHON.replace('\\','/')+'" -I -S -B "'+str(script).replace('\\','/')+'"'
     include=tmp_path/'include.cfg';include.write_text('[filter "lfs"]\n\tclean = '+json.dumps(cmd)+'\n')
     if scope=='system':
@@ -210,3 +224,78 @@ def test_config_query_only_file_override_blocks_before_any_command(monkeypatch):
     runner=Runner();r=execute(runner,operator_approved=True)
     assert r['outcome']=='BLOCKED' and runner.calls==[]
     assert 'SYNTHETIC_PRIVATE_CONFIG' not in json.dumps(r)
+
+
+def test_new_driver_between_enumeration_and_status_cannot_execute(monkeypatch,tmp_path):
+    original=smoke.run_smoke
+    def wrapped(**kwargs):
+        def changing(argv,**kw):
+            if 'status' in argv or 'ls-tree' in argv:
+                repo=Path(kwargs['repo']);config=repo/'.git/config'
+                command='"'+PYTHON.replace('\\','/')+'" -I -S -B "'+str(tmp_path/'filter.py').replace('\\','/')+'"'
+                with config.open('a') as stream:stream.write('\n[filter "late"]\n clean = '+json.dumps(command)+'\n')
+                (repo/'.git/info/attributes').write_text('source.txt filter=late\n')
+            return smoke.command(argv,**kw)
+        kwargs['runner']=changing
+        return original(**kwargs)
+    monkeypatch.setattr(smoke,'run_smoke',wrapped)
+    test_clean_status_filter_cannot_execute_during_s0(monkeypatch,tmp_path,False,'local','info',False)
+
+
+@pytest.mark.parametrize('key',['GIT_CONFIG_COUNT','GIT_CONFIG_PARAMETERS','GIT_DIR','GIT_WORK_TREE',
+    'GIT_EXEC_PATH','GIT_TRACE','GIT_TRACE2_EVENT','GIT_EXTERNAL_DIFF','GIT_INDEX_FILE','GIT_OBJECT_DIRECTORY'])
+def test_unexpected_git_environment_blocks_before_execution(monkeypatch,key):
+    monkeypatch.setenv(key,SECRET)
+    runner=Runner();r=execute(runner,operator_approved=True)
+    assert r['outcome']=='BLOCKED' and runner.calls==[] and SECRET not in json.dumps(r)
+
+
+def test_source_check_never_uses_filter_aware_or_network_commands():
+    runner=Runner();r=execute(runner,operator_approved=True)
+    assert r['outcome']=='PASS_SMOKE_ONLY'
+    for argv in runner.calls:
+        if argv[0]!=GIT:continue
+        assert '--no-lazy-fetch' in argv and '--no-replace-objects' in argv
+        assert not any(c in argv for c in ('status','diff','diff-files','fetch','submodule'))
+
+
+@pytest.mark.parametrize('raw',[
+    b'', b'100644 blob '+b'a'*40+b'\t../escape\0',
+    b'100644 blob '+b'a'*40+b'\tC:/escape\0',
+    b'160000 commit '+b'a'*40+b'\tsubmodule\0',
+    b'120000 blob '+b'a'*40+b'\tsymlink\0',
+    b'100644 blob '+b'a'*40+b'\tscripts/local_smoke.py\0',
+    (b'100644 blob '+b'a'*40+b'\tx\0')*2,
+    b'100644 blob '+b'a'*40+b'\tx\0'+b'100644 blob '+b'a'*40+b'\tX\0',
+    b'PRIVATE_TOKEN_HOST_PATH',
+])
+def test_malformed_or_mismatched_source_metadata_blocks(raw):
+    class BadTree(Runner):
+        def __call__(self,argv,**kw):
+            if 'ls-tree' in argv:
+                self.calls.append(argv);return subprocess.CompletedProcess(argv,0,raw)
+            return super().__call__(argv,**kw)
+    runner=BadTree();r=execute(runner,operator_approved=True)
+    assert r['outcome']=='BLOCKED' and not any(c[0]==PYTHON for c in runner.calls)
+    assert SECRET not in json.dumps(r)
+
+
+@pytest.mark.parametrize('target',['ls-tree','--stage','--others'])
+def test_source_listing_failure_blocks_without_child_or_retry(target):
+    class Broken(Runner):
+        def __call__(self,argv,**kw):
+            if target in argv:
+                self.calls.append(argv);return subprocess.CompletedProcess(argv,128,SECRET.encode())
+            return super().__call__(argv,**kw)
+    runner=Broken();r=execute(runner,operator_approved=True)
+    assert r['outcome']=='BLOCKED' and r['attempts']==0 and SECRET not in json.dumps(r)
+
+
+def test_raw_content_hash_mismatch_cannot_be_hidden_by_matching_index():
+    class WrongOid(Runner):
+        def __call__(self,argv,**kw):
+            value=super().__call__(argv,**kw)
+            if 'ls-tree' in argv or '--stage' in argv:
+                value.stdout=re.sub(b'[0-9a-f]{40}',b'f'*40,value.stdout)
+            return value
+    assert execute(WrongOid(),operator_approved=True)['outcome']=='BLOCKED'

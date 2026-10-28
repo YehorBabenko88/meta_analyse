@@ -41,6 +41,8 @@ def run_smoke(*,stage,expected_sha,expected_tree,repo,python,git,operator_approv
     try:
         if stage!='S0' or operator_approved is not True or not all(hex40(v) for v in (expected_sha,expected_tree)):
             return r
+        # GIT_CONFIG can redirect `git config` alone, unlike ordinary commands.
+        if any(k.casefold()=='git_config' for k in os.environ):return r
         if not all(type(p) is str and Path(p).is_absolute() for p in (repo,python,git)):
             return r
         def call(argv,limit):
@@ -53,14 +55,32 @@ def run_smoke(*,stage,expected_sha,expected_tree,repo,python,git,operator_approv
             if type(value.stdout) is not bytes or len(value.stdout)>4096:raise ValueError()
             if clock()>deadline:raise TimeoutError()
             return value
-        prefix=[git,'--no-optional-locks','-c','core.fsmonitor=false','-c','core.hooksPath='+os.devnull,
+        prefix=[git,'--no-pager','--no-optional-locks','-c','core.fsmonitor=false','-c','core.hooksPath='+os.devnull,
                 '-C',repo]
         checks=((['rev-parse','HEAD'],expected_sha),
                               (['rev-parse','HEAD^{tree}'],expected_tree),
                               (['status','--porcelain=v1','--untracked-files=all'],''))
         def bound():
+            # Read effective active includes/scopes, never filter command values.
+            filters=call(prefix+['config','--includes','--null','--name-only','--get-regexp',
+                                 r'^filter\..*\.(clean|smudge|process|required)$'],2)
+            overrides=[]
+            if filters.returncode==1:
+                if filters.stdout:return False
+            elif filters.returncode==0:
+                if not filters.stdout or not filters.stdout.endswith(b'\0'):return False
+                drivers=set()
+                for key in filters.stdout[:-1].decode('utf-8').split('\0'):
+                    match=re.fullmatch(r'(?i:filter)\.([A-Za-z0-9_.-]{1,64})\.(?i:clean|smudge|process|required)',key)
+                    if not match:return False
+                    drivers.add(match[1])
+                if len(drivers)>16:return False
+                for driver in sorted(drivers):
+                    for setting,value in (('clean',''),('smudge',''),('process',''),('required','false')):
+                        overrides+=['-c','filter.'+driver+'.'+setting+'='+value]
+            else:return False
             for args,expected in checks:
-                value=call(prefix+args,2)
+                value=call(prefix+overrides+args,2)
                 if value.returncode!=0 or value.stdout.decode('ascii').strip()!=expected:return False
             return True
         if not bound():r['reason']='SOURCE_UNAVAILABLE';return r

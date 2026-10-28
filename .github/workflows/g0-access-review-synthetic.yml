@@ -1,9 +1,9 @@
 name: G0 access and provenance synthetic
 on:
   push:
-    branches: [audit/pr60-effective-access-20261027, audit/pr66-adversarial-20261027, smoke/s0-isolated-20261028]
+    branches: [audit/pr60-effective-access-20261027, audit/pr66-adversarial-20261027, smoke/s0-isolated-20261028, fix/s0-git-filter-20261028]
   pull_request:
-    branches: [audit/pr60-g0-preflight-20261026, audit/pr60-effective-access-20261027, audit/pr66-adversarial-20261027]
+    branches: [audit/pr60-g0-preflight-20261026, audit/pr60-effective-access-20261027, audit/pr66-adversarial-20261027, smoke/s0-isolated-20261028]
 permissions:
   contents: read
 concurrency:
@@ -33,7 +33,7 @@ jobs:
       - name: Exact source-collected identities
         run: python scripts/check_final_integration_junit.py access-tests.xml access-identities.json
       - name: No missing tests, failures or skips
-        run: python scripts/check_integration_junit.py access-tests.xml --minimum 287 --require-exact test_current_token_rights_never_imply_other_subject_or_namespace_safety --require-exact test_unapproved_digest_cannot_trigger_file_reads --require-exact test_malformed_cli_does_not_echo_private_arguments --require-exact test_every_upload_is_gated_and_staging_only --require-exact test_current_token_cli_without_authority_cannot_start_collection --require-exact test_shipped_template_is_not_an_approved_baseline --require-exact test_s0_is_once_isolated_and_never_authorizes_next_stage --require-exact test_source_change_after_child_cannot_leave_pass --require-exact test_real_synthetic_checkout_and_child
+        run: python scripts/check_integration_junit.py access-tests.xml --minimum 313 --require-exact test_current_token_cli_without_authority_cannot_start_collection --require-exact test_current_token_rights_never_imply_other_subject_or_namespace_safety --require-exact test_unapproved_digest_cannot_trigger_file_reads --require-exact test_malformed_cli_does_not_echo_private_arguments --require-exact test_every_upload_is_gated_and_staging_only --require-exact test_shipped_template_is_not_an_approved_baseline --require-exact test_s0_is_once_isolated_and_never_authorizes_next_stage --require-exact test_source_change_after_child_cannot_leave_pass --require-exact test_real_synthetic_checkout_and_child --require-exact test_clean_status_filter_cannot_execute_during_s0 --require-exact test_configured_lfs_drivers_are_disabled_not_rejected_merely_for_presence --require-exact test_config_query_only_file_override_blocks_before_any_command
       - name: Tracked source unchanged
         id: clean
         if: always()

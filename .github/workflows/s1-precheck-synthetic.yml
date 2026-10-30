@@ -1,0 +1,58 @@
+name: S1 precheck synthetic
+on:
+  push:
+    branches: [control/s1-precheck-20261030]
+  pull_request:
+    paths:
+      - scripts/s1_precheck.py
+      - scripts/Invoke-S1Precheck.ps1
+      - scripts/s1_source_reference.json
+      - tests/test_s1_*.py
+      - .github/workflows/s1-precheck-synthetic.yml
+permissions:
+  contents: read
+concurrency:
+  group: s1-precheck-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  synthetic:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    env:
+      META_ANALYSE_SYNTHETIC_IDENTITIES: s1-identities.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/record_ci_source.py
+      - run: python -m pip install -c requirements.lock pytest
+      - name: Offline fixtures only (no physical entry point)
+        run: python -m pytest --noconftest -p no:cacheprovider -p scripts.ci_identity_manifest -q tests/test_s1_precheck.py ${{ runner.os == 'Windows' && 'tests/test_s1_supervisor.py' || '' }} tests/test_local_smoke.py --junitxml=s1-tests.xml
+      - name: Exact collected JUnit identities and no skips
+        run: python scripts/check_final_integration_junit.py s1-tests.xml s1-identities.json
+      - name: Mandatory regression count and identities
+        run: python scripts/check_integration_junit.py s1-tests.xml --minimum ${{ runner.os == 'Windows' && '144' || '128' }} --require-exact test_positive --require-exact test_runtime_change --require-exact test_runtime_change_during_final_source_scan --require-exact test_manifest_pin_and_supervisor_pin_match --require-exact test_no_deadline_expired_launch --require-exact test_s0_harness_unchanged --require-exact test_malformed_cli_privacy --require-exact test_link_metadata_blocks_without_privilege
+      - name: Tracked source unchanged
+        id: clean
+        if: always()
+        run: git diff --exit-code HEAD
+      - name: Public projection including failure path
+        id: privacy
+        if: always() && steps.clean.outcome == 'success'
+        run: python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit s1-tests.xml
+      - name: Validate public evidence
+        if: always() && steps.privacy.outcome == 'success'
+        run: python scripts/project_public_ci_evidence.py --validate public-evidence
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.privacy.outcome == 'success'
+        with:
+          name: s1-precheck-${{ matrix.os }}
+          path: public-evidence/
+          if-no-files-found: error

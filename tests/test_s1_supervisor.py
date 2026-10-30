@@ -26,7 +26,8 @@ def receipt():
 @pytest.mark.parametrize('variant', ['valid', 'malformed', 'raw_metadata', 'stderr',
                                    'duplicate', 'escaped_duplicate', 'forged_pass', 'timeout',
                                    'memory', 'wrong_pin', 'wrong_python', 'fast_exit', 'partial',
-                                   'late_stderr', 'slow_partial', 'array_sha'])
+                                   'late_stderr', 'slow_partial', 'array_sha', 'no_ack',
+                                   'wrong_nonce', 'extra_ack', 'release_timeout', 'partial_ack'])
 def test_supervisor_bounded_projection(tmp_path, variant):
     # This file is selected only on Windows. Linux runs actual portable worker
     # tests; it does not relabel Windows runtime cases as static PASS or skips.
@@ -52,7 +53,16 @@ def test_supervisor_bounded_projection(tmp_path, variant):
         code += 'for c in ' + repr(raw[:30]) + ':\n sys.stdout.write(c);sys.stdout.flush();time.sleep(.05)\n'
         raw = raw[30:]
     code += 'print(' + repr(raw) + ');sys.stdout.flush()\n'
-    if variant != 'fast_exit': code += 'sys.stdin.buffer.read(1)\n'
+    if variant != 'fast_exit':
+        code += 'release=sys.stdin.buffer.readline(128).strip().decode("ascii")\n'
+        if variant == 'release_timeout': code += 'time.sleep(5)\n'
+        if variant not in ('no_ack', 'release_timeout'):
+            if variant == 'wrong_nonce': code += 'release="0"*32\n'
+            if variant == 'partial_ack':
+                code += 'sys.stdout.write("S1_");sys.stdout.flush();time.sleep(.05)\n'
+                code += 'print("ACK:"+release);sys.stdout.flush()\n'
+            else: code += 'print("S1_ACK:"+release);sys.stdout.flush()\n'
+            if variant == 'extra_ack': code += 'print("PRIVATE_TRAILING_ACK");sys.stdout.flush()\n'
     if variant == 'late_stderr': code += 'sys.stderr.write("PRIVATE_LATE_EXCEPTION")\n'
     worker = tmp_path / 's1_precheck.py'
     worker.write_bytes(code.encode())
@@ -86,7 +96,7 @@ def test_supervisor_bounded_projection(tmp_path, variant):
     assert b'PRIVATE_' not in p.stdout and str(tmp_path).encode() not in p.stdout
     out = json.loads(p.stdout)
     assert out['authorization'] == 'NONE' and out['g0_status'] == 'FAIL_CLOSED'
-    if variant in ('valid', 'partial'):
+    if variant in ('valid', 'partial', 'partial_ack'):
         assert p.returncode == 0 and out['outcome'] == 'PASS_PRECHECK_ONLY'
     else:
         assert p.returncode in (1, 2) and out['outcome'] != 'PASS_PRECHECK_ONLY'

@@ -1,7 +1,7 @@
 name: S1 precheck synthetic
 on:
   push:
-    branches: [control/s1-precheck-20261030]
+    branches: [control/s1-precheck-20261030, fix/s1-ack-receipt-20261030]
   pull_request:
     paths:
       - scripts/s1_precheck.py
@@ -38,7 +38,7 @@ jobs:
       - name: Exact collected JUnit identities and no skips
         run: python scripts/check_final_integration_junit.py s1-tests.xml s1-identities.json
       - name: Mandatory regression count and identities
-        run: python scripts/check_integration_junit.py s1-tests.xml --minimum ${{ runner.os == 'Windows' && '144' || '128' }} --require-exact test_positive --require-exact test_runtime_change --require-exact test_runtime_change_during_final_source_scan --require-exact test_manifest_pin_and_supervisor_pin_match --require-exact test_no_deadline_expired_launch --require-exact test_s0_harness_unchanged --require-exact test_malformed_cli_privacy --require-exact test_link_metadata_blocks_without_privilege
+        run: python scripts/check_integration_junit.py s1-tests.xml --minimum ${{ runner.os == 'Windows' && '149' || '128' }} --require-exact test_positive --require-exact test_runtime_change --require-exact test_runtime_change_during_final_source_scan --require-exact test_manifest_pin_and_supervisor_pin_match --require-exact test_no_deadline_expired_launch --require-exact test_s0_harness_unchanged --require-exact test_malformed_cli_privacy --require-exact test_link_metadata_blocks_without_privilege
       - name: Tracked source unchanged
         id: clean
         if: always()

@@ -278,8 +278,12 @@ def main(argv=None):
         sys.stdout.flush()
         # Supervisor must sample completed-work resource state before release.
         # Unexpected EOF/release is a refusal, never a standalone worker PASS.
-        if sys.stdin.buffer.read(1) != b'1':
+        release = sys.stdin.buffer.readline(128)
+        nonce = release.strip()
+        if not release.endswith(b'\n') or re.fullmatch(b'[0-9a-f]{32}', nonce) is None:
             return 2
+        sys.stdout.write('S1_ACK:' + nonce.decode('ascii') + '\n')
+        sys.stdout.flush()
     except Exception:
         return 2
     return r['exit_code']

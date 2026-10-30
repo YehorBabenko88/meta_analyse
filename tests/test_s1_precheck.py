@@ -140,6 +140,22 @@ def test_hardlink(case, tmp_path):
     assert run()['outcome'] != 'PASS_PRECHECK_ONLY'
 
 
+@pytest.mark.parametrize('kind', ['symlink', 'reparse'])
+def test_link_metadata_blocks_without_privilege(case, monkeypatch, kind):
+    import stat
+    from types import SimpleNamespace
+    repo, _, run = case
+    original = Path.lstat
+    def lstat(path, *args, **kw):
+        info = original(path, *args, **kw)
+        if path == repo / 'sentinel.py':
+            return SimpleNamespace(st_mode=stat.S_IFLNK if kind == 'symlink' else info.st_mode,
+                                   st_file_attributes=0 if kind == 'symlink' else 0x400)
+        return info
+    monkeypatch.setattr(Path, 'lstat', lstat)
+    assert run()['reason'] == 'NAMESPACE_UNAVAILABLE'
+
+
 def test_no_stage_chaining_source():
     code = SCRIPT.read_text()
     assert 'local_smoke' not in code

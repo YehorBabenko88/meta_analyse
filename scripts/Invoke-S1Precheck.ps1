@@ -129,6 +129,10 @@ try {
  # ReadAsync may complete with a partial pipe chunk. Collect only bounded remainder.
  $count=$outTask.Result
  while($count -le 4096 -and $stdout[$count-1] -ne 10){
+  $child.Refresh()
+  if($watch.Elapsed.TotalSeconds -ge 30 -or $child.PeakWorkingSet64 -gt 268435456 -or $child.PrivateMemorySize64 -gt 268435456){
+   $child.Kill();[void]$child.WaitForExit(1000);Public-Refusal 'BUDGET_EXCEEDED' 1;exit 1
+  }
   $more=$child.StandardOutput.BaseStream.ReadAsync($stdout,$count,$stdout.Length-$count)
   Need ($more.Wait(500))
   if($more.Result -eq 0){break};$count+=$more.Result
@@ -143,6 +147,9 @@ try {
  $keys=@('schema','stage','contract_version','source_sha','source_tree','source_bound','source_continuity','runtime_continuity','output_readiness','outcome','reason','elapsed_ms','exit_code','attempts','s1_complete','authorization','g0_status','next_stage','stop_required')
  Need ($r -is [pscustomobject] -and @($r.PSObject.Properties).Count -eq $keys.Count)
  foreach($key in $keys){Need ($null -ne $r.PSObject.Properties[$key])}
+ foreach($key in @('stage','source_sha','source_tree','source_continuity','runtime_continuity','output_readiness','outcome','reason','authorization','g0_status','next_stage')){
+  Need ($r.$key -is [string])
+ }
  $jsonKeys=@([regex]::Matches($text,'"([A-Za-z_0-9]+)"\s*:')|ForEach-Object {$_.Groups[1].Value})
  Need ($jsonKeys.Count -eq $keys.Count -and @($jsonKeys|Sort-Object -Unique).Count -eq $keys.Count)
  Need ($r.schema -is [int] -and $r.schema -eq 1 -and $r.contract_version -is [int] -and $r.contract_version -eq 1)

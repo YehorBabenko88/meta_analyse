@@ -135,6 +135,9 @@ STOP; не повторять для достижения PASS. На startup fai
 resource gap, escaped duplicate JSON, missing WinAPI child tripwire и поздний
 runtime drift. Они закрыты prelaunch binding, PID/ack, strict ASCII receipt,
 _winapi event, повторной runtime проверкой и deadline check перед Start.
+Дополнительные adversarial fixtures воспроизвели медленный partial stdout и
+array-valued source_sha: закрыты watchdog в partial-read loop и scalar string
+проверками всех строковых receipt fields перед публикацией.
 Негативные fixtures включают эти сценарии; физический S1 не исполнялся.
 Exact-head tests/artifacts и remaining approval blockers — в итоговом отчёте
 к Draft PR, а не в self-measured baseline на ADMINIT.

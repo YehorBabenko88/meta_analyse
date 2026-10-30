@@ -25,13 +25,15 @@ def receipt():
 
 @pytest.mark.parametrize('variant', ['valid', 'malformed', 'raw_metadata', 'stderr',
                                    'duplicate', 'escaped_duplicate', 'forged_pass', 'timeout',
-                                   'memory', 'wrong_pin', 'wrong_python', 'fast_exit', 'partial', 'late_stderr'])
+                                   'memory', 'wrong_pin', 'wrong_python', 'fast_exit', 'partial',
+                                   'late_stderr', 'slow_partial', 'array_sha'])
 def test_supervisor_bounded_projection(tmp_path, variant):
     # This file is selected only on Windows. Linux runs actual portable worker
     # tests; it does not relabel Windows runtime cases as static PASS or skips.
     assert os.name == 'nt'
     assert PS is not None
     r = receipt()
+    if variant == 'array_sha': r['source_sha'] = [r['source_sha'], 'PRIVATE_TYPE_LEAK']
     if variant == 'forged_pass': r['source_bound'] = False
     raw = json.dumps(r)
     if variant == 'malformed': raw = '{'
@@ -46,6 +48,9 @@ def test_supervisor_bounded_projection(tmp_path, variant):
         half = len(raw) // 2
         code += 'sys.stdout.write(' + repr(raw[:half]) + ');sys.stdout.flush();time.sleep(.1)\n'
         raw = raw[half:]
+    if variant == 'slow_partial':
+        code += 'for c in ' + repr(raw[:30]) + ':\n sys.stdout.write(c);sys.stdout.flush();time.sleep(.05)\n'
+        raw = raw[30:]
     code += 'print(' + repr(raw) + ');sys.stdout.flush()\n'
     if variant != 'fast_exit': code += 'sys.stdin.buffer.read(1)\n'
     if variant == 'late_stderr': code += 'sys.stderr.write("PRIVATE_LATE_EXCEPTION")\n'
@@ -55,7 +60,7 @@ def test_supervisor_bounded_projection(tmp_path, variant):
     import re
     pin = '0' * 64 if variant == 'wrong_pin' else hashlib.sha256(worker.read_bytes()).hexdigest()
     launcher = re.sub(r"\$workerPin='[^']+'", "$workerPin='" + pin + "'", launcher)
-    if variant == 'timeout':
+    if variant in ('timeout', 'slow_partial'):
         launcher = launcher.replace('$watch.Elapsed.TotalSeconds -ge 30', '$watch.Elapsed.TotalSeconds -ge 1')
     wrapper = tmp_path / 'Invoke-S1Precheck.ps1'
     wrapper.write_text(launcher)

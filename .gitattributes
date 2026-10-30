@@ -5,3 +5,8 @@ docs/ls5_commissioning_evidence/** -text
 
 # Frozen PR39 oracle must retain canonical Git blob bytes.
 tests/fixtures/pr39_process_identity.py.txt -text
+
+# S1 control packet pins raw bytes; do not transform them on Windows checkout.
+scripts/s1_precheck.py -text
+scripts/Invoke-S1Precheck.ps1 -text
+scripts/s1_source_reference.json -text

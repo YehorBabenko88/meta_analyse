@@ -4,7 +4,7 @@ param([string]$Repo, [string]$Python, [string]$Packet,
 $ErrorActionPreference='Stop'
 $watch=[Diagnostics.Stopwatch]::StartNew()
 $child=$null
-$workerPin='f78dd0d7deee887aeb8a2b1409fde0bb87ef7c90b676acd4b7a9d0599891347b'
+$workerPin='c9dbeb3ecb3a410d0feff59cc4844ff4baebd7334379920cba259744ed9bf98a'
 function Public-Refusal([string]$Reason,[int]$Code=2) {
  $outcome='BLOCKED';if($Code -eq 1){$outcome='FAIL'}
  [ordered]@{schema=1;stage='S1_PRECHECK';contract_version=1
@@ -167,12 +167,26 @@ try {
  if($child.PeakWorkingSet64 -gt 268435456 -or $child.PrivateMemorySize64 -gt 268435456){
   $child.Kill();[void]$child.WaitForExit(1000);Public-Refusal 'BUDGET_EXCEEDED' 1;exit 1
  }
- $child.StandardInput.Write('1');$child.StandardInput.Close()
+ # A successful write does not prove the peer read it. Require an exact
+ # per-attempt response after the resource/liveness checkpoint.
+ $random=New-Object byte[] 16
+ $rng=[Security.Cryptography.RandomNumberGenerator]::Create()
+ try{$rng.GetBytes($random)}finally{$rng.Dispose()}
+ $nonce=([BitConverter]::ToString($random)).Replace('-','').ToLowerInvariant()
+ $child.StandardInput.WriteLine($nonce);$child.StandardInput.Close()
  Need ($child.WaitForExit(500) -and $errTask.Wait(500) -and $errTask.Result -eq 0 -and $watch.Elapsed.TotalSeconds -lt 30)
  Need ($child.ExitCode -eq $r.exit_code)
- $tail=New-Object byte[] 1
- $tailRead=$child.StandardOutput.BaseStream.ReadAsync($tail,0,1)
- Need ($tailRead.Wait(500) -and $tailRead.Result -eq 0)
+ $tail=New-Object byte[] 64;$tailCount=0
+ while($tailCount -lt $tail.Length){
+  Need ($watch.Elapsed.TotalSeconds -lt 30)
+  $tailRead=$child.StandardOutput.BaseStream.ReadAsync($tail,$tailCount,$tail.Length-$tailCount)
+  Need ($tailRead.Wait([int][Math]::Max(1,[Math]::Min(500,30000-$watch.ElapsedMilliseconds))))
+  if($tailRead.Result -eq 0){break};$tailCount+=$tailRead.Result
+ }
+ Need ($tailCount -lt $tail.Length)
+ $ack=$utf8.GetString($tail,0,$tailCount)
+ $expected='S1_ACK:'+$nonce
+ Need ($ack -ceq ($expected+[char]10) -or $ack -ceq ($expected+[char]13+[char]10))
  $r.elapsed_ms=[long]$watch.ElapsedMilliseconds
  $r|ConvertTo-Json -Compress
  exit $r.exit_code

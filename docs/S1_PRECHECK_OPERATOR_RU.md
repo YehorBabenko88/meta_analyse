@@ -141,3 +141,16 @@ array-valued source_sha: закрыты watchdog в partial-read loop и scalar 
 Негативные fixtures включают эти сценарии; физический S1 не исполнялся.
 Exact-head tests/artifacts и remaining approval blockers — в итоговом отчёте
 к Draft PR, а не в self-measured baseline на ADMINIT.
+
+## Исправление release/ACK относительно PR74
+
+В exact PR74 c2cb924 supervisor мог принять PASS от early-exit worker без
+подтверждения release (race в fast_exit и deterministic no_ack fixture).
+Текущий sidecar исправляет только private pipe protocol: supervisor после
+resource checkpoint генерирует случайный128-bit nonce; worker должен прочитать
+его и вернуть точную строку S1_ACK:<nonce>, затем завершиться с ожидаемым exit.
+Missing/wrong/extra/stale ACK либо timeout => BLOCKED/FAIL. ACK не попадает
+в public stdout и не является approval authority. Launcher/worker должны
+доставляться одной новой парой; старый PR74 не менять и не запускать физически.
+Resource watchdog, public contract, source manifest и ограничения OS/descendants
+не расширены. Это liveness check, не process-tree containment.

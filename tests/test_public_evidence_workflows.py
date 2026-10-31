@@ -18,7 +18,12 @@ def test_every_upload_is_gated_and_staging_only():
             uploads+=1
             assert "if: always() && steps." in block and ".outcome == 'success'" in block
             assert 'if-no-files-found: error' in block
-            if 'path: public-benchmark/' in block:
+            if 'path: public-platform/' in block:
+                assert path.name in ('ci.yml','commissioning-postgres18.yml')
+                assert "steps.platform_receipt.outcome == 'success'" in block
+                assert 'python scripts/platform_coverage.py validate public-platform' in text
+                assert 'name: platform-' in block or 'name: commissioning-platform-' in block
+            elif 'path: public-benchmark/' in block:
                 assert path.name=='ci.yml'
                 assert "steps.benchmark_projection.outcome == 'success'" in block
                 assert 'name: windows-ui-benchmark' in block or 'name: linux-ui-benchmark' in block
@@ -27,7 +32,7 @@ def test_every_upload_is_gated_and_staging_only():
                 assert 'path: public-evidence/' in block
             assert block.count('path:')==1
         assert 'scripts/project_public_ci_evidence.py --validate public-evidence' in text
-    assert uploads==18  # Original sixteen, G0 access control and S1 precheck.
+    assert uploads==22  # Existing eighteen plus four explicitly validated platform receipts.
 
 def test_s1_upload_requires_successful_independent_validation():
     text=(ROOT/'.github/workflows/s1-precheck-synthetic.yml').read_text()

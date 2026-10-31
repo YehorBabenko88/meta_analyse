@@ -32,6 +32,8 @@ $oldTestDsn = $env:META_ANALYSE_TEST_DSN
 $oldQt = $env:QT_QPA_PLATFORM
 $oldScope=$env:META_ANALYSE_CI_IDENTITY_SCOPE
 $oldManifest=$env:META_ANALYSE_SYNTHETIC_IDENTITIES
+$oldLedger=$env:META_ANALYSE_PLATFORM_LEDGER
+$oldSuite=$env:META_ANALYSE_PLATFORM_SUITE
 $started = $false
 try {
     & (Join-Path $PgBin 'pg_ctl.exe') -D $data -l $log -o "-h 127.0.0.1 -p $port" -w start
@@ -45,8 +47,10 @@ try {
     & $Python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir (Join-Path $WorkRoot 'repeat-lifecycle')
     if ($LASTEXITCODE -ne 0) { throw 'Repeated lifecycle tests failed; see repeat-lifecycle logs' }
     $env:META_ANALYSE_CI_IDENTITY_SCOPE='full'
+    $env:META_ANALYSE_PLATFORM_SUITE='main'
+    $env:META_ANALYSE_PLATFORM_LEDGER=Join-Path $WorkRoot 'platform-ledger.json'
     $env:META_ANALYSE_SYNTHETIC_IDENTITIES=Join-Path $WorkRoot 'full-identities.json'
-    & $Python -m pytest -q -p scripts.ci_identity_manifest --ignore=tests/test_pg18_disposable_acceptance.py -W error::RuntimeWarning --junitxml (Join-Path $WorkRoot 'tests.xml') --basetemp (Join-Path $WorkRoot 'pytest-temp') 2>&1 | Tee-Object -FilePath (Join-Path $WorkRoot 'tests.log')
+    & $Python -m pytest -q -p scripts.ci_identity_manifest -p scripts.ci_platform_coverage --ignore=tests/test_pg18_disposable_acceptance.py -W error::RuntimeWarning --junitxml (Join-Path $WorkRoot 'tests.xml') --basetemp (Join-Path $WorkRoot 'pytest-temp') 2>&1 | Tee-Object -FilePath (Join-Path $WorkRoot 'tests.log')
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed; see tests.log and tests.xml' }
     & $Python scripts/check_final_integration_junit.py (Join-Path $WorkRoot 'tests.xml') (Join-Path $WorkRoot 'full-identities.json')
     if ($LASTEXITCODE -ne 0) { throw 'Exact full identity gate failed' }
@@ -59,4 +63,6 @@ try {
     $env:QT_QPA_PLATFORM = $oldQt
     $env:META_ANALYSE_CI_IDENTITY_SCOPE=$oldScope
     $env:META_ANALYSE_SYNTHETIC_IDENTITIES=$oldManifest
+    $env:META_ANALYSE_PLATFORM_LEDGER=$oldLedger
+    $env:META_ANALYSE_PLATFORM_SUITE=$oldSuite
 }

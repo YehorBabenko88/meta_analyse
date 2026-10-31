@@ -37,12 +37,27 @@ jobs:
         shell: bash
         env:
           META_ANALYSE_CI_IDENTITY_SCOPE: full
+          META_ANALYSE_PLATFORM_SUITE: commissioning
+          META_ANALYSE_PLATFORM_LEDGER: ${{ runner.temp }}/platform-ledger.json
           META_ANALYSE_SYNTHETIC_IDENTITIES: ${{ runner.temp }}/pg18-full-identities.json
         run: |
           set -o pipefail
-          python -m pytest tests -q -p scripts.ci_identity_manifest --ignore=tests/test_pg18_disposable_acceptance.py -W error::RuntimeWarning --junitxml=pg18-tests.xml | tee pg18-tests.log
+          python -m pytest tests -q -p scripts.ci_identity_manifest -p scripts.ci_platform_coverage --ignore=tests/test_pg18_disposable_acceptance.py -W error::RuntimeWarning --junitxml=pg18-tests.xml | tee pg18-tests.log
           python scripts/check_final_integration_junit.py "$(pwd)/pg18-tests.xml" "${{ runner.temp }}/pg18-full-identities.json"
           python scripts/check_integration_postgres.py pg18-tests.xml --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
+      - name: Validate Linux platform receipt
+        id: platform_receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/platform_coverage.py receipt --xml pg18-tests.xml --manifest "${{ runner.temp }}/pg18-full-identities.json" --ledger "${{ runner.temp }}/platform-ledger.json" --output public-platform
+          python scripts/platform_coverage.py validate public-platform
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.platform_receipt.outcome == 'success'
+        with:
+          name: commissioning-platform-linux
+          path: public-platform/
+          if-no-files-found: error
       - name: Repeat lifecycle without missing or skipped cases
         run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir pg18-lifecycle
       - name: Verify tracked source before publication
@@ -63,3 +78,68 @@ jobs:
           name: commissioning-postgres18
           if-no-files-found: error
           path: public-evidence/
+
+  native-windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      META_ANALYSE_CI_IDENTITY_SCOPE: full
+      META_ANALYSE_PLATFORM_SUITE: commissioning
+      META_ANALYSE_PLATFORM_LEDGER: ${{ runner.temp }}/platform-ledger.json
+      META_ANALYSE_SYNTHETIC_IDENTITIES: ${{ runner.temp }}/native-identities.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -c requirements.lock -e '.[test,archive]'
+      - name: Collect full catalog and execute every native case
+        run: python -m pytest -q -p scripts.ci_identity_manifest -p scripts.ci_platform_coverage --ignore=tests/test_pg18_disposable_acceptance.py --junitxml=native-tests.xml
+      - name: Validate native Windows platform receipt
+        id: platform_receipt
+        shell: pwsh
+        run: |
+          python scripts/check_final_integration_junit.py native-tests.xml "$env:RUNNER_TEMP/native-identities.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Native identities rejected' }
+          python scripts/platform_coverage.py receipt --xml native-tests.xml --manifest "$env:RUNNER_TEMP/native-identities.json" --ledger "$env:RUNNER_TEMP/platform-ledger.json" --output public-platform
+          if ($LASTEXITCODE -ne 0) { throw 'Native receipt rejected' }
+          python scripts/platform_coverage.py validate public-platform
+          if ($LASTEXITCODE -ne 0) { throw 'Native staging rejected' }
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.platform_receipt.outcome == 'success'
+        with:
+          name: commissioning-platform-windows
+          path: public-platform/
+          if-no-files-found: error
+
+  platform-coverage:
+    needs: [postgres18-linux, native-windows]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require both actual lanes
+        env:
+          LINUX_RESULT: ${{ needs.postgres18-linux.result }}
+          WINDOWS_RESULT: ${{ needs.native-windows.result }}
+        run: python -c "import os; assert os.environ['LINUX_RESULT']=='success' and os.environ['WINDOWS_RESULT']=='success'"
+      - uses: actions/download-artifact@v4
+        with:
+          name: commissioning-platform-linux
+          path: platform-linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: commissioning-platform-windows
+          path: platform-windows
+      - name: Require exact same-source portable and Windows-native union
+        run: python scripts/platform_coverage.py aggregate --linux platform-linux --windows platform-windows --suite commissioning

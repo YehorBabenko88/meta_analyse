@@ -44,6 +44,20 @@ jobs:
       - name: Windows Qt and disposable PostgreSQL integration
         shell: pwsh
         run: ./scripts/test-windows.ps1 -PgBin "${{ steps.pg18.outputs.pgbin }}"
+      - name: Validate Windows platform receipt
+        id: platform_receipt
+        shell: pwsh
+        run: |
+          python scripts/platform_coverage.py receipt --xml "$env:RUNNER_TEMP/meta-analyse-ci/tests.xml" --manifest "$env:RUNNER_TEMP/meta-analyse-ci/full-identities.json" --ledger "$env:RUNNER_TEMP/meta-analyse-ci/platform-ledger.json" --output public-platform
+          if ($LASTEXITCODE -ne 0) { throw 'Platform receipt rejected' }
+          python scripts/platform_coverage.py validate public-platform
+          if ($LASTEXITCODE -ne 0) { throw 'Platform staging rejected' }
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.platform_receipt.outcome == 'success'
+        with:
+          name: platform-windows
+          path: public-platform/
+          if-no-files-found: error
       - name: Independently reject missing or skipped Windows storage and shutdown cases
         shell: pwsh
         run: python scripts/check_integration_postgres.py "$env:RUNNER_TEMP/meta-analyse-ci/tests.xml"
@@ -137,11 +151,26 @@ jobs:
         shell: bash
         env:
           META_ANALYSE_CI_IDENTITY_SCOPE: full
+          META_ANALYSE_PLATFORM_SUITE: main
+          META_ANALYSE_PLATFORM_LEDGER: ${{ runner.temp }}/platform-ledger.json
           META_ANALYSE_SYNTHETIC_IDENTITIES: ${{ runner.temp }}/full-identities.json
         run: |
           set -o pipefail
-          python -m pytest -q -p scripts.ci_identity_manifest --ignore=tests/test_pg18_disposable_acceptance.py -W error::RuntimeWarning --junitxml=tests.xml | tee tests.log
+          python -m pytest -q -p scripts.ci_identity_manifest -p scripts.ci_platform_coverage --ignore=tests/test_pg18_disposable_acceptance.py -W error::RuntimeWarning --junitxml=tests.xml | tee tests.log
           python scripts/check_final_integration_junit.py "$(pwd)/tests.xml" "${{ runner.temp }}/full-identities.json"
+      - name: Validate Linux platform receipt
+        id: platform_receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/platform_coverage.py receipt --xml tests.xml --manifest "${{ runner.temp }}/full-identities.json" --ledger "${{ runner.temp }}/platform-ledger.json" --output public-platform
+          python scripts/platform_coverage.py validate public-platform
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.platform_receipt.outcome == 'success'
+        with:
+          name: platform-linux
+          path: public-platform/
+          if-no-files-found: error
       - name: Verify eleven PostgreSQL and five shutdown integration cases executed without skips
         run: python scripts/check_integration_postgres.py tests.xml --allow-skip test_failed_pip_install_never_reports_success_or_creates_launcher
       - name: Measure synthetic 20-instrument UI load
@@ -211,3 +240,32 @@ jobs:
           name: archive-pinned-contract-evidence
           if-no-files-found: error
           path: public-evidence/
+
+  platform-coverage:
+    needs: [linux, windows]
+    if: ${{ always() && (needs.linux.result != 'skipped' || needs.windows.result != 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require both actual lanes
+        env:
+          LINUX_RESULT: ${{ needs.linux.result }}
+          WINDOWS_RESULT: ${{ needs.windows.result }}
+        run: python -c "import os; assert os.environ['LINUX_RESULT']=='success' and os.environ['WINDOWS_RESULT']=='success'"
+      - uses: actions/download-artifact@v4
+        with:
+          name: platform-linux
+          path: platform-linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: platform-windows
+          path: platform-windows
+      - name: Require exact same-source portable and Windows coverage
+        run: python scripts/platform_coverage.py aggregate --linux platform-linux --windows platform-windows --suite main

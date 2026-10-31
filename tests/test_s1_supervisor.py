@@ -72,6 +72,15 @@ def test_supervisor_bounded_projection(tmp_path, variant):
     launcher = re.sub(r"\$workerPin='[^']+'", "$workerPin='" + pin + "'", launcher)
     if variant in ('timeout', 'slow_partial'):
         launcher = launcher.replace('$watch.Elapsed.TotalSeconds -ge 30', '$watch.Elapsed.TotalSeconds -ge 1')
+    # Diagnose only the copied fixture supervisor, never alter production guards.
+    # Line numbers/known booleans identify which exact refusal boundary failed;
+    # paths, environment values and exception bodies stay private.
+    launcher = launcher.replace(
+        "function Need($Condition){if(-not $Condition){throw 'UNAVAILABLE'}}",
+        "function Need($Condition){if(-not $Condition){$script:fixtureNeedLine=[int]$MyInvocation.ScriptLineNumber;throw 'UNAVAILABLE'}}")
+    launcher = launcher.replace(
+        "} catch {\n if($null -ne $child)",
+        "} catch {\n [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'fixture-stage.json'),([ordered]@{need_line=[int]$script:fixtureNeedLine;catch_line=[int]$_.InvocationInfo.ScriptLineNumber;child_started=[bool]($null -ne $child);role=[string]$entry.role;environment_key=[string]$key}|ConvertTo-Json -Compress))\n if($null -ne $child)")
     wrapper = tmp_path / 'Invoke-S1Precheck.ps1'
     wrapper.write_text(launcher)
     packet = tmp_path / 'private.json'
@@ -95,11 +104,31 @@ def test_supervisor_bounded_projection(tmp_path, variant):
     assert p.stderr == b''
     assert b'PRIVATE_' not in p.stdout and str(tmp_path).encode() not in p.stdout
     out = json.loads(p.stdout)
+    marker = tmp_path / 'fixture-stage.json'
+    stage = {}
+    if marker.exists() and marker.stat().st_size <= 512:
+        candidate = json.loads(marker.read_bytes())
+        for key in ('need_line', 'catch_line'):
+            if type(candidate.get(key)) is int and 0 <= candidate[key] <= 500:
+                stage[key] = candidate[key]
+        if type(candidate.get('child_started')) is bool:
+            stage['child_started'] = candidate['child_started']
+        if candidate.get('role') in roles:
+            stage['role'] = candidate['role']
+        if candidate.get('environment_key') in env_keys:
+            stage['environment_key'] = candidate['environment_key']
+    # No raw paths, executable identities, environment values or traceback text.
+    diagnosis = json.dumps(dict(variant=variant, exit=p.returncode,
+                                reason=out.get('reason'), attempts=out.get('attempts'),
+                                python_path_canonical=str(Path(sys._base_executable).resolve()) == sys._base_executable,
+                                shell_path_canonical=str(Path(PS).resolve()) == PS,
+                                temporary_path_canonical=tmp_path.resolve() == tmp_path,
+                                stage=stage), sort_keys=True)
     assert out['authorization'] == 'NONE' and out['g0_status'] == 'FAIL_CLOSED'
     if variant in ('valid', 'partial', 'partial_ack'):
-        assert p.returncode == 0 and out['outcome'] == 'PASS_PRECHECK_ONLY'
+        assert p.returncode == 0 and out['outcome'] == 'PASS_PRECHECK_ONLY', diagnosis
     else:
         assert p.returncode in (1, 2) and out['outcome'] != 'PASS_PRECHECK_ONLY'
     if variant in ('timeout', 'memory'):
-        assert out['reason'] == 'BUDGET_EXCEEDED'
+        assert out['reason'] == 'BUDGET_EXCEEDED', diagnosis
     if variant == 'wrong_python': assert out['attempts'] == 0

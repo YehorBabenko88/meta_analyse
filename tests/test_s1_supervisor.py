@@ -139,6 +139,7 @@ def test_supervisor_bounded_projection(tmp_path, variant):
                                 stage=stage), sort_keys=True)
     assert out['authorization'] == 'NONE' and out['g0_status'] == 'FAIL_CLOSED'
     if variant in ('valid', 'partial', 'partial_ack'):
+        assert control_class == 'ASCII_MATCH', diagnosis
         assert p.returncode == 0 and out['outcome'] == 'PASS_PRECHECK_ONLY', diagnosis
     else:
         assert p.returncode in (1, 2) and out['outcome'] != 'PASS_PRECHECK_ONLY'

@@ -41,7 +41,15 @@ def test_supervisor_bounded_projection(tmp_path, variant):
     if variant == 'raw_metadata': raw = 'PRIVATE_PATH_HOSTNAME_SID_EXCEPTION'
     if variant == 'duplicate': raw = raw.replace('{', '{"schema":1,', 1)
     if variant == 'escaped_duplicate': raw = raw.replace('"schema": 1', '"schema":0,"\\u0073chema":1', 1)
-    code = 'import time,sys,os\nassert int(sys.stdin.buffer.readline(32))==os.getpid()\ntime.sleep(.1)\n'
+    control_marker = tmp_path / 'fixture-control-prefix.txt'
+    code = 'import time,sys,os\ncontrol=sys.stdin.buffer.readline(32)\n'
+    code += ('control_class=("UTF8_BOM" if control.startswith(bytes.fromhex("efbbbf")) else '
+             '"UTF16_BOM" if control.startswith((bytes.fromhex("fffe"),bytes.fromhex("feff"))) else '
+             '"ASCII_MATCH" if control.strip()==str(os.getpid()).encode("ascii") else '
+             '"ASCII_MISMATCH" if control.isascii() else "NONASCII")\n')
+    code += 'with open(' + repr(str(control_marker)) + ',"w",encoding="ascii") as marker:marker.write(control_class)\n'
+    code += 'assert int(control)==os.getpid()\ntime.sleep(.1)\n'
+
     if variant == 'stderr': code += 'sys.stderr.write("PRIVATE_EXCEPTION")\n'
     if variant == 'timeout': code += 'time.sleep(60)\n'
     if variant == 'memory': code += 'x=bytearray(300*1024*1024)\ntime.sleep(5)\n'
@@ -118,7 +126,12 @@ def test_supervisor_bounded_projection(tmp_path, variant):
         if candidate.get('environment_key') in env_keys:
             stage['environment_key'] = candidate['environment_key']
     # No raw paths, executable identities, environment values or traceback text.
-    diagnosis = json.dumps(dict(variant=variant, exit=p.returncode,
+    control_class = 'NOT_OBSERVED'
+    if control_marker.exists() and control_marker.stat().st_size <= 32:
+        observed = control_marker.read_text(encoding='ascii')
+        if observed in ('UTF8_BOM', 'UTF16_BOM', 'ASCII_MATCH', 'ASCII_MISMATCH', 'NONASCII'):
+            control_class = observed
+    diagnosis = json.dumps(dict(variant=variant, control_prefix=control_class, exit=p.returncode,
                                 reason=out.get('reason'), attempts=out.get('attempts'),
                                 python_path_canonical=str(Path(sys._base_executable).resolve()) == sys._base_executable,
                                 shell_path_canonical=str(Path(PS).resolve()) == PS,

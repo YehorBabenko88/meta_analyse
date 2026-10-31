@@ -1,0 +1,80 @@
+{
+  "schema": "grid.history.v1.1",
+  "request": {
+    "schema": "grid.history.request.v1",
+    "venue": "bybit",
+    "market_type": "linear",
+    "symbol": "BTCUSDT",
+    "start_ms": 0,
+    "end_ms": 180000,
+    "as_of_ms": 180000,
+    "max_age_ms": 60000,
+    "units": {
+      "price": "USDT/BTC",
+      "volume": "BTC"
+    }
+  },
+  "source": {
+    "identity": "fixture",
+    "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "epoch": "fixture-epoch"
+  },
+  "evidence_class": "SYNTHETIC",
+  "rows": [
+    {
+      "open": 100.0,
+      "high": 102.0,
+      "low": 99.0,
+      "close": 101.0,
+      "volume": 3.0,
+      "event_start_ms": 0,
+      "event_end_ms": 60000,
+      "available_at_ms": 60000,
+      "revision": "7a926879012dcf13c01ce8f55662361aa0b84818bb28b43e817ece0fd5b6fb69",
+      "source_event_start_ms": 1,
+      "source_event_end_ms": 59998,
+      "watermark_ms": 60000,
+      "source_receipt_hash": "40ea0477a52a922631890b436795c1f6c33303cad68aea3cee0eb0b9f4d0c452"
+    },
+    {
+      "open": 100.1,
+      "high": 102.1,
+      "low": 99.1,
+      "close": 101.1,
+      "volume": 3.0,
+      "event_start_ms": 60000,
+      "event_end_ms": 120000,
+      "available_at_ms": 120000,
+      "revision": "7ba2f51fb15c1fdb2e5f6b33c5c526df65aa627650ec36426fe81f01dac39794",
+      "source_event_start_ms": 60001,
+      "source_event_end_ms": 119998,
+      "watermark_ms": 120000,
+      "source_receipt_hash": "e9f394be7fb12dc6a6371309337235a3966e64c482a3fc937160472978a72a88"
+    },
+    {
+      "open": 100.2,
+      "high": 102.2,
+      "low": 99.2,
+      "close": 101.2,
+      "volume": 3.0,
+      "event_start_ms": 120000,
+      "event_end_ms": 180000,
+      "available_at_ms": 180000,
+      "revision": "08e5b97cf2e78c62ce751fb37ab47c5ee505177b950ea4ec948ea70c098fd886",
+      "source_event_start_ms": 120001,
+      "source_event_end_ms": 179998,
+      "watermark_ms": 180000,
+      "source_receipt_hash": "b7a57cabe6cb743ce88a3796a432840b79e17d5dbe5fb297642496f75afc18f6"
+    }
+  ],
+  "source_receipts": [
+    "40ea0477a52a922631890b436795c1f6c33303cad68aea3cee0eb0b9f4d0c452",
+    "e9f394be7fb12dc6a6371309337235a3966e64c482a3fc937160472978a72a88",
+    "b7a57cabe6cb743ce88a3796a432840b79e17d5dbe5fb297642496f75afc18f6"
+  ],
+  "execution_authority": false,
+  "trading_authorized": false,
+  "watermark_ms": 180000,
+  "dataset_id": "eb4b9143d5f82551d1cfff9ec72988c70896e0d03751490ff49ec0dc57481550",
+  "dataset_fingerprint": "a73b703c7a4035ea2304e0bf45033548dec814cc2c490ad9b53fe0e969b9b693"
+}

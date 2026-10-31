@@ -123,3 +123,18 @@ def test_collection_policy_forbids_unreviewed_omission_or_partial_selection():
             with pytest.raises(ValueError):plugin.pytest_collection_modifyitems(None,config,[])
         config=SimpleNamespace(option=SimpleNamespace(**base),args=['tests/test_platform_coverage.py'])
         with pytest.raises(ValueError):plugin.pytest_collection_modifyitems(None,config,[])
+
+
+def test_native_workflow_runner_paths_use_step_context_not_job_context():
+    from pathlib import Path
+    text=(Path(__file__).parents[1]/'.github/workflows/commissioning-postgres18.yml').read_text()
+    native=text.split('  native-windows:\n',1)[1].split('\n  platform-coverage:',1)[0]
+    job,steps=native.split('    steps:\n',1)
+    # GitHub does not expose runner in jobs.<job_id>.env. It is available
+    # after runner allocation in jobs.<job_id>.steps.env.
+    assert '${{ runner.' not in job
+    collection=steps.split('      - name: Collect full catalog and execute every native case\n',1)[1].split('      - name:',1)[0]
+    assert '        env:\n' in collection
+    for variable,filename in (('META_ANALYSE_PLATFORM_LEDGER','platform-ledger.json'),
+                              ('META_ANALYSE_SYNTHETIC_IDENTITIES','native-identities.json')):
+        assert f'          {variable}: ${{{{ runner.temp }}}}/{filename}' in collection

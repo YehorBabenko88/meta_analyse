@@ -85,8 +85,6 @@ jobs:
     env:
       META_ANALYSE_CI_IDENTITY_SCOPE: full
       META_ANALYSE_PLATFORM_SUITE: commissioning
-      META_ANALYSE_PLATFORM_LEDGER: ${{ runner.temp }}/platform-ledger.json
-      META_ANALYSE_SYNTHETIC_IDENTITIES: ${{ runner.temp }}/native-identities.json
     steps:
       - uses: actions/checkout@v4
         with:
@@ -97,6 +95,9 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -c requirements.lock -e '.[test,archive]'
       - name: Collect full catalog and execute every native case
+        env:
+          META_ANALYSE_PLATFORM_LEDGER: ${{ runner.temp }}/platform-ledger.json
+          META_ANALYSE_SYNTHETIC_IDENTITIES: ${{ runner.temp }}/native-identities.json
         run: python -m pytest -q -p scripts.ci_identity_manifest -p scripts.ci_platform_coverage --ignore=tests/test_pg18_disposable_acceptance.py --junitxml=native-tests.xml
       - name: Validate native Windows platform receipt
         id: platform_receipt

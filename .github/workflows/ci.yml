@@ -10,12 +10,28 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     env:
+      UNIFIED_SOURCE_ROOT: ${{ github.workspace }}/.source/unified-system
       QT_QPA_PLATFORM: offscreen
       PYTHONASYNCIODEBUG: '1'
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Checkout exact owned Python bootstrap source
+        uses: actions/checkout@v4
+        with:
+          repository: YehorBabenko88/unified-system
+          ref: d065537d880295282eb2a157579813958417407e
+          path: .source/unified-system
+          persist-credentials: false
+      - name: Verify exact Unified bootstrap dependency
+        shell: python
+        run: |
+          import os, pathlib, subprocess
+          root=pathlib.Path(os.environ['UNIFIED_SOURCE_ROOT'])
+          actual=subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()
+          assert actual=='d065537d880295282eb2a157579813958417407e'
+          assert (root/'unified_system/owned_python.py').is_file()
       - name: Verify exact Actions source SHA
         run: python scripts/record_ci_source.py
       - uses: actions/setup-python@v5
@@ -44,6 +60,44 @@ jobs:
       - name: Windows Qt and disposable PostgreSQL integration
         shell: pwsh
         run: ./scripts/test-windows.ps1 -PgBin "${{ steps.pg18.outputs.pgbin }}"
+      - name: Bounded native JUnit failure annotations
+        if: always()
+        shell: python
+        run: |
+          import os, re, xml.etree.ElementTree as ET
+          from pathlib import Path
+          reports = [Path("diagnostic-tests.xml"), Path(os.environ["RUNNER_TEMP"]) / "meta-analyse-ci" / "tests.xml"]
+
+          def safe(value, limit):
+              text = re.sub(r"(?i)\bbearer\s+\S+", "Bearer [REDACTED]", str(value))
+              text = re.sub(r"(?i)\b(?:[a-z][a-z0-9+.-]*://|www\.)[^\s<>\"']+", "[URL REDACTED]", text)
+              text = re.sub(r"""(?i)\b[\w.-]*(?:password|passwd|pwd|token|secret|authorization)[\w.-]*['"]?\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)""", "[CREDENTIAL REDACTED]", text)
+              text = re.sub(r"[\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f]", " ", text)[:limit]
+              return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+          shown = 0
+          for path in reports:
+              try:
+                  with path.open("rb") as stream:
+                      raw = stream.read(16 * 1024 * 1024 + 1)
+                  if len(raw) > 16 * 1024 * 1024:
+                      raise ValueError("size")
+                  text = raw.decode("utf-8-sig")
+                  if "\x00" in text or "<!doctype" in text.lower() or "<!entity" in text.lower():
+                      raise ValueError("DTD/entity")
+                  root = ET.fromstring(text)
+              except FileNotFoundError:
+                  continue
+              except (OSError, UnicodeError, ValueError, ET.ParseError):
+                  print("::error::Native JUnit diagnostics refused an unsafe or invalid report")
+                  continue
+              for case in root.iter("testcase"):
+                  failure = next((child for child in case if child.tag in ("failure", "error")), None)
+                  if failure is None or shown >= 10:
+                      continue
+                  identity = case.get("classname", "") + "." + case.get("name", "unknown")
+                  print("::error::" + safe(identity, 200) + " | " + safe(failure.get("message", "No failure message"), 360))
+                  shown += 1
       - name: Validate Windows platform receipt
         id: platform_receipt
         shell: pwsh
@@ -115,6 +169,7 @@ jobs:
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
+      UNIFIED_SOURCE_ROOT: ${{ github.workspace }}/.source/unified-system
       QT_QPA_PLATFORM: offscreen
       PYTHONASYNCIODEBUG: '1'
       META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
@@ -123,6 +178,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Checkout exact owned Python bootstrap source
+        uses: actions/checkout@v4
+        with:
+          repository: YehorBabenko88/unified-system
+          ref: d065537d880295282eb2a157579813958417407e
+          path: .source/unified-system
+          persist-credentials: false
+      - name: Verify exact Unified bootstrap dependency
+        shell: python
+        run: |
+          import os, pathlib, subprocess
+          root=pathlib.Path(os.environ['UNIFIED_SOURCE_ROOT'])
+          actual=subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()
+          assert actual=='d065537d880295282eb2a157579813958417407e'
+          assert (root/'unified_system/owned_python.py').is_file()
       - name: Verify exact Actions source SHA
         run: python scripts/record_ci_source.py
       - uses: actions/setup-python@v5

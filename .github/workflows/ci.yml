@@ -44,6 +44,44 @@ jobs:
       - name: Windows Qt and disposable PostgreSQL integration
         shell: pwsh
         run: ./scripts/test-windows.ps1 -PgBin "${{ steps.pg18.outputs.pgbin }}"
+      - name: Bounded native JUnit failure annotations
+        if: always()
+        shell: python
+        run: |
+          import os, re, xml.etree.ElementTree as ET
+          from pathlib import Path
+          reports = [Path("diagnostic-tests.xml"), Path(os.environ["RUNNER_TEMP"]) / "meta-analyse-ci" / "tests.xml"]
+
+          def safe(value, limit):
+              text = re.sub(r"(?i)\bbearer\s+\S+", "Bearer [REDACTED]", str(value))
+              text = re.sub(r"(?i)\b(?:[a-z][a-z0-9+.-]*://|www\.)[^\s<>\"']+", "[URL REDACTED]", text)
+              text = re.sub(r"""(?i)\b[\w.-]*(?:password|passwd|pwd|token|secret|authorization)[\w.-]*['"]?\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)""", "[CREDENTIAL REDACTED]", text)
+              text = re.sub(r"[\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f]", " ", text)[:limit]
+              return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+          shown = 0
+          for path in reports:
+              try:
+                  with path.open("rb") as stream:
+                      raw = stream.read(16 * 1024 * 1024 + 1)
+                  if len(raw) > 16 * 1024 * 1024:
+                      raise ValueError("size")
+                  text = raw.decode("utf-8-sig")
+                  if "\x00" in text or "<!doctype" in text.lower() or "<!entity" in text.lower():
+                      raise ValueError("DTD/entity")
+                  root = ET.fromstring(text)
+              except FileNotFoundError:
+                  continue
+              except (OSError, UnicodeError, ValueError, ET.ParseError):
+                  print("::error::Native JUnit diagnostics refused an unsafe or invalid report")
+                  continue
+              for case in root.iter("testcase"):
+                  failure = next((child for child in case if child.tag in ("failure", "error")), None)
+                  if failure is None or shown >= 10:
+                      continue
+                  identity = case.get("classname", "") + "." + case.get("name", "unknown")
+                  print("::error::" + safe(identity, 200) + " | " + safe(failure.get("message", "No failure message"), 360))
+                  shown += 1
       - name: Validate Windows platform receipt
         id: platform_receipt
         shell: pwsh

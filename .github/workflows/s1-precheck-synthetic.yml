@@ -48,10 +48,11 @@ jobs:
         if: always() && steps.clean.outcome == 'success'
         run: python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit s1-tests.xml
       - name: Validate public evidence
+        id: validate_public
         if: always() && steps.privacy.outcome == 'success'
         run: python scripts/project_public_ci_evidence.py --validate public-evidence
       - uses: actions/upload-artifact@v4
-        if: always() && steps.privacy.outcome == 'success'
+        if: always() && steps.privacy.outcome == 'success' && steps.validate_public.outcome == 'success'
         with:
           name: s1-precheck-${{ matrix.os }}
           path: public-evidence/

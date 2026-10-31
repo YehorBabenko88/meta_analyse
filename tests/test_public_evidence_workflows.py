@@ -27,7 +27,19 @@ def test_every_upload_is_gated_and_staging_only():
                 assert 'path: public-evidence/' in block
             assert block.count('path:')==1
         assert 'scripts/project_public_ci_evidence.py --validate public-evidence' in text
-    assert uploads==17  # Original sixteen plus the isolated G0 access control job.
+    assert uploads==18  # Original sixteen, G0 access control and S1 precheck.
+
+def test_s1_upload_requires_successful_independent_validation():
+    text=(ROOT/'.github/workflows/s1-precheck-synthetic.yml').read_text()
+    validation=text.split('      - name: Validate public evidence\n')[1].split('      - uses:')[0]
+    assert 'id: validate_public' in validation
+    assert "if: always() && steps.privacy.outcome == 'success'" in validation
+    assert 'python scripts/project_public_ci_evidence.py --validate public-evidence' in validation
+    upload=text.split('      - uses: actions/upload-artifact@v4\n')[1]
+    assert "if: always() && steps.privacy.outcome == 'success' && steps.validate_public.outcome == 'success'" in upload
+    assert 'name: s1-precheck-${{ matrix.os }}' in upload
+    assert 'path: public-evidence/' in upload
+
 
 def test_projection_commands_stop_on_first_failure():
     for path in (ROOT/'.github/workflows').glob('*.yml'):

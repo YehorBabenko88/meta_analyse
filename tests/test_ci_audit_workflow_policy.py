@@ -41,3 +41,7 @@ def test_property_test_dependency_is_in_standard_test_extra():
     assert pin in project['project']['optional-dependencies']['test']
     lock=(ROOT/'requirements.lock').read_text()
     assert pin in lock and 'sortedcontainers==2.4.0' in lock
+
+@pytest.mark.parametrize('branch', ['control/s1-precheck-20261030', 'fix/s1-ack-receipt-20261030'])
+def test_s1_control_branches_keep_all_runtime_jobs_enabled(branch):
+    assert branch not in policies()

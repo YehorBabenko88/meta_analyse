@@ -109,8 +109,21 @@ try {
  $info.WorkingDirectory=$Repo;$info.UseShellExecute=$false;$info.CreateNoWindow=$true
  $info.RedirectStandardInput=$true;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
  $child=New-Object Diagnostics.Process;$child.StartInfo=$info
- Need ($watch.Elapsed.TotalSeconds -lt 30)
- Need ($child.Start())
+ # .NET Framework emits StreamWriter's preamble while enabling AutoFlush
+ # INSIDE Process.Start, before BaseStream becomes available. Keep the same
+ # console code page and restore the process-local Encoding object immediately.
+ $priorInputEncoding=[Console]::InputEncoding
+ $restoreInputEncoding=$false
+ try {
+  if($priorInputEncoding.GetPreamble().Length -ne 0){
+   Need ($priorInputEncoding.CodePage -eq 65001)
+   [Console]::InputEncoding=New-Object Text.UTF8Encoding($false)
+   $restoreInputEncoding=$true
+   Need ([Console]::InputEncoding.CodePage -eq $priorInputEncoding.CodePage -and [Console]::InputEncoding.GetPreamble().Length -eq 0)
+  }
+  Need ($watch.Elapsed.TotalSeconds -lt 30)
+  Need ($child.Start())
+ } finally {if($restoreInputEncoding){[Console]::InputEncoding=$priorInputEncoding}}
  $control=$child.StandardInput.BaseStream
  Write-ControlLine $control ([string]$child.Id)
  # Pin worker execution to one CPU already available to this process.

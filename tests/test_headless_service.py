@@ -67,8 +67,10 @@ def launch(capsule):
 def running(capsule):
     process,port=launch(capsule)
     yield process,port,capsule
+    assert process.poll() is None, 'service exited before owner cleanup'
     process.terminate();process.communicate(timeout=5)
-    assert process.returncode==0
+    # Windows terminate() invokes TerminateProcess(..., 1), not SIGTERM.
+    assert process.returncode==(1 if os.name=='nt' else 0)
 
 
 def request(port,method='GET',path='/internal/v2/module/health',body=None,headers=None):
@@ -141,7 +143,7 @@ def test_trickled_headers_hit_absolute_deadline_and_leave_service_healthy(runnin
             except OSError:break
             time.sleep(.15)
         assert con.recv(1024)==b''
-    except (ConnectionResetError,BrokenPipeError):pass
+    except (ConnectionResetError,ConnectionAbortedError,BrokenPipeError):pass
     finally:con.close()
     assert time.monotonic()-started<5
     assert request(port)[0]==200
@@ -202,6 +204,34 @@ def test_source_rejects_index_staging_overrides_and_noncanonical_raw_bytes(capsu
     file.write_bytes(original)
     (root/'added.txt').write_text('staged');git('add','added.txt')
     with pytest.raises(ValueError):verifier.verify()
+
+
+def test_source_verification_bounds_git_startups_and_still_rejects_shadow(capsule,monkeypatch):
+    root,env,_=capsule
+    verifier=service.SourceVerifier(root,service.Identity.from_environment(env))
+    original=verifier.git;commands=[]
+    def recorded(*args,**kwargs):
+        commands.append(args)
+        return original(*args,**kwargs)
+    monkeypatch.setattr(verifier,'git',recorded)
+    verifier.verify()
+    assert len(commands)<=7, 'readiness verification exceeds its native process-start budget'
+    (root/'notes.txt').write_text('ordinary non-code diagnostic')
+    verifier.verify()
+    (root/'shadow.py').write_text('VALUE=99')
+    with pytest.raises(ValueError):verifier.verify()
+
+
+@pytest.mark.skipif(os.name=='nt',reason='Windows forbids TAB in filenames')
+def test_untracked_index_record_spoof_cannot_replace_removed_index_entry(capsule):
+    root,env,git=capsule
+    (root/'aaa.txt').write_text('tracked non-code file')
+    git('add','aaa.txt');git('-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','non-code first entry')
+    identity=service.Identity.from_environment(dict(env,UNIFIED_SOURCE_COMMIT=git('rev-parse','HEAD')))
+    record=git('ls-files','--stage','aaa.txt')
+    git('update-index','--force-remove','aaa.txt')
+    (root/record).write_text('untracked index record impostor')
+    with pytest.raises(ValueError):service.SourceVerifier(root,identity).verify()
 
 
 def test_execute_without_owned_environment_denies_before_listener(tmp_path):

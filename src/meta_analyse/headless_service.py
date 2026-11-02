@@ -138,8 +138,12 @@ class SourceVerifier:
             if name=='extensions':need('worktreeconfig' not in config[section] and 'partialclone' not in config[section])
             if name.startswith('remote '):need('promisor' not in config[section])
         need(not self.git('for-each-ref','--format=%(refname)','refs/replace',limit=65536).strip())
-        head=self.git('rev-parse','HEAD',limit=128).decode().strip();need(head==self.identity.source_commit)
-        need(Path(self.git('rev-parse','--show-toplevel',limit=4096).decode().strip()).resolve()==self.root.resolve())
+        # Combine queries to avoid repeated Windows Git startup costs inside
+        # the existing health deadline. All identity checks remain mandatory.
+        head_raw,top=self.git('rev-parse','HEAD','--show-toplevel',limit=4224).split(b'\n',1)
+        need(len(head_raw)<=128 and len(top)<=4096)
+        head=head_raw.decode().strip();need(head==self.identity.source_commit)
+        need(Path(top.decode().strip()).resolve()==self.root.resolve())
         tree=self.git('ls-tree','-rz','--full-tree','HEAD',limit=2*1024*1024)
         files={}
         expected_index=[]

@@ -326,6 +326,15 @@ def admitted_result(value):
     return value
 
 
+def admitted_ohlcv_result(value):
+    # A separate contract never upgrades OHLCV/backfill into Grid or H_B evidence.
+    need(type(value) is dict and value.get('schema')=='meta.ohlcv.research.result.v1')
+    need(all(value.get(k) is False for k in ('execution_authority','trading_authorized','training_authorized','h_b_eligible')))
+    need(value.get('source_authenticity')=='NOT_EVALUATED' and value.get('quality_status')=='UNKNOWN')
+    need(value.get('coverage_status')=='DECLARED_COMPLETE_UNVERIFIED')
+    return value
+
+
 class PrivateServer(ThreadingHTTPServer):
     request_queue_size=8
     daemon_threads=False
@@ -404,13 +413,18 @@ class Handler(BaseHTTPRequestHandler):
                 try:self.server.verifier.verify_health()
                 except (OSError,ValueError,subprocess.SubprocessError,configparser.Error):return self.fail(503)
                 return self.reply(200,self.server.identity.health())
-            if self.path!='/internal/v1/history/analyze':return self.fail(404)
+            if self.path not in ('/internal/v1/history/analyze','/internal/v1/research/ohlcv/analyze'):return self.fail(404)
             if self.headers.get_all('Content-Type',[])!=['application/json']:return self.fail(415)
             if len(lengths)!=1 or not re.fullmatch('[0-9]{1,8}',lengths[0]) or not 2<=int(lengths[0])<=MAX_BODY:return self.fail(413)
             raw=self.rfile.read(int(lengths[0]));need(len(raw)==int(lengths[0]))
             value=strict_json(raw)
             need(type(value) is dict and set(value)=={'payload','decision_ms'})
             self.server.verifier.verify_scientific()
+            if self.path=='/internal/v1/research/ohlcv/analyze':
+                from . import ohlcv_research_adapter
+                attest_module(ohlcv_research_adapter,'src/meta_analyse/ohlcv_research_adapter.py')
+                result=ohlcv_research_adapter.analyze_ohlcv_research(value['payload'],decision_ms=value['decision_ms'])
+                return self.reply(200,admitted_ohlcv_result(result))
             from . import grid_history_adapter
             attest_module(grid_history_adapter,'src/meta_analyse/grid_history_adapter.py')
             result=grid_history_adapter.analyze_grid_history(value['payload'],decision_ms=value['decision_ms'])

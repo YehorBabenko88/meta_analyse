@@ -20,6 +20,16 @@ def receipt(platform='linux',suite='main'):
         passed=l['selected'][:],skipped=[],source_authenticity='NOT_EVALUATED',physical='NOT_RUN')
 
 
+@pytest.mark.parametrize('platform,accepted',[('windows',True),('linux',False)])
+def test_platform_receipt_admits_posix_filename_skip_on_windows_only(platform,accepted):
+    r=receipt(platform);case=p.identity('tests.test_headless_service','test_untracked_index_record_spoof_cannot_replace_removed_index_entry')
+    l=r['ledger'];l['identities']=sorted(l['identities']+[case]);l['selected']=sorted(l['selected']+[case])
+    r['skipped']=[case]
+    if accepted:p.validate_receipt(r)
+    else:
+        with pytest.raises(ValueError):p.validate_receipt(r)
+
+
 @pytest.mark.parametrize('suite',['main','commissioning'])
 def test_real_lane_partition_union_requires_native_windows(suite):
     linux,windows=receipt(suite=suite),receipt('windows',suite)

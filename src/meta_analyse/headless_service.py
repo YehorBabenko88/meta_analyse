@@ -83,9 +83,97 @@ class Identity:
 
 
 class SourceVerifier:
-    """Bounded pinned Git object/raw-byte comparison, never filters or status."""
+    """Authoritative Git admission plus immutable whole-capsule health proof."""
     def __init__(self,root,identity):
         self.root=Path(root).absolute();self.identity=identity;self.snapshot=None
+        self._health_baseline=None;self._health_binding_attempted=False
+
+    @staticmethod
+    def _stat_key(info):
+        return (info.st_dev,info.st_ino,info.st_mode,info.st_nlink,info.st_size,
+                info.st_mtime_ns,info.st_ctime_ns,getattr(info,'st_file_attributes',0))
+
+    @staticmethod
+    def _fd_binding(key):
+        # Windows path stat synthesizes executable permission bits and its ctime
+        # can differ from fstat. Bind stable object/type/size identity across APIs;
+        # compare the complete metadata before/after within each API separately.
+        return key[:2]+(stat.S_IFMT(key[2]),)+key[3:6]+key[7:]
+
+    def _namespace(self):
+        entries={}
+        def visit(folder,relative,depth):
+            need(depth<=128)
+            with os.scandir(folder) as iterator:
+                for entry in iterator:
+                    name=relative+'/'+entry.name if relative else entry.name
+                    # DirEntry's cached Windows stat omits link counts/file IDs.
+                    info=os.stat(entry.path,follow_symlinks=False)
+                    need(not stat.S_ISLNK(info.st_mode) and not getattr(info,'st_file_attributes',0)&1024)
+                    need(stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode) and info.st_nlink==1)
+                    entries[name]=(entry.path,self._stat_key(info));need(len(entries)<=24096)
+                    if stat.S_ISDIR(info.st_mode):visit(entry.path,name,depth+1)
+        info=os.stat(self.root,follow_symlinks=False)
+        need(stat.S_ISDIR(info.st_mode) and not getattr(info,'st_file_attributes',0)&1024)
+        entries['']=(str(self.root),self._stat_key(info));visit(str(self.root),'',0)
+        return entries
+
+    def _file_proof(self,path,initial,limit,*,unique=True):
+        need(stat.S_ISREG(initial[2]) and (not unique or initial[3]==1) and initial[4]<=limit)
+        digest=hashlib.sha256()
+        with open(path,'rb') as stream:
+            before=self._stat_key(os.fstat(stream.fileno()))
+            need(self._fd_binding(before)==self._fd_binding(initial))
+            remaining=before[4]
+            while remaining:
+                raw=stream.read(min(1048576,remaining));need(raw)
+                digest.update(raw);remaining-=len(raw)
+            need(not stream.read(1))
+            need(self._stat_key(os.fstat(stream.fileno()))==before)
+        return before[4],digest.hexdigest()
+
+    def _byte_proof(self):
+        """Rehash all source and Git bytes, including complete namespace shape.
+
+        This freezes the owned capsule more strictly than Git's working-tree
+        rules. Every call rereads bytes; stat data is an additional concurrent-
+        mutation detector, never an mtime cache. This is not hostile-owner or
+        native filesystem namespace-race containment.
+        """
+        need(not any(k.upper() in {'GIT_DIR','GIT_WORK_TREE','GIT_COMMON_DIR','GIT_OBJECT_DIRECTORY','GIT_ALTERNATE_OBJECT_DIRECTORIES','GIT_CONFIG_PARAMETERS','GIT_CONFIG_COUNT','GIT_INDEX_FILE','GIT_REPLACE_REF_BASE'} for k in os.environ))
+        directory(self.root)
+        first=self._namespace();hashes={};total=0
+        for name,(path,info) in first.items():
+            if stat.S_ISREG(info[2]):
+                size,digest=self._file_proof(path,info,128*1024*1024-total)
+                total+=size;hashes[name]=digest
+        executable=regular(self.identity.git_executable,unique=False)
+        exe_info=self._stat_key(executable.lstat())
+        _,exe_digest=self._file_proof(executable,exe_info,64*1024*1024,unique=False)
+        need(exe_digest==self.identity.git_sha256)
+        # Independent bounded namespace/file-identity resample detects changes
+        # during hashing, including additions to an already visited directory.
+        need(first==self._namespace());directory(self.root)
+        need(self._stat_key(executable.lstat())==exe_info)
+        shape=tuple(sorted((name,stat.S_IFMT(info[2]),stat.S_IMODE(info[2]))
+                           for name,(_,info) in first.items()))
+        return shape,tuple(sorted(hashes.items())),exe_digest
+
+    def bind_health(self):
+        # Admit exactly once. Metadata changed across the authoritative proof
+        # cannot be silently blessed by a later cache capture or retry.
+        need(not self._health_binding_attempted);self._health_binding_attempted=True
+        before=self._byte_proof();snapshot=self.verify();after=self._byte_proof()
+        need(before==after)
+        actual=dict(after[1]);need(all(actual.get(name)==digest for name,digest in snapshot[2].items()))
+        self._health_baseline=after
+
+    def verify_health(self):
+        need(self._health_baseline is not None)
+        need(self._byte_proof()==self._health_baseline)
+
+    def verify_scientific(self):
+        self.verify_health();self.verify();self.verify_health()
 
     def git(self,*args,input=b'',limit=40*1024*1024):
         executable=regular(self.identity.git_executable,unique=False)
@@ -251,7 +339,7 @@ class PrivateServer(ThreadingHTTPServer):
         need(Path(__file__).absolute()==ROOT/'src/meta_analyse/headless_service.py')
         need(__cached__ is not None and Path(__cached__).is_relative_to(cache) and not Path(__cached__).exists())
         self.identity=identity;self.verifier=SourceVerifier(ROOT,identity)
-        self.verifier.verify();selfcheck()
+        self.verifier.bind_health();selfcheck()
         self.slots=threading.BoundedSemaphore(4)
         super().__init__(('127.0.0.1',port),Handler)
         self.timeout=.2
@@ -313,7 +401,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.command=='GET':
                 if self.path!='/internal/v2/module/health':return self.fail(404)
                 if lengths and lengths!=['0']:return self.fail(400)
-                try:self.server.verifier.verify()
+                try:self.server.verifier.verify_health()
                 except (OSError,ValueError,subprocess.SubprocessError,configparser.Error):return self.fail(503)
                 return self.reply(200,self.server.identity.health())
             if self.path!='/internal/v1/history/analyze':return self.fail(404)
@@ -322,7 +410,7 @@ class Handler(BaseHTTPRequestHandler):
             raw=self.rfile.read(int(lengths[0]));need(len(raw)==int(lengths[0]))
             value=strict_json(raw)
             need(type(value) is dict and set(value)=={'payload','decision_ms'})
-            self.server.verifier.verify()
+            self.server.verifier.verify_scientific()
             from . import grid_history_adapter
             attest_module(grid_history_adapter,'src/meta_analyse/grid_history_adapter.py')
             result=grid_history_adapter.analyze_grid_history(value['payload'],decision_ms=value['decision_ms'])

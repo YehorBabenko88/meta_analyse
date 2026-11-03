@@ -180,7 +180,10 @@ def test_bounded_concurrency_recovers_after_slow_body_connections(running):
         con=socket.create_connection(('127.0.0.1',port),timeout=4)
         try:
             con.sendall(b'GET / HTTP/1.0\r\n\r\n')
-            assert b'503' in con.recv(1024).split(b'\r\n',1)[0]
+            try:assert b'503' in con.recv(1024).split(b'\r\n',1)[0]
+            # Windows may reset an overloaded socket while its unread request
+            # is closed. Both are bounded refusal, never an admitted worker.
+            except (ConnectionAbortedError,ConnectionResetError):pass
         finally:con.close()
     finally:
         for con in connections:con.close()

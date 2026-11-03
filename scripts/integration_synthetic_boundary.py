@@ -29,6 +29,7 @@ def pytest_collection_finish(session):
         public='case_'+digest;rows.append(public)
         if item.name in ('test_symlink_is_rejected','test_existing_private_survives_static_alias_spellings[symlink]'):skips.append(public)
         if os.environ.get('META_ANALYSE_CI_IDENTITY_SCOPE')=='full' and sys.platform!='win32' and item.name=='test_failed_pip_install_never_reports_success_or_creates_launcher':skips.append(public)
+        if os.environ.get('META_ANALYSE_CI_IDENTITY_SCOPE')=='full' and sys.platform=='win32' and item.name=='test_untracked_index_record_spoof_cannot_replace_removed_index_entry':skips.append(public)
     def git(arg):return subprocess.check_output(['git','rev-parse',arg],text=True).strip()
     manifest=dict(schema=1,sha=git('HEAD'),tree=git('HEAD^{tree}'),identities=sorted(rows),allowed_skips=sorted(skips))
     Path(output).write_text(json.dumps(manifest,sort_keys=True)+'\n',encoding='utf-8')

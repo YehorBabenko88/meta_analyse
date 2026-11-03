@@ -26,6 +26,10 @@ def main():
         raise SystemExit("Usage: check_integration_postgres.py FULL_JUNIT_XML [--allow-skip TEST_NAME ...]")
     checker = Path(__file__).with_name("check_integration_junit.py")
     command = [sys.executable, str(checker), sys.argv[1], "--minimum", str(len(REQUIRED)), *sys.argv[2:]]
+    if sys.platform == 'win32':
+        # This full-suite case needs TAB in a filename, which Windows forbids.
+        # Mandatory DB/shutdown identities below must still run, never skip.
+        command.extend(['--allow-skip', 'test_untracked_index_record_spoof_cannot_replace_removed_index_entry'])
     for name in REQUIRED:
         command.extend(["--require-identity", "tests.test_storage_ingestion_postgres." + name])
     for name in ("test_shutdown_waits_for_thread_write_before_cancelled_task_finishes",

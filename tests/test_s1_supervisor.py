@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 import pytest
+from scripts.s1_fixture_diagnostics import instrument_fixture, annotate_timeout
 
 ROOT = Path(__file__).parents[1]
 PS = shutil.which('powershell.exe') if os.name == 'nt' else shutil.which('pwsh')
@@ -90,7 +91,7 @@ def test_supervisor_bounded_projection(tmp_path, variant):
         "} catch {\n if($null -ne $child)",
         "} catch {\n [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'fixture-stage.json'),([ordered]@{need_line=[int]$script:fixtureNeedLine;catch_line=[int]$_.InvocationInfo.ScriptLineNumber;child_started=[bool]($null -ne $child);role=[string]$entry.role;environment_key=[string]$key}|ConvertTo-Json -Compress))\n if($null -ne $child)")
     wrapper = tmp_path / 'Invoke-S1Precheck.ps1'
-    wrapper.write_text(launcher)
+    wrapper.write_text(instrument_fixture(launcher))
     packet = tmp_path / 'private.json'
     roles = ['python_exe','python312_dll','hashlib_pyd','ctypes_pyd','libcrypto','libffi',
              'crt','bz2_pyd','lzma_pyd','git_exe','git_core','libiconv','libintl','pcre2',
@@ -105,10 +106,14 @@ def test_supervisor_bounded_projection(tmp_path, variant):
     packet.write_text(json.dumps(dict(schema=1, reference_kind='EXTERNALLY_REVIEWED_CONTINUITY',
                                      files=files, absent=[str(tmp_path / 'absent')],
                                      environment={k: os.environ.get(k) for k in env_keys})))
-    p = subprocess.run([PS, '-NoProfile', '-NonInteractive', '-File', str(wrapper),
-                        '-Repo', str(tmp_path), '-Python', sys._base_executable, '-Packet', str(packet),
-                        '-PacketSha256', hashlib.sha256(packet.read_bytes()).hexdigest(), '-OperatorApproved'],
-                       capture_output=True, timeout=15)
+    try:
+        p = subprocess.run([PS, '-NoProfile', '-NonInteractive', '-File', str(wrapper),
+                            '-Repo', str(tmp_path), '-Python', sys._base_executable, '-Packet', str(packet),
+                            '-PacketSha256', hashlib.sha256(packet.read_bytes()).hexdigest(), '-OperatorApproved'],
+                           capture_output=True, timeout=15)
+    except subprocess.TimeoutExpired as error:
+        annotate_timeout(tmp_path,error)
+        raise
     assert p.stderr == b''
     assert b'PRIVATE_' not in p.stdout and str(tmp_path).encode() not in p.stdout
     out = json.loads(p.stdout)

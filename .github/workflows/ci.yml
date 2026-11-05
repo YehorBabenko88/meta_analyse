@@ -132,8 +132,10 @@ jobs:
         if: always() && steps.source_clean.outcome == 'success'
         shell: python
         run: |
-          import os
+          import os,sys
           from pathlib import Path
+          checkout=Path(os.environ['GITHUB_WORKSPACE']).resolve(strict=True)
+          sys.path.insert(0,str(checkout))
           from scripts import project_public_ci_evidence as public
           from scripts.s1_fixture_diagnostics import public_timeout_lines
           try:

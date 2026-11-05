@@ -2,6 +2,11 @@
 from pathlib import Path
 import ast
 import importlib.util
+import os
+import re
+import subprocess
+import sys
+import textwrap
 ROOT=Path(__file__).resolve().parents[1]
 BRANCH='integration/final-ci-g0-20261026'
 
@@ -61,8 +66,35 @@ def test_full_failure_publication_requires_clean_tracked_source():
     for name,count in [('ci.yml',3),('commissioning-postgres18.yml',1)]:
         s=(ROOT/'.github/workflows'/name).read_text()
         assert s.count('id: source_clean')==count
-        assert s.count("if: always() && steps.source_clean.outcome == 'success'")==count
+        jobs=re.split(r'^  [A-Za-z0-9_-]+:\s*$',s,flags=re.MULTILINE)
+        projected=[]
+        for job in jobs:
+            steps=job.split('      - name: ')
+            for step in steps[1:]:
+                if step.startswith('Project isolated public evidence\n') or step.startswith('Project bounded S1 fixture timeout phase into retained public log\n'):
+                    assert "if: always() && steps.source_clean.outcome == 'success'" in step
+                    assert 'id: source_clean' in job
+                    projected.append(step.splitlines()[0])
+        assert projected.count('Project isolated public evidence')==count
+        assert projected.count('Project bounded S1 fixture timeout phase into retained public log')==(1 if name=='ci.yml' else 0)
         assert s.count('path: public-evidence/')==count
 
     privacy=(ROOT/'.github/workflows/public-junit-privacy.yml').read_text().split('  offline:',1)[1]
     assert BRANCH in privacy.split('strategy:',1)[0], 'mandatory privacy job must be enabled, not merely triggered'
+
+
+def test_actions_temp_python_step_imports_from_explicit_checkout(tmp_path):
+    workflow=(ROOT/'.github/workflows/ci.yml').read_text()
+    step=workflow.split('      - name: Project bounded S1 fixture timeout phase into retained public log\n',1)[1].split('      - name:',1)[0]
+    script=tmp_path/'actions-temp-step.py'
+    script.write_text(textwrap.dedent(step.split('        run: |\n',1)[1]))
+    shadow=tmp_path/'scripts'
+    shadow.mkdir()
+    (shadow/'__init__.py').write_text("raise RuntimeError('UNTRUSTED_TEMP_SCRIPTS_IMPORTED')\n")
+    env=os.environ.copy()
+    env.update(GITHUB_WORKSPACE=str(ROOT),RUNNER_TEMP=str(tmp_path),PYTHONPATH=str(tmp_path))
+    result=subprocess.run([sys.executable,'-I','-S','-B',str(script)],cwd=tmp_path,env=env,
+                          capture_output=True,text=True,timeout=10)
+    assert result.returncode==0,result.stderr
+    assert 'S1_FIXTURE_DIAGNOSTICS status=UNAVAILABLE' in result.stdout
+    assert 'UNTRUSTED_TEMP_SCRIPTS_IMPORTED' not in result.stderr

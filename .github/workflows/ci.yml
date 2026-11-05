@@ -128,6 +128,26 @@ jobs:
         id: source_clean
         if: always()
         run: git diff --exit-code HEAD
+      - name: Project bounded S1 fixture timeout phase into retained public log
+        if: always() && steps.source_clean.outcome == 'success'
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          from scripts import project_public_ci_evidence as public
+          from scripts.s1_fixture_diagnostics import public_timeout_lines
+          try:
+              source=public.decode(public.read('source-sha.json'))
+              public.provenance(source)
+              root=Path(os.environ['RUNNER_TEMP'])/'meta-analyse-ci'
+              inventory=public.decode(public.read(root/'full-identities.json'))
+              public.need(type(inventory) is dict and set(inventory)=={'schema','sha','tree','identities','allowed_skips'})
+              public.need(type(inventory['schema']) is int and inventory['schema']==1 and inventory['sha']==source['sha'] and inventory['tree']==source['tree_sha'])
+              lines=public_timeout_lines(public.read(root/'tests.xml'),inventory['identities'])
+              for line in lines: print('::error::'+line)
+              if not lines: print('S1_FIXTURE_DIAGNOSTICS status=NO_TIMEOUT_MARKERS')
+          except Exception:
+              print('S1_FIXTURE_DIAGNOSTICS status=UNAVAILABLE')
       - name: Project isolated public evidence
         id: privacy_gate
         if: always() && steps.source_clean.outcome == 'success'

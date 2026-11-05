@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import stat
 import subprocess
+import re
 
 PHASES=frozenset(('SCRIPT_ENTERED','PACKET_DECODE','RUNTIME_FILE','ENVIRONMENT',
     'WORKER_START','WORKER_CONTROL','WORKER_OUTPUT','RELEASE_HANDSHAKE','PUBLICATION'))
@@ -77,3 +78,44 @@ def annotate_timeout(root,error):
     note=timeout_note(root)
     print(note,flush=True)
     error.add_note(note)
+
+
+def public_timeout_lines(raw,expected_ids):
+    """Project only closed notes for source-collected, failed S1 fixture cases.
+
+    The workflow must first bind its collected inventory to exact Actions/Git
+    provenance. This does not change the private/public JUnit acceptance rules.
+    """
+    from scripts import project_public_ci_evidence as public
+    from scripts.platform_coverage import NATIVE_VARIANTS
+    public.need(type(raw)is bytes and len(raw)<=public.LIMIT)
+    public.need(type(expected_ids)is list and 1<=len(expected_ids)<=10000)
+    public.need(all(type(value)is str and re.fullmatch('case_[0-9a-f]{64}',value)for value in expected_ids))
+    public.need(expected_ids==sorted(set(expected_ids)))
+    projected=public.project(raw,set());public.validate_junit(projected,set())
+    projected_cases=list(public.parse(projected).iter('testcase'))
+    public.need(sorted(case.get('name')for case in projected_cases)==expected_ids)
+    original_cases=public.cases_from(public.parse(raw));public.need(len(original_cases)==len(projected_cases))
+    pattern=re.compile(r'S1_FIXTURE_TIMEOUT phase=([A-Z_]+) role=([a-z0-9_]+|NONE) elapsed_ms=([0-9]{1,5}) reason=OUTER_15S_DEADLINE')
+    names={'test_supervisor_bounded_projection['+variant+']'for variant in NATIVE_VARIANTS}
+    output=[]
+    for case,opaque in zip(original_cases,projected_cases):
+        if case.get('classname')!='tests.test_s1_supervisor'or case.get('name')not in names:continue
+        failure=case.find('failure')
+        if failure is None:failure=case.find('error')
+        if failure is None:continue
+        notes=set()
+        for value in (failure.get('message',''),failure.text or'',*(child.text or'' for child in case if child.tag in ('system-out','system-err'))):
+            for line in value.splitlines():
+                line=line.strip()
+                if not line.startswith('S1_FIXTURE_TIMEOUT '):continue
+                match=pattern.fullmatch(line)
+                public.need(match is not None)
+                phase,role,elapsed=match.groups()
+                public.need(phase in PHASES|{'START_NOT_OBSERVED','UNAVAILABLE'}and role in ROLES and str(int(elapsed))==elapsed and 0<=int(elapsed)<=30000)
+                notes.add((phase,role,elapsed))
+        public.need(len(notes)<=1)
+        if notes:
+            phase,role,elapsed=next(iter(notes))
+            output.append(f"S1_FIXTURE_TIMEOUT case={opaque.get('name')} phase={phase} role={role} elapsed_ms={elapsed} reason=OUTER_15S_DEADLINE")
+    return output

@@ -15,6 +15,13 @@ function Public-Refusal([string]$Reason,[int]$Code=2) {
  next_stage='BLOCKED';stop_required=$true}|ConvertTo-Json -Compress
 }
 function Need($Condition){if(-not $Condition){throw 'UNAVAILABLE'}}
+function Write-ControlLine([IO.Stream]$Stream,[string]$Value){
+ # Byte-framed protocol: .NET Framework StreamWriter inherits Console.InputEncoding
+ # and may emit a BOM. Do not mutate console encoding or relax the worker parser.
+ Need ($Value -cmatch '^(?:[1-9][0-9]{0,9}|[0-9a-f]{32})$')
+ $bytes=[Text.Encoding]::ASCII.GetBytes($Value+[char]10)
+ $Stream.Write($bytes,0,$bytes.Length);$Stream.Flush()
+}
 function Local-Ordinary([string]$Path){
  Need ($Path -match '^[A-Za-z]:\\' -and $Path.Substring(2).IndexOf(':') -lt 0)
  $parts=$Path.Substring(3).Split('\');$at=$Path.Substring(0,3)
@@ -102,10 +109,23 @@ try {
  $info.WorkingDirectory=$Repo;$info.UseShellExecute=$false;$info.CreateNoWindow=$true
  $info.RedirectStandardInput=$true;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
  $child=New-Object Diagnostics.Process;$child.StartInfo=$info
- Need ($watch.Elapsed.TotalSeconds -lt 30)
- Need ($child.Start())
- $child.StandardInput.WriteLine([string]$child.Id)
- $child.StandardInput.Flush()
+ # .NET Framework emits StreamWriter's preamble while enabling AutoFlush
+ # INSIDE Process.Start, before BaseStream becomes available. Keep the same
+ # console code page and restore the process-local Encoding object immediately.
+ $priorInputEncoding=[Console]::InputEncoding
+ $restoreInputEncoding=$false
+ try {
+  if($priorInputEncoding.GetPreamble().Length -ne 0){
+   Need ($priorInputEncoding.CodePage -eq 65001)
+   [Console]::InputEncoding=New-Object Text.UTF8Encoding($false)
+   $restoreInputEncoding=$true
+   Need ([Console]::InputEncoding.CodePage -eq $priorInputEncoding.CodePage -and [Console]::InputEncoding.GetPreamble().Length -eq 0)
+  }
+  Need ($watch.Elapsed.TotalSeconds -lt 30)
+  Need ($child.Start())
+ } finally {if($restoreInputEncoding){[Console]::InputEncoding=$priorInputEncoding}}
+ $control=$child.StandardInput.BaseStream
+ Write-ControlLine $control ([string]$child.Id)
  # Pin worker execution to one CPU already available to this process.
  [long]$mask=$child.ProcessorAffinity.ToInt64();[long]$bit=1
  while(($mask -band $bit) -eq 0 -and $bit -gt 0){$bit=$bit -shl 1}
@@ -173,7 +193,7 @@ try {
  $rng=[Security.Cryptography.RandomNumberGenerator]::Create()
  try{$rng.GetBytes($random)}finally{$rng.Dispose()}
  $nonce=([BitConverter]::ToString($random)).Replace('-','').ToLowerInvariant()
- $child.StandardInput.WriteLine($nonce);$child.StandardInput.Close()
+ Write-ControlLine $control $nonce;$control.Close()
  Need ($child.WaitForExit(500) -and $errTask.Wait(500) -and $errTask.Result -eq 0 -and $watch.Elapsed.TotalSeconds -lt 30)
  Need ($child.ExitCode -eq $r.exit_code)
  $tail=New-Object byte[] 64;$tailCount=0

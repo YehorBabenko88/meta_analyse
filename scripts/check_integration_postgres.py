@@ -6,6 +6,9 @@ isolated PR #9 baseline. No optional/skipped database tests are accepted.
 from pathlib import Path
 import subprocess
 import sys
+if __package__ in (None,''):
+    sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from scripts.ci_skip_policy import allowed_pairs
 
 REQUIRED = (
     "test_resume_and_deduplication",
@@ -26,6 +29,8 @@ def main():
         raise SystemExit("Usage: check_integration_postgres.py FULL_JUNIT_XML [--allow-skip TEST_NAME ...]")
     checker = Path(__file__).with_name("check_integration_junit.py")
     command = [sys.executable, str(checker), sys.argv[1], "--minimum", str(len(REQUIRED)), *sys.argv[2:]]
+    for _,name in sorted(allowed_pairs(sys.platform)):
+        command.extend(['--allow-skip',name])
     for name in REQUIRED:
         command.extend(["--require-identity", "tests.test_storage_ingestion_postgres." + name])
     for name in ("test_shutdown_waits_for_thread_write_before_cancelled_task_finishes",

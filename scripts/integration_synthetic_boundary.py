@@ -4,6 +4,7 @@ import subprocess
 import socket
 import sys
 import pytest
+from scripts.ci_skip_policy import allowed_identities
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'commissioning'))
@@ -21,14 +22,14 @@ def pytest_collection_finish(session):
     from _pytest.junitxml import mangle_test_address
     output=os.environ.get('META_ANALYSE_SYNTHETIC_IDENTITIES')
     if not output:return
+    allowed=allowed_identities(sys.platform,os.environ.get('META_ANALYSE_CI_IDENTITY_SCOPE'))
     rows=[];skips=[]
     for item in session.items:
         names=mangle_test_address(item.nodeid)
         pair=['.'.join(names[:-1]),item.name]
         digest=hashlib.sha256((json.dumps(pair,sort_keys=True,separators=(',',':'))+'\n').encode()).hexdigest()
         public='case_'+digest;rows.append(public)
-        if item.name in ('test_symlink_is_rejected','test_existing_private_survives_static_alias_spellings[symlink]'):skips.append(public)
-        if os.environ.get('META_ANALYSE_CI_IDENTITY_SCOPE')=='full' and sys.platform!='win32' and item.name=='test_failed_pip_install_never_reports_success_or_creates_launcher':skips.append(public)
+        if public in allowed:skips.append(public)
     def git(arg):return subprocess.check_output(['git','rev-parse',arg],text=True).strip()
     manifest=dict(schema=1,sha=git('HEAD'),tree=git('HEAD^{tree}'),identities=sorted(rows),allowed_skips=sorted(skips))
     Path(output).write_text(json.dumps(manifest,sort_keys=True)+'\n',encoding='utf-8')

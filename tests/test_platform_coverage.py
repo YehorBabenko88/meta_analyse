@@ -20,6 +20,16 @@ def receipt(platform='linux',suite='main'):
         passed=l['selected'][:],skipped=[],source_authenticity='NOT_EVALUATED',physical='NOT_RUN')
 
 
+@pytest.mark.parametrize('platform,accepted',[('windows',True),('linux',False)])
+def test_platform_receipt_admits_posix_filename_skip_on_windows_only(platform,accepted):
+    r=receipt(platform);case=p.identity('tests.test_headless_service','test_untracked_index_record_spoof_cannot_replace_removed_index_entry')
+    l=r['ledger'];l['identities']=sorted(l['identities']+[case]);l['selected']=sorted(l['selected']+[case])
+    r['skipped']=[case]
+    if accepted:p.validate_receipt(r)
+    else:
+        with pytest.raises(ValueError):p.validate_receipt(r)
+
+
 @pytest.mark.parametrize('suite',['main','commissioning'])
 def test_real_lane_partition_union_requires_native_windows(suite):
     linux,windows=receipt(suite=suite),receipt('windows',suite)
@@ -123,3 +133,26 @@ def test_collection_policy_forbids_unreviewed_omission_or_partial_selection():
             with pytest.raises(ValueError):plugin.pytest_collection_modifyitems(None,config,[])
         config=SimpleNamespace(option=SimpleNamespace(**base),args=['tests/test_platform_coverage.py'])
         with pytest.raises(ValueError):plugin.pytest_collection_modifyitems(None,config,[])
+
+
+def test_native_workflow_runner_paths_use_step_context_not_job_context():
+    from pathlib import Path
+    text=(Path(__file__).parents[1]/'.github/workflows/commissioning-postgres18.yml').read_text()
+    native=text.split('  native-windows:\n',1)[1].split('\n  platform-coverage:',1)[0]
+    job,steps=native.split('    steps:\n',1)
+    # GitHub does not expose runner in jobs.<job_id>.env. It is available
+    # after runner allocation in jobs.<job_id>.steps.env.
+    assert '${{ runner.' not in job
+    collection=steps.split('      - name: Collect full catalog and execute every native case\n',1)[1].split('      - name:',1)[0]
+    assert '        env:\n' in collection
+    for variable,filename in (('META_ANALYSE_PLATFORM_LEDGER','platform-ledger.json'),
+                              ('META_ANALYSE_SYNTHETIC_IDENTITIES','native-identities.json')):
+        assert f'          {variable}: ${{{{ runner.temp }}}}/{filename}' in collection
+
+
+def test_commissioning_can_qualify_current_mission_branches():
+    from pathlib import Path
+    text=(Path(__file__).parents[1]/'.github/workflows/commissioning-postgres18.yml').read_text()
+    triggers=text.split('permissions:',1)[0]
+    assert '  workflow_dispatch:\n' in triggers
+    assert "'mission3/**'" in triggers

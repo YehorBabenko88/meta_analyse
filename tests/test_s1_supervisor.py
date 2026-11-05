@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 import pytest
+from scripts.s1_fixture_diagnostics import instrument_fixture, annotate_timeout
 
 ROOT = Path(__file__).parents[1]
 PS = shutil.which('powershell.exe') if os.name == 'nt' else shutil.which('pwsh')
@@ -41,7 +42,15 @@ def test_supervisor_bounded_projection(tmp_path, variant):
     if variant == 'raw_metadata': raw = 'PRIVATE_PATH_HOSTNAME_SID_EXCEPTION'
     if variant == 'duplicate': raw = raw.replace('{', '{"schema":1,', 1)
     if variant == 'escaped_duplicate': raw = raw.replace('"schema": 1', '"schema":0,"\\u0073chema":1', 1)
-    code = 'import time,sys,os\nassert int(sys.stdin.buffer.readline(32))==os.getpid()\ntime.sleep(.1)\n'
+    control_marker = tmp_path / 'fixture-control-prefix.txt'
+    code = 'import time,sys,os\ncontrol=sys.stdin.buffer.readline(32)\n'
+    code += ('control_class=("UTF8_BOM" if control.startswith(bytes.fromhex("efbbbf")) else '
+             '"UTF16_BOM" if control.startswith((bytes.fromhex("fffe"),bytes.fromhex("feff"))) else '
+             '"ASCII_MATCH" if control.strip()==str(os.getpid()).encode("ascii") else '
+             '"ASCII_MISMATCH" if control.isascii() else "NONASCII")\n')
+    code += 'with open(' + repr(str(control_marker)) + ',"w",encoding="ascii") as marker:marker.write(control_class)\n'
+    code += 'assert int(control)==os.getpid()\ntime.sleep(.1)\n'
+
     if variant == 'stderr': code += 'sys.stderr.write("PRIVATE_EXCEPTION")\n'
     if variant == 'timeout': code += 'time.sleep(60)\n'
     if variant == 'memory': code += 'x=bytearray(300*1024*1024)\ntime.sleep(5)\n'
@@ -72,8 +81,17 @@ def test_supervisor_bounded_projection(tmp_path, variant):
     launcher = re.sub(r"\$workerPin='[^']+'", "$workerPin='" + pin + "'", launcher)
     if variant in ('timeout', 'slow_partial'):
         launcher = launcher.replace('$watch.Elapsed.TotalSeconds -ge 30', '$watch.Elapsed.TotalSeconds -ge 1')
+    # Diagnose only the copied fixture supervisor, never alter production guards.
+    # Line numbers/known booleans identify which exact refusal boundary failed;
+    # paths, environment values and exception bodies stay private.
+    launcher = launcher.replace(
+        "function Need($Condition){if(-not $Condition){throw 'UNAVAILABLE'}}",
+        "function Need($Condition){if(-not $Condition){$script:fixtureNeedLine=[int]$MyInvocation.ScriptLineNumber;throw 'UNAVAILABLE'}}")
+    launcher = launcher.replace(
+        "} catch {\n if($null -ne $child)",
+        "} catch {\n [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'fixture-stage.json'),([ordered]@{need_line=[int]$script:fixtureNeedLine;catch_line=[int]$_.InvocationInfo.ScriptLineNumber;child_started=[bool]($null -ne $child);role=[string]$entry.role;environment_key=[string]$key}|ConvertTo-Json -Compress))\n if($null -ne $child)")
     wrapper = tmp_path / 'Invoke-S1Precheck.ps1'
-    wrapper.write_text(launcher)
+    wrapper.write_text(instrument_fixture(launcher))
     packet = tmp_path / 'private.json'
     roles = ['python_exe','python312_dll','hashlib_pyd','ctypes_pyd','libcrypto','libffi',
              'crt','bz2_pyd','lzma_pyd','git_exe','git_core','libiconv','libintl','pcre2',
@@ -88,18 +106,48 @@ def test_supervisor_bounded_projection(tmp_path, variant):
     packet.write_text(json.dumps(dict(schema=1, reference_kind='EXTERNALLY_REVIEWED_CONTINUITY',
                                      files=files, absent=[str(tmp_path / 'absent')],
                                      environment={k: os.environ.get(k) for k in env_keys})))
-    p = subprocess.run([PS, '-NoProfile', '-NonInteractive', '-File', str(wrapper),
-                        '-Repo', str(tmp_path), '-Python', sys._base_executable, '-Packet', str(packet),
-                        '-PacketSha256', hashlib.sha256(packet.read_bytes()).hexdigest(), '-OperatorApproved'],
-                       capture_output=True, timeout=15)
+    try:
+        p = subprocess.run([PS, '-NoProfile', '-NonInteractive', '-File', str(wrapper),
+                            '-Repo', str(tmp_path), '-Python', sys._base_executable, '-Packet', str(packet),
+                            '-PacketSha256', hashlib.sha256(packet.read_bytes()).hexdigest(), '-OperatorApproved'],
+                           capture_output=True, timeout=15)
+    except subprocess.TimeoutExpired as error:
+        annotate_timeout(tmp_path,error)
+        raise
     assert p.stderr == b''
     assert b'PRIVATE_' not in p.stdout and str(tmp_path).encode() not in p.stdout
     out = json.loads(p.stdout)
+    marker = tmp_path / 'fixture-stage.json'
+    stage = {}
+    if marker.exists() and marker.stat().st_size <= 512:
+        candidate = json.loads(marker.read_bytes())
+        for key in ('need_line', 'catch_line'):
+            if type(candidate.get(key)) is int and 0 <= candidate[key] <= 500:
+                stage[key] = candidate[key]
+        if type(candidate.get('child_started')) is bool:
+            stage['child_started'] = candidate['child_started']
+        if candidate.get('role') in roles:
+            stage['role'] = candidate['role']
+        if candidate.get('environment_key') in env_keys:
+            stage['environment_key'] = candidate['environment_key']
+    # No raw paths, executable identities, environment values or traceback text.
+    control_class = 'NOT_OBSERVED'
+    if control_marker.exists() and control_marker.stat().st_size <= 32:
+        observed = control_marker.read_text(encoding='ascii')
+        if observed in ('UTF8_BOM', 'UTF16_BOM', 'ASCII_MATCH', 'ASCII_MISMATCH', 'NONASCII'):
+            control_class = observed
+    diagnosis = json.dumps(dict(variant=variant, control_prefix=control_class, exit=p.returncode,
+                                reason=out.get('reason'), attempts=out.get('attempts'),
+                                python_path_canonical=str(Path(sys._base_executable).resolve()) == sys._base_executable,
+                                shell_path_canonical=str(Path(PS).resolve()) == PS,
+                                temporary_path_canonical=tmp_path.resolve() == tmp_path,
+                                stage=stage), sort_keys=True)
     assert out['authorization'] == 'NONE' and out['g0_status'] == 'FAIL_CLOSED'
     if variant in ('valid', 'partial', 'partial_ack'):
-        assert p.returncode == 0 and out['outcome'] == 'PASS_PRECHECK_ONLY'
+        assert control_class == 'ASCII_MATCH', diagnosis
+        assert p.returncode == 0 and out['outcome'] == 'PASS_PRECHECK_ONLY', diagnosis
     else:
         assert p.returncode in (1, 2) and out['outcome'] != 'PASS_PRECHECK_ONLY'
     if variant in ('timeout', 'memory'):
-        assert out['reason'] == 'BUDGET_EXCEEDED'
+        assert out['reason'] == 'BUDGET_EXCEEDED', diagnosis
     if variant == 'wrong_python': assert out['attempts'] == 0

@@ -82,10 +82,8 @@ def validate_receipt(r):
     passed,skipped=ids(r['passed']),ids(r['skipped'])
     need(not passed&skipped and passed|skipped==set(l['selected']))
     need(not set(l['native_identities'])&skipped)
-    # Keep only the pre-existing narrowly allowed skips; never admit a native skip.
-    allowed={identity('tests.test_installer','test_failed_pip_install_never_reports_success_or_creates_launcher')} if l['platform']=='linux' else set()
-    allowed|={identity('tests.test_public_junit','test_symlink_is_rejected'),
-              identity('tests.test_pr23_transaction','test_existing_private_survives_static_alias_spellings[symlink]')}
+    from scripts.ci_skip_policy import allowed_identities
+    allowed=allowed_identities(l['platform'])
     need(skipped<=allowed)
     return r
 

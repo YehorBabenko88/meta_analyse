@@ -53,6 +53,25 @@ def test_projection_commands_stop_on_first_failure():
             block=block.split('      - uses: actions/upload-artifact@v4')[0]
             assert ('shell: bash' in block and 'set -euo pipefail' in block) or ('shell: pwsh' in block and block.count('$LASTEXITCODE -ne 0')==2)
 
+
+def test_benchmark_projection_only_runs_after_an_actual_attempt_and_clean_source():
+    import json
+    text=(ROOT/'.github/workflows/ci.yml').read_text()
+    blocks=text.split('        id: benchmark_projection\n')[1:]
+    assert len(blocks)==2
+    for block in blocks:
+        condition=block.splitlines()[0].strip()
+        # Closed expression grammar makes the truth table independent of the
+        # CLI's success/failure enum. Skipped/cancelled producers have no result.
+        match=re.fullmatch(r"if: \$\{\{ always\(\) && steps.source_clean.outcome == 'success' && contains\(fromJSON\('([^']+)'\), steps.benchmark.outcome\) \}\}",condition)
+        assert match is not None, 'benchmark projection can run for an unstarted producer'
+        admitted=json.loads(match[1])
+        assert set(admitted)=={'success','failure'} and len(admitted)==2
+        for source in ('success','failure','skipped','cancelled'):
+            for producer in ('success','failure','skipped','cancelled'):
+                decision=source=='success' and producer in admitted
+                assert decision == (source=='success' and producer in ('success','failure'))
+
 @pytest.mark.parametrize('ordinal',[1,2,3])
 def test_write_fault_never_publishes_partial_set(tmp_path,receipt,monkeypatch,ordinal):
     source=raw(tmp_path,'<testsuite><testcase classname="x" name="a"/></testsuite>')

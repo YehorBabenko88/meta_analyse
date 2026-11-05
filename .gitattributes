@@ -10,3 +10,6 @@ tests/fixtures/pr39_process_identity.py.txt -text
 scripts/s1_precheck.py -text
 scripts/Invoke-S1Precheck.ps1 -text
 scripts/s1_source_reference.json -text
+
+# Keep the hash-pinned dependency lock byte-identical on Windows.
+requirements.lock -text

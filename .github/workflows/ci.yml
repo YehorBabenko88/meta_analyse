@@ -139,7 +139,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Public inventory blocked' }
       - name: Project bounded UI benchmark evidence (including refusal)
         id: benchmark_projection
-        if: ${{ always() && steps.source_clean.outcome == 'success' }}
+        if: ${{ always() && steps.source_clean.outcome == 'success' && contains(fromJSON('["success","failure"]'), steps.benchmark.outcome) }}
         shell: pwsh
         run: python scripts/project_ui_benchmark.py --output public-benchmark --source source-sha.json --benchmark "$env:RUNNER_TEMP/meta-analyse-ci/ui-performance.json" --expected-outcome "${{ steps.benchmark.outcome }}"
       - uses: actions/upload-artifact@v4
@@ -260,7 +260,7 @@ jobs:
           python scripts/project_public_ci_evidence.py --validate public-evidence
       - name: Project bounded UI benchmark evidence (including refusal)
         id: benchmark_projection
-        if: ${{ always() && steps.source_clean.outcome == 'success' }}
+        if: ${{ always() && steps.source_clean.outcome == 'success' && contains(fromJSON('["success","failure"]'), steps.benchmark.outcome) }}
         shell: bash
         run: python scripts/project_ui_benchmark.py --output public-benchmark --source source-sha.json --benchmark ui-performance.json --expected-outcome "${{ steps.benchmark.outcome }}"
       - uses: actions/upload-artifact@v4

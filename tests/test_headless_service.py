@@ -314,3 +314,33 @@ def test_git_http_alternates_metadata_is_rejected_before_object_reads(capsule):
     # forbidden even before Git could use it as a remote object fallback.
     (root/'.git/objects/info/http-alternates').write_text('https://example.invalid/never-contacted\n')
     with pytest.raises(ValueError):service.SourceVerifier(root,identity).verify()
+
+
+def test_protected_git_exact_scope_handles_forced_foreign_owner_without_config_writes(capsule,monkeypatch):
+    from types import SimpleNamespace
+    root,env,_=capsule;identity=service.Identity.from_environment(env);config=(root/'.git/config').read_bytes();calls=[]
+    real=service.subprocess.Popen
+    def foreign(*args,**kwargs):
+        kwargs['env']=dict(kwargs.get('env',os.environ),GIT_TEST_ASSUME_DIFFERENT_OWNER='1');return real(*args,**kwargs)
+    monkeypatch.setattr(service.subprocess,'Popen',foreign)
+    with pytest.raises(ValueError):service.SourceVerifier(root,identity).git('rev-parse','HEAD')
+    def scope(module,actual,commit):
+        calls.append((module,actual,commit));assert (module,actual,commit)==('meta_analyse',root,identity.source_commit);return root
+    admitted=SimpleNamespace(require_current=lambda:True,source_scope=scope,git_executable=identity.git_executable,git_sha256=identity.git_sha256)
+    verifier=service.SourceVerifier(root,identity,startup_admission=admitted)
+    assert verifier.git('rev-parse','HEAD').decode().strip()==identity.source_commit
+    assert calls and (root/'.git/config').read_bytes()==config
+    admitted.require_current=lambda:1
+    with pytest.raises(ValueError):verifier.git('rev-parse','HEAD')
+    admitted.require_current=lambda:True;admitted.source_scope=lambda *args:root.parent
+    with pytest.raises(ValueError):verifier.git('rev-parse','HEAD')
+
+
+def test_startup_admission_passed_through_main_and_server_without_json_optin(monkeypatch):
+    from types import SimpleNamespace
+    admission=object();seen=[]
+    class Server:
+        def __init__(self,identity,*,port,startup_admission=None):seen.append(startup_admission);raise ValueError('fixed-test-stop')
+    monkeypatch.setattr(service.Identity,'from_environment',lambda env:None);monkeypatch.setattr(service,'PrivateServer',Server)
+    assert service.main(['--execute'],startup_admission=admission)==2
+    assert seen==[admission]

@@ -84,8 +84,8 @@ class Identity:
 
 class SourceVerifier:
     """Authoritative Git admission plus immutable whole-capsule health proof."""
-    def __init__(self,root,identity):
-        self.root=Path(root).absolute();self.identity=identity;self.snapshot=None
+    def __init__(self,root,identity,*,startup_admission=None):
+        self.root=Path(root).absolute();self.identity=identity;self.snapshot=None;self.startup_admission=startup_admission
         self._health_baseline=None;self._health_binding_attempted=False
 
     @staticmethod
@@ -176,6 +176,15 @@ class SourceVerifier:
         self.verify_health();self.verify();self.verify_health()
 
     def git(self,*args,input=b'',limit=40*1024*1024):
+        owner_scope=[]
+        if self.startup_admission is not None:
+            admission=self.startup_admission
+            need(not isinstance(admission,dict) and callable(getattr(admission,'require_current',None)) and callable(getattr(admission,'source_scope',None)))
+            need(admission.require_current() is True)
+            scoped=admission.source_scope('meta_analyse',self.root,self.identity.source_commit)
+            need(isinstance(scoped,Path) and scoped.is_absolute() and '*' not in str(scoped) and scoped==self.root.resolve(strict=True))
+            need(Path(admission.git_executable)==self.identity.git_executable and admission.git_sha256==self.identity.git_sha256)
+            owner_scope=['-c','safe.directory=','-c','safe.directory='+scoped.as_posix()]
         executable=regular(self.identity.git_executable,unique=False)
         need(executable.stat().st_size<=64*1024*1024)
         need(hashlib.sha256(executable.read_bytes()).hexdigest()==self.identity.git_sha256)
@@ -183,7 +192,7 @@ class SourceVerifier:
         env.update(GIT_CONFIG_NOSYSTEM='1',GIT_CONFIG_SYSTEM=os.devnull,GIT_CONFIG_GLOBAL=os.devnull,GIT_ATTR_NOSYSTEM='1',GIT_NO_REPLACE_OBJECTS='1',GIT_NO_LAZY_FETCH='1',GIT_TERMINAL_PROMPT='0')
         with tempfile.TemporaryFile() as stdin:
             stdin.write(input);stdin.seek(0)
-            process=subprocess.Popen([str(self.identity.git_executable),'--no-replace-objects','--no-optional-locks','-c','core.fsmonitor=false','-C',str(self.root),*args],stdin=stdin,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,env=env)
+            process=subprocess.Popen([str(self.identity.git_executable),'--no-replace-objects','--no-optional-locks','-c','core.fsmonitor=false',*owner_scope,'-C',str(self.root),*args],stdin=stdin,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,env=env)
             timer=threading.Timer(5,process.kill);timer.daemon=True;timer.start()
             try:
                 raw=process.stdout.read(limit+1)
@@ -341,13 +350,13 @@ class PrivateServer(ThreadingHTTPServer):
     block_on_close=True
     allow_reuse_address=False
 
-    def __init__(self,identity,*,port=0):
+    def __init__(self,identity,*,port=0,startup_admission=None):
         need(type(port) is int and 0<=port<=65535)
         cache=owned_profile()
         attest_module(sys.modules['meta_analyse'],'src/meta_analyse/__init__.py')
         need(Path(__file__).absolute()==ROOT/'src/meta_analyse/headless_service.py')
         need(__cached__ is not None and Path(__cached__).is_relative_to(cache) and not Path(__cached__).exists())
-        self.identity=identity;self.verifier=SourceVerifier(ROOT,identity)
+        self.identity=identity;self.verifier=SourceVerifier(ROOT,identity,startup_admission=startup_admission)
         self.verifier.bind_health();selfcheck()
         self.slots=threading.BoundedSemaphore(4)
         super().__init__(('127.0.0.1',port),Handler)
@@ -434,7 +443,7 @@ class Handler(BaseHTTPRequestHandler):
         except (OSError,TimeoutError):return
 
 
-def main(argv=None):
+def main(argv=None,*,startup_admission=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--execute',action='store_true');parser.add_argument('--port',type=int,default=8769)
     args=parser.parse_args(argv)
@@ -444,7 +453,7 @@ def main(argv=None):
     server=None
     try:
         identity=Identity.from_environment(os.environ)
-        server=PrivateServer(identity,port=args.port)
+        server=PrivateServer(identity,port=args.port,startup_admission=startup_admission)
         stop=threading.Event()
         def halt(*_):stop.set()
         signal.signal(signal.SIGTERM,halt);signal.signal(signal.SIGINT,halt)

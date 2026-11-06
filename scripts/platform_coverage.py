@@ -162,7 +162,7 @@ def main():
             need(os.environ.get('GITHUB_ACTIONS')=='true')
             sha,tree=git('HEAD'),git('HEAD^{tree}')
             # Check actual checkout binding again immediately before receipt/review.
-            need(not subprocess.check_output(['git','status','--porcelain','--untracked-files=no'],text=True))
+            need(not subprocess.check_output(['git','--no-replace-objects','status','--porcelain','--untracked-files=no'],text=True))
             run_id,attempt=os.environ['GITHUB_RUN_ID'],os.environ['GITHUB_RUN_ATTEMPT']
             if args.command=='receipt':
                 l=public.decode(public.read(args.ledger))

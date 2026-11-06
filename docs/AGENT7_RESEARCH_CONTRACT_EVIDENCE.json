@@ -1,0 +1,63 @@
+{
+  "schema": "agent7.regression-evidence.v1",
+  "date": "2026-11-06",
+  "scope": "OFFLINE_SYNTHETIC_ENGINEERING_ONLY",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "endpoint_ack": "PENDING",
+  "physical_acceptance": "NOT_QUALIFIED",
+  "real_orders": "NOT_SENT",
+  "system_acceptance": "BLOCKED",
+  "no_gate_waiver": true,
+  "base_head": "2c4db055e56e36384a2661d443f9abc7b2331e90",
+  "tested_source": {
+    "head": "0bd0612e95251893e95a48e20f6cb40cb086f2ad",
+    "tree": "458a0102b514aaddb49f6dfe808cbc4cab48cbac",
+    "branch": "agent7/meta-research-contract-20261106",
+    "tracked_clean": true
+  },
+  "command": "python -m pytest -q tests/test_agent7_ohlcv_research_contract.py --basetemp=<fresh-owned-scratch> --json-report",
+  "exit_code": 0,
+  "summary": {
+    "passed": 24,
+    "total": 24,
+    "collected": 24
+  },
+  "nodeids": [
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_deterministic_derived_levels_and_capability_denial[BTCUSDT]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_deterministic_derived_levels_and_capability_denial[ETHUSDT]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_deterministic_derived_levels_and_capability_denial[SOLUSDT]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_deterministic_derived_levels_and_capability_denial[XRPUSDT]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_deterministic_derived_levels_and_capability_denial[BNBUSDT]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_deterministic_derived_levels_and_capability_denial[DOGEUSDT]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_deterministic_derived_levels_and_capability_denial[ADAUSDT]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_deterministic_derived_levels_and_capability_denial[AVAXUSDT]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_deterministic_derived_levels_and_capability_denial[LINKUSDT]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_deterministic_derived_levels_and_capability_denial[DOTUSDT]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_resealed_invalid_dataset_still_fails_closed[schema]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_resealed_invalid_dataset_still_fails_closed[gap]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_resealed_invalid_dataset_still_fails_closed[missing]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_resealed_invalid_dataset_still_fails_closed[duplicate]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_resealed_invalid_dataset_still_fails_closed[ohlc]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_resealed_invalid_dataset_still_fails_closed[future]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_resealed_invalid_dataset_still_fails_closed[symbol]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_resealed_invalid_dataset_still_fails_closed[extra]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_resealed_invalid_dataset_still_fails_closed[rows-limit]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_untouched_digest_cannot_hide_changed_dataset",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_nonfinite_input_rejected_before_result[nan]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_nonfinite_input_rejected_before_result[inf]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_nonfinite_input_rejected_before_result[-inf]",
+    "tests/test_agent7_ohlcv_research_contract.py::test_agent7_resource_budget_precedes_candle_allocation"
+  ],
+  "log_sha256": "d36d8364872c4aca04a5ecd9bb23965106ee164e39fb47d08318484d57ef1269",
+  "json_report_sha256": "ab864ad520afa06f99df42d396a20d16568854ae082688a05d884c88ab04993d",
+  "full_suite": "Prior incomplete environment run retained; retry with exact Unified dependency in progress. Final same-HEAD hosted CI is required separately.",
+  "invariants": [
+    "10symbol deterministic levels with independent hand oracle",
+    "dataset and request digest binding",
+    "schema/gap/corruption/nonfinite/budget rejection",
+    "no execution/trading/training/h_b authority",
+    "whole backfill declared retrieval is not point-in-time authenticity"
+  ],
+  "unified_dependency": "d065537d880295282eb2a157579813958417407e"
+}

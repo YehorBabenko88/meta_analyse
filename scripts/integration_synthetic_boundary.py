@@ -30,7 +30,7 @@ def pytest_collection_finish(session):
         digest=hashlib.sha256((json.dumps(pair,sort_keys=True,separators=(',',':'))+'\n').encode()).hexdigest()
         public='case_'+digest;rows.append(public)
         if public in allowed:skips.append(public)
-    def git(arg):return subprocess.check_output(['git','rev-parse',arg],text=True).strip()
+    def git(arg):return subprocess.check_output(['git','--no-replace-objects','rev-parse',arg],text=True).strip()
     manifest=dict(schema=1,sha=git('HEAD'),tree=git('HEAD^{tree}'),identities=sorted(rows),allowed_skips=sorted(skips))
     Path(output).write_text(json.dumps(manifest,sort_keys=True)+'\n',encoding='utf-8')
 

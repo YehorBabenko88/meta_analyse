@@ -52,8 +52,8 @@ def main():
     parser.add_argument('expected_json')
     args = parser.parse_args()
     try:
-        sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
-        tree = subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True, stderr=subprocess.DEVNULL).strip()
+        sha = subprocess.check_output(['git', '--no-replace-objects', 'rev-parse', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
+        tree = subprocess.check_output(['git', '--no-replace-objects', 'rev-parse', 'HEAD^{tree}'], text=True, stderr=subprocess.DEVNULL).strip()
         raw = public.read(args.xml)
         manifest = public.decode(public.read(args.expected_json))
         count = check(raw, manifest, sha, tree)

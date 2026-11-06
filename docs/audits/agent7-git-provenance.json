@@ -1,0 +1,71 @@
+{
+  "schema": "agent7.git-provenance-regressions.v1",
+  "repository": "meta",
+  "base_head": "88b45c328bfdc8131ff0c6d139fddd8b27a4050c",
+  "base_tree": "83304074f9cc3f90c09615c7f6920e1a07eab0c6",
+  "scope": "IsolatedGitobjectcontrols andsourceevidencehardening; no research/trading/native/profile/skip/identitypolicychange",
+  "changed_source_and_tests": [
+    "scripts/record_ci_source.py",
+    "scripts/integration_synthetic_boundary.py",
+    "scripts/check_final_integration_junit.py",
+    "scripts/platform_coverage.py",
+    "tests/test_ci_source_replacements.py"
+  ],
+  "test_controls": {
+    "new_tests": 10,
+    "namespaces": [
+      "refs/replace",
+      "refs/agent7-replacements"
+    ],
+    "cases": [
+      "clean",
+      "blob",
+      "tree",
+      "commit"
+    ],
+    "real_dirty_checkout_rejection_cases": 2,
+    "isolated_git": "Independentseed+--no-hardlinksclone, noalternates, Gitpath/configenvironmentcleared beforefixtureGit, rawprimaryrefsuntouched",
+    "witness": "Actualreplacement-awarecat-file returnsvirtualbytes, raw--no-replace lookupreturnsoriginal",
+    "no_skip_when_git_available": true
+  },
+  "classification": "Meta recorderpreviouslymisreportedtreewithunchangedHEAD undercommitreplacement; Strattstatuspreconditionfalse-dirtyfailclosedavailability, notprovenPASSbypass",
+  "red_green": {
+    "red": {
+      "exit_code": 1,
+      "summary": {
+        "passed": 6,
+        "failed": 4,
+        "total": 10,
+        "collected": 10
+      },
+      "json_sha256": "a6b6a0345f28c8cfcd3f934ee822ad34d0a8703eab4532c3a4d8d08c7c0d3a57",
+      "log_sha256": "2080da94b4ae090899514aa0c6d2eef4e2adafb45e319c8e358c4279226a6434"
+    },
+    "green": {
+      "exit_code": 0,
+      "summary": {
+        "passed": 68,
+        "total": 68,
+        "collected": 68
+      },
+      "json_sha256": "b99b97192ab295079763e385e6fcccf5e8d387402b87fe1a33d9e3208092de35",
+      "log_sha256": "5dd07ead01fe2f089092885ea3c1d4e3664c1ca2cb325055f14e8acbc1c33193"
+    }
+  },
+  "environment": {
+    "python": "3.12.10",
+    "git": "git version 2.55.0.windows.5",
+    "local_scope": "Windows softwareguards only; no nativeMain/broker or endpoint/DB/network execution"
+  },
+  "acceptance_limits": {
+    "old_meta_ci": "3123actualCIidentities retained on88b; notretroactiveadversarialPASS",
+    "meta_source_authenticity": "NOT_EVALUATED",
+    "stratt_strict_aggregate": "UNCHANGED_BLOCKED",
+    "old_pr_refs": "77/71 preserved",
+    "math113": "dbb9 source/activation untouched, no cancel/rerun/relabel",
+    "new_ci": "NOT_YET_RUN",
+    "physical": "NOT_RUN",
+    "overall": "NO-GO"
+  },
+  "exact_final_head_tree": "Containingcommitcannotembedownhash; suppliedinDraftPRandexternalhandoff"
+}

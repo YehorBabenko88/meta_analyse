@@ -18,7 +18,7 @@ def read_orderflow_trades(store, *, venue: str, symbol: str,
     Interval is [start_ms, end_ms); results preserve Decimal precision.
     The result may be limited and does not establish source completeness.
     """
-    if not venue or not symbol:
+    if not isinstance(venue, str) or not venue.strip() or not isinstance(symbol, str) or not symbol.strip():
         raise ValueError("venue and symbol are required")
     if type(start_ms) is not int or type(end_ms) is not int or start_ms < 0 or end_ms <= start_ms:
         raise ValueError("invalid timestamp interval")

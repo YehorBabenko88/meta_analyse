@@ -11,6 +11,7 @@ jobs:
     timeout-minutes: 20
     env:
       UNIFIED_SOURCE_ROOT: ${{ github.workspace }}/.source/unified-system
+      MATH_SOURCE_ROOT: ${{ github.workspace }}/.source/math
       QT_QPA_PLATFORM: offscreen
       PYTHONASYNCIODEBUG: '1'
     steps:
@@ -225,6 +226,7 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       UNIFIED_SOURCE_ROOT: ${{ github.workspace }}/.source/unified-system
+      MATH_SOURCE_ROOT: ${{ github.workspace }}/.source/math
       QT_QPA_PLATFORM: offscreen
       PYTHONASYNCIODEBUG: '1'
       META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres

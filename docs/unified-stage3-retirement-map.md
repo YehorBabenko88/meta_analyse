@@ -74,3 +74,10 @@ See docs/meta-stage6-feature-migration.csv for 17 feature families with USED/UNK
 - Deletion gate: validate every old source consumer, identical-input precision and causal behavior, user settings/history/results and DB row counts/digests, no concurrent writers or duplicate services, physical Windows release acceptance, and separate owner confirmation.
 
 - Full pinned Python **file** inventory: `docs/meta-stage6-file-inventory.csv` contains all 83 `src/meta_analyse/*.py` modules at this Draft PR head, their exact Git blob OIDs, candidate owners, and explicit NOT_EXHAUSTIVELY_CHECKED reachability. Nine mixed-ownership modules require per-symbol separation. The 17-row feature-family ledger is `docs/meta-stage6-feature-migration.csv`. These two ledgers are not a complete dynamic/per-function audit, so archive clearance remains NO_GO.
+
+## Stage 10: isolated headless Math dependency
+
+- KEEP `grid_history_adapter.analyze_grid_history`, MetaScalp level ownership, historical settings and persisted result evidence pending migration.
+- MOVE the headless integration launch onto Unified's explicit `--dependency-root` for the Math SDK. This lets the isolated process import `core.py -> market_profile_math` using the already pinned SDK at `98d6783522aac7155cbb4635e5b29239746d88e0`. CI retains `-I -S -B` and the existing Math source parity verification.
+- MERGE through existing adapters and owner APIs. Production registration must supply the approved Math root or use the replacement Gateway route. Direct exchange/collector, paper writer and Qt/settings ownership transfers still require matching, qualified contracts and persisted row-digest/restore proof.
+- DELETE no source or data. Keep the legacy paper tests as a parity oracle until Terminan accepts equivalent inputs and results.

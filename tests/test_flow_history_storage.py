@@ -656,7 +656,7 @@ def test_legacy_orderflow_reader_rejects_missing_identity_and_invalid_intervals(
     from meta_analyse.orderflow_archive_reader import read_orderflow_trades
 
     store = FakeStore([])
-    for venue, symbol in (("", "BTCUSDT"), ("bybit", "")):
+    for venue, symbol in (("", "BTCUSDT"), ("bybit", ""), (None, "BTCUSDT"), (123, "BTCUSDT"), ("bybit", None), ("bybit", 123)):
         with pytest.raises(ValueError):
             read_orderflow_trades(
                 store, venue=venue, symbol=symbol, start_ms=1000, end_ms=2000

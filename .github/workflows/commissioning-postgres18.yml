@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: YehorBabenko88/math
-          ref: ed4339a30e4a97bf29f70b45627bf988bc1338b1
+          ref: 98d6783522aac7155cbb4635e5b29239746d88e0
           path: .source/math
           persist-credentials: false
       - name: Checkout exact owned Python bootstrap source
@@ -61,7 +61,7 @@ jobs:
         run: |
           import importlib.metadata,pathlib,subprocess
           root=pathlib.Path('.source/math').resolve(strict=True)
-          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='ed4339a30e4a97bf29f70b45627bf988bc1338b1'
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='98d6783522aac7155cbb4635e5b29239746d88e0'
           import market_profile_math,market_compute_api
           assert importlib.metadata.version('unified-math-kernels')=='0.1.0'
           assert pathlib.Path(market_profile_math.__file__).resolve().is_relative_to(root)
@@ -132,7 +132,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: YehorBabenko88/math
-          ref: ed4339a30e4a97bf29f70b45627bf988bc1338b1
+          ref: 98d6783522aac7155cbb4635e5b29239746d88e0
           path: .source/math
           persist-credentials: false
       - name: Checkout exact owned Python bootstrap source
@@ -161,7 +161,7 @@ jobs:
         run: |
           import importlib.metadata,pathlib,subprocess
           root=pathlib.Path('.source/math').resolve(strict=True)
-          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='ed4339a30e4a97bf29f70b45627bf988bc1338b1'
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='98d6783522aac7155cbb4635e5b29239746d88e0'
           import market_profile_math,market_compute_api
           assert importlib.metadata.version('unified-math-kernels')=='0.1.0'
           assert pathlib.Path(market_profile_math.__file__).resolve().is_relative_to(root)

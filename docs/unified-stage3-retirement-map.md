@@ -85,3 +85,21 @@ See docs/meta-stage6-feature-migration.csv for 17 feature families with USED/UNK
 ## Stage 11: qualify the next Math cohort
 
 Meta CI, commissioning and storage integration pin Math #122 at `150910fff08c896f243fdf7e64ec18611420a4d2`. The kernel, public compute API and package metadata Git objects match the Stage 10 pin. The parity script still verifies the same three objects and installed SDK. Unified bootstrap receives the Math source root explicitly. Revert the Stage 11 pin commit to restore the prior candidate across all four files together. This requires no data migration.
+
+## Stage 15: offline Terminan journal delivery
+
+`python -m meta_analyse.offline_paper_delivery SOURCE_JSON EXPECTED_SHA256 LEDGER_SQLITE`
+requires the pinned Terminan SDK from #91. Retain the source file and its independently
+recorded SHA-256 before attempting delivery. The `meta.paper.source.v1` object contains
+`schema`, `source_id`, `symbol`, and an ordered nonempty `events` array of
+`terminan.paper.event.v1` objects with contiguous sequences starting at one. Source limit
+is 8 MiB. Terminan validates each event and commits its ACK and checkpoint. An interrupted
+delivery can leave a committed prefix. To resume, reopen the same ledger and replay the
+original file with its original hash. Do not edit a rejected or incomplete file and treat
+it as a retry: content changes create a different run identity.
+
+The delivery receipt reports the source digest, run identity, highest ACKed sequence,
+fill count and ordered SHA-256 of fill ACKs. The adapter reads back the journal and rejects
+a fill digest mismatch. Keep the original source and local SQLite backup for restoration.
+The live monitor remains fenced. Source qualification, live cursor admission and migration
+of historical PostgreSQL rows need separate evidence.

@@ -159,6 +159,41 @@ def check_installed_api(root: Path) -> None:
     if importlib.metadata.version("unified-math-kernels") != "0.1.0":
         raise ValueError("unexpected Math package version")
 
+    # Expanded Math-owned market algorithms are checked at pinned source,
+    # without introducing another Meta implementation or synthetic live data.
+    for name in (
+        "tape_velocity_metrics", "wall_notional", "flow_window_metrics",
+        "wall_turnover_ratios", "untouched_decimal_levels",
+    ):
+        if not callable(getattr(kernel, name, None)):
+            raise ValueError("missing Math-owned migration symbol")
+    tape = kernel.tape_velocity_metrics(
+        ((1000, Decimal("100"), Decimal("2"), "Buy"),
+         (1500, Decimal("101"), Decimal("1"), "Sell")),
+        Decimal("100"), Decimal("1"), 5000, Decimal("2"), 1500,
+        observed_price=Decimal("101"),
+    )
+    assert tape == (
+        Decimal("0.4"), Decimal("60.2"), Decimal("200"), Decimal("101"),
+        Decimal("1"),
+    )
+    assert kernel.wall_notional(Decimal("100"), Decimal("2")) == Decimal("200")
+    assert kernel.flow_window_metrics(
+        ((1000, Decimal("200"), "buy"), (1500, Decimal("101"), "sell")),
+        1500, 5,
+    ) == {
+        "turnover_usd": Decimal("301"), "trades": 2,
+        "buy_usd": Decimal("200"), "sell_usd": Decimal("101"),
+        "trades_per_second": Decimal("0.4"),
+    }
+    assert kernel.wall_turnover_ratios(
+        Decimal("100"), Decimal("2"), {60: Decimal("100")}
+    )["ratios"][60] == Decimal("2")
+    assert kernel.untouched_decimal_levels(
+        ((1000, Decimal("102"), Decimal("99")),
+         (2000, Decimal("103"), Decimal("99"))),
+    ) == (("high", Decimal("103"), 2000), ("low", Decimal("99"), 2000))
+
     request = {
         "schema": "math.market.compute.v1",
         "execution_authority": False,

@@ -41,8 +41,6 @@ jobs:
           ref: f41d5018e2b79d91f7934e7e838691725ce78277
           path: .source/math
           persist-credentials: false
-      - name: Verify Meta-to-Math numerical source parity (offline only)
-        run: python scripts/check_math_consumer_parity.py .source/math
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -50,6 +48,8 @@ jobs:
           cache-dependency-path: requirements.lock
       - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
+      - name: Verify Meta-to-Math numerical source parity (offline only)
+        run: python scripts/check_math_consumer_parity.py .source/math
       - name: Mandatory diagnostic hardening regressions (synthetic evidence only)
         run: python -m pytest -q tests/test_diagnostic_hardening.py tests/test_process_inventory_identity.py tests/test_host_identity_authorization.py tests/test_windows_service_contracts.py --junitxml=diagnostic-tests.xml
       - name: Reject missing or skipped diagnostic cases
@@ -233,8 +233,6 @@ jobs:
           ref: f41d5018e2b79d91f7934e7e838691725ce78277
           path: .source/math
           persist-credentials: false
-      - name: Verify Meta-to-Math numerical source parity (offline only)
-        run: python scripts/check_math_consumer_parity.py .source/math
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -243,6 +241,8 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
       - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
+      - name: Verify Meta-to-Math numerical source parity (offline only)
+        run: python scripts/check_math_consumer_parity.py .source/math
       - name: Mandatory diagnostic hardening regressions (synthetic evidence only)
         run: python -m pytest -q tests/test_diagnostic_hardening.py tests/test_process_inventory_identity.py tests/test_host_identity_authorization.py tests/test_windows_service_contracts.py --junitxml=diagnostic-tests.xml
       - name: Reject missing or skipped diagnostic cases

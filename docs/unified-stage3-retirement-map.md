@@ -120,3 +120,20 @@ to Terminan #91 4035647edb332260859850ad2a3ffc1044a4c818 and its active Math SDK
 8de3858cd5ca9a63dc3cd10f5f5cdec870ef4440. The original source, durable ACK and fill
 digest checks remain unchanged. This does not change the legacy live-monitor interlock.
 Rollback reverts the CI and parity pins together while retaining any offline ledgers.
+
+## Stage 20: archive historical paper fills from one PostgreSQL snapshot
+
+An authorized migration caller can pass an attested Store, a dedicated Terminan
+PaperReplayLedger and a stable source ID to archive_paper_fills. The function uses
+one REPEATABLE READ READ ONLY transaction and two named cursors. The first scans
+the digest and count, and the second transfers the canonical rows from that same
+snapshot into Terminan's existing atomic importer. The two scans use the existing
+Meta digest-v1 encoding and bounded batches of 256 rows. Preserve the original
+database backup, source ID and returned digest. A retry with a changed snapshot
+must refuse under the existing source ID. Verify with Terminan restore_meta_fills.
+No historical rows are modified in Meta. Settings and level_map are outside this
+paper-fill contract, and the live interlock remains in place.
+
+Qualification pins Terminan #91 0f3b1408ada9a2cdea20e66ec56840d5bb196bac and Math
+#122 876b31f2310827d417e70ed22d0e9b5cfc9b5320. To roll back, revert the source
+commit while retaining the PostgreSQL backup and any committed Terminan archive.

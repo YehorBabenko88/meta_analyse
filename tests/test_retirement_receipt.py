@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from meta_analyse.retirement_receipt import persisted_state_receipt
+from meta_analyse.retirement_receipt import archive_paper_fills, persisted_state_receipt
 
 
 class Cursor:
@@ -141,3 +141,79 @@ def test_timezone_offset_normalization_and_naive_refusal():
     naive = paper_row(1, timestamp=datetime(2026, 11, 19))
     with pytest.raises(ValueError, match="NAIVE_PERSISTED_TIMESTAMP"):
         persisted_state_receipt(Store([naive]), "paper_fills")
+
+
+@pytest.mark.parametrize("second_id", [1, 2])
+def test_archive_uses_named_cursors_and_checks_second_scan(tmp_path, second_id):
+    from contextlib import closing, contextmanager
+    import sqlite3
+    from terminan.paper_ledger import PaperReplayLedger
+
+    state = Store([])
+    scans = iter(([paper_row(1)], [paper_row(second_id)]))
+    names = []
+
+    @contextmanager
+    def cursor(*, name):
+        names.append(name)
+        assert state.connection.statements == ["SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY"]
+        result = Cursor(next(scans))
+        result.execute = lambda sql: assert_paper_select(sql)
+        yield result
+
+    def assert_paper_select(sql):
+        assert sql.startswith("SELECT id,")
+        assert sql.endswith("FROM meta_analyse.paper_fills ORDER BY id")
+
+    state.connection.cursor = cursor
+    state.connection.execute = state.connection.statements.append
+    path = tmp_path / "terminan.sqlite"
+    ledger = PaperReplayLedger(path)
+
+    if second_id == 1:
+        receipt = archive_paper_fills(state, ledger, "snapshot")
+        assert receipt == persisted_state_receipt(Store([paper_row(1)]), "paper_fills")
+        assert list(ledger.restore_meta_fills("snapshot"))[0][3:5] == ["102.0000", "100.00"]
+    else:
+        with pytest.raises(ValueError, match="receipt|digest"):
+            archive_paper_fills(state, ledger, "snapshot")
+        with closing(sqlite3.connect(path)) as connection:
+            assert connection.execute(
+                "SELECT name FROM sqlite_schema WHERE name = 'meta_fill_archives'"
+            ).fetchone() is None
+    assert len(names) == 2
+    assert all(names)
+    assert state.connect_calls == 1
+
+
+def test_disposable_pg_archive_keeps_snapshot_across_concurrent_source_update(postgres_store, tmp_path):
+    from types import SimpleNamespace
+    from terminan.paper_ledger import PaperReplayLedger
+
+    postgres_store.initialize()
+    timestamp = datetime(2026, 11, 19, 12, 0, 0, 123456, tzinfo=timezone.utc)
+    with postgres_store.connect() as connection:
+        connection.execute(
+            "INSERT INTO meta_analyse.paper_fills "
+            "(symbol,side,entry,exit,reason,gross,fees,net,exit_ts) "
+            "VALUES ('BTCUSDT','short',102.0000,100.00,'target',1.23,0.10,1.13,%s)",
+            (timestamp,),
+        )
+    source = SimpleNamespace(expected_cluster=object(), connect=postgres_store.connect)
+    expected = persisted_state_receipt(source, "paper_fills")
+    ledger = PaperReplayLedger(tmp_path / "terminan.sqlite")
+
+    class ConcurrentUpdate:
+        def import_meta_fills(self, source_id, rows, receipt):
+            assert receipt == expected
+            with postgres_store.connect() as writer:
+                writer.execute("UPDATE meta_analyse.paper_fills SET reason='concurrent-fixture'")
+            return ledger.import_meta_fills(source_id, rows, receipt)
+
+    assert archive_paper_fills(source, ConcurrentUpdate(), "snapshot") == expected
+    restored = PaperReplayLedger(tmp_path / "terminan.sqlite")
+    assert list(restored.restore_meta_fills("snapshot")) == [[
+        1, "BTCUSDT", "short", "102.0000", "100.00", "target", "1.23", "0.10", "1.13",
+        "2026-11-19T12:00:00.123456+00:00",
+    ]]
+    assert persisted_state_receipt(source, "paper_fills")["sha256"] != expected["sha256"]

@@ -66,6 +66,13 @@ jobs:
           ref: 98d6783522aac7155cbb4635e5b29239746d88e0
           path: .source/math
           persist-credentials: false
+      - name: Checkout pinned Terminan paper-only package
+        uses: actions/checkout@v4
+        with:
+          repository: YehorBabenko88/Terminan
+          ref: 9723e1518b7dd6f32f3df75685c38588202207a0
+          path: .source/terminan
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -73,6 +80,20 @@ jobs:
         run: python -m pip install -c requirements.lock -e '.[test]'
       - name: Install canonical Math v1 for migrated runtime imports
         run: python -m pip install --no-deps -e .source/math
+      - name: Install canonical Terminan 0.1 paper owner
+        run: python -m pip install --no-deps -e .source/terminan
+      - name: Reject unexpected Terminan paper source or runtime class
+        shell: python
+        run: |
+          import importlib.metadata,pathlib,subprocess
+          root=pathlib.Path('.source/terminan').resolve(strict=True)
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='9723e1518b7dd6f32f3df75685c38588202207a0'
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD:terminan/paper.py'],text=True).strip()=='d87560f1050e2f1209d6b39c6c61bcae722695b8'
+          import terminan.paper
+          assert importlib.metadata.version('unified-terminan')=='0.1.0'
+          assert pathlib.Path(terminan.paper.__file__).resolve().is_relative_to(root)
+          from meta_analyse.runtime import PaperEngine
+          assert PaperEngine is terminan.paper.PaperEngine
       - name: Verify Math installed dependency and source
         shell: python
         run: |

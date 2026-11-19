@@ -37,11 +37,13 @@ class Runtime:
         symbol = data.get("ticker")
         if symbol not in self.symbols:
             return []
-        # Legacy Meta has no authorized durable Terminan paper receipt sink.
-        # Refuse before mutating strategy state rather than silently drop
-        # simulated fills when a persistent Meta store was configured.
-        if self.store is not None and self.paper.enabled:
-            raise RuntimeError("TERMINAN_DURABLE_PAPER_LEDGER_REQUIRED")
+        # Legacy Meta has no approved Grid market-data writer and no
+        # Terminan durable paper receipt sink. Refuse *before* processing any
+        # selected-symbol trade when the old PostgreSQL store was configured:
+        # silently accepting it could lose both market profiles and paper
+        # fills after their competing Meta writer calls were removed.
+        if self.store is not None:
+            raise RuntimeError("GRID_TERMINAN_DURABLE_SINKS_REQUIRED")
         outputs = []
         for raw in data.get("trades", []):
             try:

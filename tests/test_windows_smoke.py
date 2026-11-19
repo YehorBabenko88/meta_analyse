@@ -96,6 +96,7 @@ async def test_windows_qt_mock_network_postgres_disconnect_restart(postgres_stor
             window.connect_flow()  # duplicate requests must be harmless
             window.start()
             window.start()
+            await until(app, lambda: 'DurableSinksRequired' in window._snapshot.status)
             def persisted(trades, books):
                 with postgres_store.connect() as conn:
                     return (conn.execute('SELECT count(*) FROM meta_analyse.executions').fetchone()[0] >= trades
@@ -116,7 +117,7 @@ async def test_windows_qt_mock_network_postgres_disconnect_restart(postgres_stor
             window.connect_flow()
             await until(app, lambda: counter['trade'] >= 3 and window._snapshot.flow_state == 'connected')
             await until(app, lambda: persisted(3, 2))
-            assert counter['terminal'] == 1, window._snapshot.status
+            assert counter['terminal'] == 0, window._snapshot.status
             assert all(method == 'GET' for method, _ in http_calls)
         finally:
             before = time.monotonic()

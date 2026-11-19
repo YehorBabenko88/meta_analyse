@@ -5,6 +5,7 @@ import sqlite3
 
 import pytest
 from terminan.paper_journal import PaperJournal
+from terminan.paper_ledger import PaperReplayLedger
 
 from meta_analyse.offline_paper_delivery import deliver
 
@@ -70,3 +71,15 @@ def test_changed_source_is_refused_before_creating_ledger(tmp_path):
     with pytest.raises(ValueError, match="source digest mismatch"):
         deliver(path, digest, target)
     assert not target.exists()
+
+
+def test_conflicting_durable_checkpoint_cannot_advance(tmp_path):
+    path, digest = source(tmp_path)
+    payload = json.loads(path.read_bytes())
+    target = tmp_path / "ledger.sqlite3"
+    journal = PaperJournal(PaperReplayLedger(target), "meta-fixture",
+                           f"meta-offline-{digest}", "BTCUSDT")
+    original = journal.submit(dict(payload["events"][0], enabled=False))
+    with pytest.raises(RuntimeError, match="checkpoint disagrees"):
+        deliver(path, digest, target)
+    assert journal.read_checkpoint() == original

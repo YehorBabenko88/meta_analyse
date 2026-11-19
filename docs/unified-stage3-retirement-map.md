@@ -103,3 +103,12 @@ fill count and ordered SHA-256 of fill ACKs. The adapter reads back the journal 
 a fill digest mismatch. Keep the original source and local SQLite backup for restoration.
 The live monitor remains fenced. Source qualification, live cursor admission and migration
 of historical PostgreSQL rows need separate evidence.
+
+## Stage 16: reconcile the Terminan checkpoint before resuming
+
+The adapter checks the last durable ACK against the source sequence and event hash
+before submitting anything on reopen. The delivered receipt uses the checkpoint
+read back from Terminan and requires the final persisted ACK to match the delivery
+ACK. A divergent checkpoint fails closed. Qualification pins Terminan #91
+`7b15cacb03cd51477d0d7b4254694e0db923f092` and its Math SDK dependency
+`ba7a07e8a7730c7d6be328b2dfd39132274e1e8e`.

@@ -41,6 +41,12 @@ def deliver(source: Path, expected_sha256: str, ledger_path: Path) -> dict:
     source_id, symbol = envelope["source_id"], envelope["symbol"]
     run_id = f"meta-offline-{digest}"
     journal = PaperJournal(PaperReplayLedger(ledger_path), source_id, run_id, symbol)
+    previous = journal.read_checkpoint()
+    if previous is not None:
+        sequence = previous["checkpoint"]
+        if (type(sequence) is not int or not 1 <= sequence <= len(events)
+                or previous["event_sha256"] != sha256(canonical_json(events[sequence - 1])).hexdigest()):
+            raise RuntimeError("Terminan checkpoint disagrees with offline source")
     submitted_fills = sha256()
     fill_count = 0
     for sequence, event in enumerate(events, 1):
@@ -55,6 +61,10 @@ def deliver(source: Path, expected_sha256: str, ledger_path: Path) -> dict:
             submitted_fills.update(canonical_json(ack) + b"\n")
             fill_count += 1
 
+    checkpoint = journal.read_checkpoint()
+    if checkpoint != ack:
+        raise RuntimeError("Terminan checkpoint readback mismatch")
+
     restored_fills = sha256()
     for ack in journal.read_fills():
         restored_fills.update(canonical_json(ack) + b"\n")
@@ -64,7 +74,7 @@ def deliver(source: Path, expected_sha256: str, ledger_path: Path) -> dict:
         "schema": "meta.paper.delivery.receipt.v1",
         "source_sha256": digest,
         "run_id": run_id,
-        "checkpoint": len(events),
+        "checkpoint": checkpoint["checkpoint"],
         "fill_count": fill_count,
         "fills_sha256": restored_fills.hexdigest(),
     }

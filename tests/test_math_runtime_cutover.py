@@ -129,3 +129,59 @@ def test_legacy_runtime_paper_consumer_is_terminan_owner():
 
     assert runtime.receive(packet(190, "103"))[0][0] == "closed_minute"
     assert "BTCUSDT" not in runtime.paper.reference
+
+
+def test_legacy_runtime_cannot_write_market_or_paper_rows_after_owner_cutover():
+    """Grid owns market writes; Terminan owns durable paper receipts.
+
+    This is a negative test with a deliberately hostile legacy storage object.
+    It does not claim Terminan persistence or a qualified Grid data source.
+    """
+    from meta_analyse.runtime import Runtime
+
+    class NoLegacyWrites:
+        def profile(self, *_args, **_kwargs):
+            raise AssertionError("Meta market profile writer must not run")
+
+        def paper_fill(self, *_args, **_kwargs):
+            raise AssertionError("Meta paper-fill writer must not run")
+
+        def candle_batch(self, *_args, **_kwargs):
+            raise AssertionError("Meta candle writer must not run")
+
+        def initialize(self):
+            raise AssertionError("Meta PostgreSQL initializer must not run")
+
+    runtime = Runtime(None, None, store=NoLegacyWrites(), tick_size=D("1"))
+    runtime.paper.enabled = True
+    runtime.symbols = ["BTCUSDT"]
+    start = datetime(2026, 11, 19, 12, 0, tzinfo=timezone.utc)
+
+    def msg(seconds, price):
+        return {"Type": "trade_update", "Data": {"ticker": "BTCUSDT",
+                "trades": [{"time": (start + timedelta(seconds=seconds)).isoformat(),
+                            "side": "Buy", "size": "1", "price": price}]}}
+
+    import pytest
+
+    # Old persistent stores cannot substitute for the sole Grid writer or
+    # Terminan's durable receipt ledger, regardless of paper enablement.
+    for enabled in (True, False):
+        runtime.paper.enabled = enabled
+        with pytest.raises(RuntimeError, match="GRID_TERMINAN_DURABLE_SINKS_REQUIRED"):
+            runtime.receive(msg(0, "100"))
+        assert runtime.minutes == {}
+        assert runtime.paper.positions == {}
+        assert runtime.paper.fills == []
+        assert runtime.paper.last_trade_time == {}
+
+    # Without persistence, the legacy migration fixture can still process
+    # bounded offline observations; it may not claim durable results.
+    offline = Runtime(None, None, store=None, tick_size=D("1"))
+    offline.symbols = ["BTCUSDT"]
+    offline.paper.enabled = False
+    assert offline.receive(msg(0, "100")) == []
+    events = offline.receive(msg(60, "102"))
+    assert [event[0] for event in events] == ["closed_minute"]
+    assert offline.paper.positions == {}
+    assert offline.paper.fills == []

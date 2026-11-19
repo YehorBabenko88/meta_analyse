@@ -3,7 +3,7 @@ from decimal import Decimal
 from dataclasses import FrozenInstanceError
 import pytest
 
-from meta_analyse.flow_history_storage import read_flow_history, FlowHistorySnapshot, HistoricalTrade, HistoricalTrade
+from meta_analyse.flow_history_storage import read_flow_history, FlowHistorySnapshot, HistoricalTrade
 
 
 class FakeConnection:
@@ -569,3 +569,120 @@ def test_cancelled_history_request_cannot_publish_orderflow(monkeypatch):
         assert snapshot.orderflow_rows == ()
         assert snapshot.flow_history_request_id == 1
     asyncio.run(scenario())
+
+
+def test_legacy_orderflow_archive_uses_single_readonly_query():
+    from meta_analyse.orderflow_archive_reader import read_orderflow_trades
+
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    trade_time = start + timedelta(microseconds=123456)
+    start_ms = (start - epoch).days * 86400000
+    price = Decimal("0.000000000000012345678901")
+    quantity = Decimal("123456.00000000000000001")
+    store = FakeStore([("trade-1", trade_time, price, quantity, "Buy")])
+    calls = []
+    original_execute = store.connection.execute
+
+    def record_execute(sql, params=None):
+        calls.append(sql)
+        return original_execute(sql, params)
+
+    store.connection.execute = record_execute
+    records = read_orderflow_trades(
+        store, venue="bybit", symbol="BTCUSDT",
+        start_ms=start_ms, end_ms=start_ms + 60000, limit=2,
+    )
+    assert records == [{
+        "trade_id": "trade-1",
+        "timestamp_ms": start_ms + 123,
+        "price": price,
+        "volume": quantity,
+        "side": "Buy",
+    }]
+    assert store.connection.read_only
+    assert sum("SELECT" in sql for sql in calls) == 1
+    assert calls.count("SET TRANSACTION READ ONLY") == 1
+    assert store.connection.params == (
+        "bybit", "BTCUSDT", start, start + timedelta(minutes=1), 3,
+    )
+    assert records[0]["price"] is price
+    assert records[0]["volume"] is quantity
+
+
+def test_legacy_orderflow_reader_preserves_bounds_and_no_completeness_claim():
+    from meta_analyse.orderflow_archive_reader import read_orderflow_trades
+
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    start_ms = (start - epoch).days * 86400000
+    rows = [(str(i), start, Decimal("1"), Decimal("2"), "Sell") for i in range(3)]
+    store = FakeStore(rows)
+    records = read_orderflow_trades(
+        store, venue="bybit", symbol="BTCUSDT",
+        start_ms=start_ms, end_ms=start_ms + 1000, limit=2,
+    )
+    assert len(records) == 2
+    assert [row["trade_id"] for row in records] == ["0", "1"]
+    assert all("verified" not in row and "complete" not in row for row in records)
+    assert store.connection.params[-1] == 3
+
+    for bad in (True, -1, 0):
+        with pytest.raises(ValueError):
+            read_orderflow_trades(
+                store, venue="bybit", symbol="BTCUSDT",
+                start_ms=start_ms, end_ms=start_ms + 1000, limit=bad,
+            )
+
+
+def test_legacy_orderflow_reader_keeps_unknown_aggressor_without_promoting_quality():
+    from meta_analyse.orderflow_archive_reader import read_orderflow_trades
+
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    start_ms = (start - epoch).days * 86400000
+    store = FakeStore([("legacy-unknown", start, Decimal("100"), Decimal("0"), "Unknown")])
+    records = read_orderflow_trades(
+        store, venue="bybit", symbol="BTCUSDT",
+        start_ms=start_ms, end_ms=start_ms + 1000,
+    )
+    assert records[0]["side"] == "Unknown"
+    assert records[0]["volume"] == Decimal("0")
+    assert store.connection.read_only
+    assert all("verified" not in row for row in records)
+
+
+def test_legacy_orderflow_reader_rejects_missing_identity_and_invalid_intervals():
+    from meta_analyse.orderflow_archive_reader import read_orderflow_trades
+
+    store = FakeStore([])
+    for venue, symbol in (("", "BTCUSDT"), ("bybit", ""), (None, "BTCUSDT"), (123, "BTCUSDT"), ("bybit", None), ("bybit", 123)):
+        with pytest.raises(ValueError):
+            read_orderflow_trades(
+                store, venue=venue, symbol=symbol, start_ms=1000, end_ms=2000
+            )
+    for start_ms, end_ms in ((2000, 1000), (1000, 1000), (-1, 1000),
+                             (True, 2000), (1000, False)):
+        with pytest.raises(ValueError):
+            read_orderflow_trades(
+                store, venue="bybit", symbol="BTCUSDT",
+                start_ms=start_ms, end_ms=end_ms,
+            )
+    assert store.connection.sql is None
+
+
+def test_legacy_orderflow_reader_does_not_round_large_epoch_milliseconds():
+    from meta_analyse.orderflow_archive_reader import read_orderflow_trades
+
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    timestamp = datetime(2255, 6, 1, tzinfo=timezone.utc) + timedelta(microseconds=999999)
+    delta = timestamp - epoch
+    timestamp_ms = (delta.days * 86400 + delta.seconds) * 1000 + 999
+    store = FakeStore([("future-id", timestamp, Decimal("0.001"), Decimal("4"), "Sell")])
+    records = read_orderflow_trades(
+        store, venue="bybit", symbol="BTCUSDT",
+        start_ms=timestamp_ms - 999, end_ms=timestamp_ms + 1, limit=1,
+    )
+    assert records[0]["timestamp_ms"] == timestamp_ms
+    assert records[0]["price"] == Decimal("0.001")
+    assert store.connection.read_only

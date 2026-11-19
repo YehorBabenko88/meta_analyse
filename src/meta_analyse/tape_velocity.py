@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 from decimal import Decimal
+from market_profile_math import tape_velocity_metrics
 
 @dataclass(frozen=True)
 class TapeSnapshot:
@@ -41,11 +42,10 @@ class TapeVelocity:
         cutoff=execution.timestamp_ms-self.window_ms
         while self.events and self.events[0].timestamp_ms<cutoff:
             self.events.popleft()
-        near=[e for e in self.events
-              if abs(e.price-level_price)/self.tick_size<=self.proximity_ticks]
-        buys=sum((e.price*e.quantity for e in near if e.taker_side=="Buy"),Decimal(0))
-        sells=sum((e.price*e.quantity for e in near if e.taker_side=="Sell"),Decimal(0))
-        seconds=Decimal(self.window_ms)/1000
-        distance=abs(execution.price-level_price)/self.tick_size
-        return TapeSnapshot(Decimal(len(near))/seconds,(buys+sells)/seconds,
-                            buys,sells,distance,distance<=self.proximity_ticks)
+        rows = [(event.timestamp_ms,event.price,event.quantity,event.taker_side)
+                for event in self.events]
+        trades,notional,buys,sells,distance=tape_velocity_metrics(
+            rows,level_price,self.tick_size,self.window_ms,self.proximity_ticks,
+            execution.timestamp_ms,observed_price=execution.price)
+        return TapeSnapshot(trades,notional,buys,sells,distance,
+                            distance<=self.proximity_ticks)

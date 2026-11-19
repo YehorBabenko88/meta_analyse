@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Iterable
+from market_profile_math import orderflow_volume_metrics
 
 
 @dataclass(frozen=True)
@@ -29,25 +30,10 @@ def calculate(trades: Iterable[Trade], *, initial_delta: Decimal = Decimal(0)) -
     """Imbalance=(buy-sell)/(buy+sell); None when no classified volume exists."""
     if not isinstance(initial_delta, Decimal) or not initial_delta.is_finite():
         raise ValueError("initial_delta must be a finite Decimal")
-    buy = sell = unknown = Decimal(0)
-    count = 0
-    for trade in trades:
-        if not trade.price.is_finite() or trade.price <= 0:
-            raise ValueError("trade price must be finite and positive")
-        if not trade.volume.is_finite() or trade.volume < 0:
-            raise ValueError("trade volume must be finite and nonnegative")
-        if trade.side == "buy":
-            buy += trade.volume
-        elif trade.side == "sell":
-            sell += trade.volume
-        elif trade.side == "unknown":
-            unknown += trade.volume
-        else:
-            raise ValueError("unsupported trade side")
-        count += 1
-    delta = buy - sell
-    classified = buy + sell
+    records = [(trade.price, trade.volume, trade.side) for trade in trades]
+    metrics = orderflow_volume_metrics(records, initial_delta)
     return FlowMetrics(
-        buy, sell, unknown, delta, initial_delta + delta,
-        delta / classified if classified else None, count,
+        metrics["buy_volume"], metrics["sell_volume"], metrics["unknown_volume"],
+        metrics["delta"], metrics["cumulative_delta"], metrics["imbalance"],
+        metrics["trade_count"]
     )

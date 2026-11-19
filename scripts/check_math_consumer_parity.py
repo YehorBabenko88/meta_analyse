@@ -1,0 +1,326 @@
+"""Exact-source parity gate for Meta -> Math market-profile migration.
+
+This is an offline source-contract check, not a production package adapter or
+evidence of real market data. Never silently substitute a synthetic Math module.
+"""
+from __future__ import annotations
+
+import importlib
+import importlib.metadata
+import importlib.util
+import hashlib
+import json
+from datetime import datetime, timezone
+from decimal import Decimal
+from pathlib import Path
+import subprocess
+import sys
+
+MATH_SHA = "98d6783522aac7155cbb4635e5b29239746d88e0"
+MATH_BLOB = "2e952926c6218aa58eb992fa7f8a252a22444c64"
+MATH_API_BLOB = "47042fa83270209aeaf3d3b1c8224e7aae2362d6"
+MATH_PROJECT_BLOB = "82876b8a6fe14cc6ddfddc6b2f3785206c82d895"
+
+
+def git(root: Path, *args: str) -> str:
+    return subprocess.check_output(
+        ["git", "--no-replace-objects", "-C", str(root), *args],
+        text=True, stderr=subprocess.DEVNULL,
+    ).strip()
+
+
+def load_math(root: Path):
+    root = root.resolve(strict=True)
+    source = (root / "python" / "market_profile_math.py").resolve(strict=True)
+    if not source.is_relative_to(root):
+        raise ValueError("Math source escapes its pinned checkout")
+    if git(root, "rev-parse", "HEAD") != MATH_SHA:
+        raise ValueError("unexpected Math commit")
+    if git(root, "rev-parse", "HEAD:python/market_profile_math.py") != MATH_BLOB:
+        raise ValueError("unexpected Math source object")
+    committed = subprocess.check_output(
+        ["git", "--no-replace-objects", "-C", str(root),
+         "show", "HEAD:python/market_profile_math.py"],
+        stderr=subprocess.DEVNULL,
+    )
+    working = source.read_bytes()
+    # Windows checkout can expand only LF -> CRLF. Verify actual raw Git
+    # object bytes before allowing that single transport transformation.
+    normalized = working.replace(b"\r\n", b"\n")
+    if working != committed and (
+        normalized != committed or b"\r" in working.replace(b"\r\n", b"")
+    ):
+        raise ValueError("unexpected Math working file bytes")
+    if git(root, "status", "--porcelain", "--untracked-files=no"):
+        raise ValueError("modified Math source checkout")
+    spec = importlib.util.spec_from_file_location("_pinned_market_profile_math", source)
+    if spec is None or spec.loader is None:
+        raise ValueError("unable to load pinned Math")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def check(math_module) -> None:
+    from meta_analyse.core import Minute, price_bucket
+    from meta_analyse.footprint import Footprint, FootprintCell
+
+    D = Decimal
+    zero = D(0)
+    for i in range(1, 251):
+        price, tick = D(i) / D(7), D("0.01")
+        assert price_bucket(price, tick) == math_module.price_bucket(price, tick)
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    for i in range(1, 201):
+        close = D(100 + i % 7)
+        profile = {
+            D("99"): D(i % 5),
+            D("100"): D((i + 1) % 5),
+            D("101"): D((i + 2) % 5),
+        }
+        minute = Minute(start, D("1"), close, close, close, close, profile=profile)
+        assert minute.poc == math_module.volume_profile_poc(profile, close=close)
+        cells = {
+            price: FootprintCell(volume, D("0"), 1)
+            for price, volume in profile.items()
+        }
+        footprint = Footprint("BTCUSDT", 0, 60000, D("1"), cells=cells)
+        assert footprint.poc == math_module.volume_profile_poc(profile)
+        for cell in cells.values():
+            assert cell.delta == math_module.executed_volume_delta(
+                cell.buy, cell.sell
+            )
+        assert footprint.delta == sum(
+            (math_module.executed_volume_delta(c.buy, c.sell)
+             for c in cells.values()), zero
+        )
+
+    empty_minute = Minute(start, D("1"), D("1"), D("1"), D("1"), D("1"))
+    try:
+        empty_minute.poc
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Meta empty minute POC must reject")
+    try:
+        math_module.volume_profile_poc({}, close=D("1"))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Math empty minute POC must reject")
+    assert Footprint("BTCUSDT", 0, 60000, D("1")).poc is None
+    assert math_module.volume_profile_poc({}) is None
+
+    # Legacy source accepted zero, but live Meta now uses Math and fails closed.
+    # Refusal is mandatory in BOTH entrypoints; do not leave an old permissive fallback.
+    for bucket in (price_bucket, math_module.price_bucket):
+        try:
+            bucket(zero, D("1"))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Active Meta/Math must refuse zero-priced market input")
+
+
+
+def check_installed_api(root: Path) -> None:
+    """Prove installed v1 API resolves to exact owned Math checkout bytes."""
+    root = root.resolve(strict=True)
+    checks = (
+        ("python/market_compute_api.py", MATH_API_BLOB),
+        ("python/market_profile_math.py", MATH_BLOB),
+        ("pyproject.toml", MATH_PROJECT_BLOB),
+    )
+    for relative, expected_oid in checks:
+        source = (root / relative).resolve(strict=True)
+        if not source.is_relative_to(root):
+            raise ValueError("Math source escapes checkout")
+        if git(root, "rev-parse", "HEAD:" + relative) != expected_oid:
+            raise ValueError("unexpected Math API source object")
+        committed = subprocess.check_output(
+            ["git", "--no-replace-objects", "-C", str(root), "show", "HEAD:" + relative],
+            stderr=subprocess.DEVNULL,
+        )
+        working = source.read_bytes()
+        if working != committed and (
+            working.replace(b"\r\n", b"\n") != committed
+            or b"\r" in working.replace(b"\r\n", b"")
+        ):
+            raise ValueError("unexpected Math API working bytes")
+    if git(root, "rev-parse", "HEAD") != MATH_SHA:
+        raise ValueError("wrong installed Math release")
+    if git(root, "status", "--porcelain", "--untracked-files=no"):
+        raise ValueError("dirty Math source")
+    api = importlib.import_module("market_compute_api")
+    kernel = importlib.import_module("market_profile_math")
+    if Path(api.__file__).resolve(strict=True) != (root / "python/market_compute_api.py").resolve():
+        raise ValueError("Math API imported from unapproved distribution")
+    if Path(kernel.__file__).resolve(strict=True) != (root / "python/market_profile_math.py").resolve():
+        raise ValueError("Math kernel imported from unapproved distribution")
+    if importlib.metadata.version("unified-math-kernels") != "0.1.0":
+        raise ValueError("unexpected Math package version")
+
+    # Runtime consumer cutover evidence: not just a separate numerical oracle.
+    from meta_analyse.core import (Candle, Level, Minute, Trade as MinuteTrade,
+                                   RollingFlow, price_bucket as running_bucket,
+                                   untouched_levels)
+    from meta_analyse.footprint import Footprint, FootprintCell
+    from meta_analyse.orderflow_metrics import Trade as FlowTrade, calculate
+    from meta_analyse.orderflow_aggregation import aggregate_by_time, aggregate_by_price
+    from meta_analyse.tape_velocity import TapeVelocity
+    from meta_analyse.wall_tracker import WallTracker
+    from meta_analyse.liquidity import large_levels
+    from datetime import timedelta
+    from types import SimpleNamespace
+    import inspect
+
+    # Each imported public Meta wrapper must reference the exact installed Math module.
+    assert running_bucket is kernel.price_bucket
+    assert untouched_levels.__globals__["untouched_decimal_levels"] is kernel.untouched_decimal_levels
+    assert Minute.poc.fget.__globals__["volume_profile_poc"] is kernel.volume_profile_poc
+    assert Footprint.poc.fget.__globals__["volume_profile_poc"] is kernel.volume_profile_poc
+    assert FootprintCell.delta.fget.__globals__["executed_volume_delta"] is kernel.executed_volume_delta
+    assert calculate.__globals__["orderflow_volume_metrics"] is kernel.orderflow_volume_metrics
+    assert aggregate_by_time.__globals__["aggregate_orderflow_stream"] is kernel.aggregate_orderflow_stream
+    from market_compute_api import STREAM_ABI
+    assert STREAM_ABI == "math.market.orderflow.stream.v1"
+
+    assert TapeVelocity.add.__globals__["tape_velocity_metrics"] is kernel.tape_velocity_metrics
+    assert WallTracker.observe.__globals__["wall_notional"] is kernel.wall_notional
+    assert large_levels.__globals__["large_liquidity_levels"] is kernel.large_liquidity_levels
+
+    now=datetime(2026,11,19,12,0,tzinfo=timezone.utc)
+    item=MinuteTrade("BTCUSDT",now,Decimal("100"),Decimal("1"),"Buy")
+    minute=Minute(now,Decimal("1"),item.price,item.price,item.price,item.price)
+    minute.add(item)
+    minute.add(MinuteTrade("BTCUSDT",now+timedelta(seconds=1),Decimal("101"),Decimal("1"),"Sell"))
+    assert minute.poc==Decimal("101")
+    clock=int(now.timestamp()*1000)
+    book=Footprint("BTCUSDT",clock,60000,Decimal("1"))
+    for i,(price,side) in enumerate((("100","Buy"),("101","Sell"))):
+        book.add(SimpleNamespace(symbol="BTCUSDT",timestamp_ms=clock+i,
+                                 price=Decimal(price),quantity=Decimal("1"),
+                                 taker_side=side),contiguous=True)
+    assert book.poc==Decimal("100") and book.delta==Decimal("0") and book.trusted
+    old_levels=[Candle(now,Decimal("101"),Decimal("99"),Decimal("100"),Decimal("100")),
+                Candle(now+timedelta(days=1),Decimal("102"),Decimal("99"),Decimal("100"),Decimal("101"))]
+    assert {(x.kind,x.price) for x in untouched_levels(old_levels,"D1")} == {
+        ("high",Decimal("102")),("low",Decimal("99"))}
+    flow=RollingFlow()
+    flow.add(item)
+    assert flow.metrics(now+timedelta(seconds=1))[60]["buy_usd"]==Decimal("100")
+    assert flow.wall_score(Decimal("10"),Decimal("100"),now+timedelta(seconds=1))["ratios"][60]==Decimal("10")
+    rows=[FlowTrade(2000,Decimal("100.19"),Decimal("3"),"buy"),
+          FlowTrade(999,Decimal("100.09"),Decimal("2"),"sell"),
+          FlowTrade(1000,Decimal("100.11"),Decimal("1"),"buy")]
+    assert calculate(rows).delta==Decimal("2")
+    assert [key for key,_ in aggregate_by_time(rows,1000)] == [0,1000,2000]
+    assert [key for key,_ in aggregate_by_price(rows,Decimal("0.1"))] == [
+        Decimal("100.0"),Decimal("100.1")]
+    tape=TapeVelocity(Decimal("1"),5000,20)
+    first=SimpleNamespace(timestamp_ms=1000,price=Decimal("100"),quantity=Decimal("1"),taker_side="Buy")
+    second=SimpleNamespace(timestamp_ms=2000,price=Decimal("101"),quantity=Decimal("2"),taker_side="Sell")
+    tape.add(first,Decimal("100"),contiguous=True)
+    snapshot=tape.add(second,Decimal("100"),contiguous=True)
+    assert snapshot.trades_per_second==Decimal("0.4") and snapshot.buy_notional==Decimal("100")
+    wall=WallTracker()
+    wall.observe(SimpleNamespace(valid=True,bids={Decimal("100"):Decimal("1000")},asks={}),1000)
+    warnings=wall.observe(SimpleNamespace(valid=True,bids={},asks={}),2000)
+    assert len(warnings)==1 and warnings[0].notional==Decimal("100000")
+    assert large_levels(SimpleNamespace(valid=True,symbol="BTCUSDT",
+        bids={Decimal("100"):Decimal("1000"),Decimal("99"):Decimal("10000")},
+        asks={Decimal("101"):Decimal("2000"),Decimal("102"):Decimal("500")}),
+        Decimal("100"),Decimal("1"))
+
+    # Expanded Math-owned market algorithms are checked at pinned source,
+    # without introducing another Meta implementation or synthetic live data.
+    for name in (
+        "tape_velocity_metrics", "wall_notional", "flow_window_metrics",
+        "wall_turnover_ratios", "untouched_decimal_levels",
+    ):
+        if not callable(getattr(kernel, name, None)):
+            raise ValueError("missing Math-owned migration symbol")
+    tape = kernel.tape_velocity_metrics(
+        ((1000, Decimal("100"), Decimal("2"), "Buy"),
+         (1500, Decimal("101"), Decimal("1"), "Sell")),
+        Decimal("100"), Decimal("1"), 5000, Decimal("2"), 1500,
+        observed_price=Decimal("101"),
+    )
+    assert tape == (
+        Decimal("0.4"), Decimal("60.2"), Decimal("200"), Decimal("101"),
+        Decimal("1"),
+    )
+    assert kernel.wall_notional(Decimal("100"), Decimal("2")) == Decimal("200")
+    assert kernel.flow_window_metrics(
+        ((1000, Decimal("200"), "buy"), (1500, Decimal("101"), "sell")),
+        1500, 5,
+    ) == {
+        "turnover_usd": Decimal("301"), "trades": 2,
+        "buy_usd": Decimal("200"), "sell_usd": Decimal("101"),
+        "trades_per_second": Decimal("0.4"),
+    }
+    assert kernel.wall_turnover_ratios(
+        Decimal("100"), Decimal("2"), {60: Decimal("100")}
+    )["ratios"][60] == Decimal("2")
+    assert kernel.untouched_decimal_levels(
+        ((1000, Decimal("102"), Decimal("99")),
+         (2000, Decimal("103"), Decimal("99"))),
+    ) == (("high", Decimal("103"), 2000), ("low", Decimal("99"), 2000))
+
+    request = {
+        "schema": "math.market.compute.v1",
+        "execution_authority": False,
+        "source": {
+            "snapshot_sha256": "a" * 64,
+            "as_of_ms": 1792200000000,
+            "units": {"price": "quote/base", "volume": "base"},
+        },
+        "operations": [
+            {"operation": "price_bucket", "input": {"price": "1.235", "tick": "0.01"}},
+            {"operation": "volume_profile_poc", "input": {
+                "profile": [{"price": "99", "volume": "3"},
+                            {"price": "101", "volume": "3"}], "close": "101"}},
+            {"operation": "volume_profile_poc", "input": {
+                "profile": [{"price": "99", "volume": "3"},
+                            {"price": "101", "volume": "3"}], "close": None}},
+            {"operation": "executed_volume_delta", "input": {"buy": "3", "sell": "2"}},
+        ],
+    }
+    receipt = api.compute_batch(request)
+    assert receipt["schema"] == "math.market.result.v1"
+    assert receipt["algorithm_version"] == "math.market.v1"
+    assert receipt["execution_authority"] is False
+    assert receipt["trading_authorized"] is False
+    assert receipt["provenance"] == "CALLER_SUPPLIED_UNATTESTED"
+    assert [r["value"] for r in receipt["results"]] == ["1.24", "101", "99", "1"]
+    expected = hashlib.sha256(
+        json.dumps(request, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+                   allow_nan=False).encode()
+    ).hexdigest()
+    assert receipt["request_sha256"] == expected
+    assert api.compute_batch(request) == receipt
+    invalid = dict(request, execution_authority=True)
+    try:
+        api.compute_batch(invalid)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Math execution authorization must be refused")
+
+def main() -> None:
+    if len(sys.argv) != 2:
+        raise SystemExit("usage: check_math_consumer_parity.py MATH_CHECKOUT")
+    root = Path(sys.argv[1])
+    # Authenticate the installed canonical package before importing Meta's
+    # production callers, which now import that package at module load.
+    check_installed_api(root)
+    check(load_math(root))
+    print("META_MATH_SOURCE_PARITY=PASS checks=price_bucket,minute_poc,footprint_poc,delta,refusal")
+    print("MATH_INSTALLED_COMPUTE_API_V1=PASS source-pinned,call-contract-only")
+    print("META_MATH_RUNNING_PYTHON_CONSUMERS=SWITCHED_SOURCE_ONLY")
+    print("META_PRODUCTION_DEPLOYMENT=NOT_ESTABLISHED")
+    print("REAL_MARKET_DATA=NOT_TESTED")
+
+
+if __name__ == "__main__":
+    main()

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 from decimal import Decimal
+from market_profile_math import wall_notional
 
 @dataclass(frozen=True)
 class WallObservation:
@@ -35,7 +36,7 @@ class WallTracker:
         current={}
         for side,levels in (("bid",book.bids),("ask",book.asks)):
             for price,size in levels.items():
-                value=price*size
+                value=wall_notional(price,size)
                 if value>=self.min_notional:
                     current[(side,price)]=value
         warnings=[]

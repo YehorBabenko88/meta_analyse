@@ -34,6 +34,20 @@ jobs:
           assert (root/'unified_system/owned_python.py').is_file()
       - name: Verify exact Actions source SHA
         run: python scripts/record_ci_source.py
+      - name: Checkout pinned Math market-profile source (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: YehorBabenko88/math
+          ref: 98d6783522aac7155cbb4635e5b29239746d88e0
+          path: .source/math
+          persist-credentials: false
+      - name: Checkout sole Terminan paper engine source (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: YehorBabenko88/Terminan
+          ref: b49028e10a11398028c3cf1fb8560bdccce1ab79
+          path: .source/terminan
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -41,6 +55,25 @@ jobs:
           cache-dependency-path: requirements.lock
       - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
+      - name: Install exact Math distribution for API import contract
+        run: python -m pip install --no-deps -e .source/math
+      - name: Install Terminan package for migrated paper strategy runtime
+        run: python -m pip install --no-deps -e .source/terminan
+      - name: Check exact Terminan paper source and runtime binding
+        shell: python
+        run: |
+          import importlib.metadata, pathlib, subprocess
+          root=pathlib.Path('.source/terminan').resolve(strict=True)
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='b49028e10a11398028c3cf1fb8560bdccce1ab79'
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD:terminan/paper.py'],text=True).strip()=='54329265c1826a0d694a622acfe315a0531a80e1'
+          import terminan.paper
+          assert importlib.metadata.version('unified-terminan')=='0.1.0'
+          assert pathlib.Path(terminan.paper.__file__).resolve().is_relative_to(root)
+          from meta_analyse.runtime import PaperEngine
+          assert PaperEngine is terminan.paper.PaperEngine
+      - run: python -m pip check
+      - name: Verify Meta-to-Math numerical source parity and installed compute API (offline only)
+        run: python scripts/check_math_consumer_parity.py .source/math
       - name: Mandatory diagnostic hardening regressions (synthetic evidence only)
         run: python -m pytest -q tests/test_diagnostic_hardening.py tests/test_process_inventory_identity.py tests/test_host_identity_authorization.py tests/test_windows_service_contracts.py --junitxml=diagnostic-tests.xml
       - name: Reject missing or skipped diagnostic cases
@@ -217,6 +250,20 @@ jobs:
           assert (root/'unified_system/owned_python.py').is_file()
       - name: Verify exact Actions source SHA
         run: python scripts/record_ci_source.py
+      - name: Checkout pinned Math market-profile source (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: YehorBabenko88/math
+          ref: 98d6783522aac7155cbb4635e5b29239746d88e0
+          path: .source/math
+          persist-credentials: false
+      - name: Checkout sole Terminan paper engine source (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: YehorBabenko88/Terminan
+          ref: b49028e10a11398028c3cf1fb8560bdccce1ab79
+          path: .source/terminan
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -225,6 +272,25 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
       - run: python -m pip install -c requirements.lock -e ".[test,archive]"
       - run: python -m pip check
+      - name: Install exact Math distribution for API import contract
+        run: python -m pip install --no-deps -e .source/math
+      - name: Install Terminan package for migrated paper strategy runtime
+        run: python -m pip install --no-deps -e .source/terminan
+      - name: Check exact Terminan paper source and runtime binding
+        shell: python
+        run: |
+          import importlib.metadata, pathlib, subprocess
+          root=pathlib.Path('.source/terminan').resolve(strict=True)
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='b49028e10a11398028c3cf1fb8560bdccce1ab79'
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD:terminan/paper.py'],text=True).strip()=='54329265c1826a0d694a622acfe315a0531a80e1'
+          import terminan.paper
+          assert importlib.metadata.version('unified-terminan')=='0.1.0'
+          assert pathlib.Path(terminan.paper.__file__).resolve().is_relative_to(root)
+          from meta_analyse.runtime import PaperEngine
+          assert PaperEngine is terminan.paper.PaperEngine
+      - run: python -m pip check
+      - name: Verify Meta-to-Math numerical source parity and installed compute API (offline only)
+        run: python scripts/check_math_consumer_parity.py .source/math
       - name: Mandatory diagnostic hardening regressions (synthetic evidence only)
         run: python -m pytest -q tests/test_diagnostic_hardening.py tests/test_process_inventory_identity.py tests/test_host_identity_authorization.py tests/test_windows_service_contracts.py --junitxml=diagnostic-tests.xml
       - name: Reject missing or skipped diagnostic cases

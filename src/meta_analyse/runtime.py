@@ -6,7 +6,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal as D
 import websockets
-from .core import Trade, new_minute, floor_minute, PaperEngine, RollingFlow
+from .core import Trade, new_minute, floor_minute, RollingFlow
+from terminan.paper import PaperEngine, ClosedMinute, ExecutionTrade
 
 LOG = logging.getLogger(__name__)
 
@@ -36,6 +37,13 @@ class Runtime:
         symbol = data.get("ticker")
         if symbol not in self.symbols:
             return []
+        # Legacy Meta has no approved Grid market-data writer and no
+        # Terminan durable paper receipt sink. Refuse *before* processing any
+        # selected-symbol trade when the old PostgreSQL store was configured:
+        # silently accepting it could lose both market profiles and paper
+        # fills after their competing Meta writer calls were removed.
+        if self.store is not None:
+            raise RuntimeError("GRID_TERMINAN_DURABLE_SINKS_REQUIRED")
         outputs = []
         for raw in data.get("trades", []):
             try:
@@ -54,9 +62,16 @@ class Runtime:
                 continue
             if current and slot > current.start:
                 current.complete = (slot - current.start == timedelta(minutes=1))
-                if self.store:
-                    self.store.profile(symbol, current, self.quality if current.complete else "gap")
-                self.paper.on_closed_minute(symbol, current)
+                # Grid owns persisted market profiles; this retired Meta
+                # runtime must not create a competing PostgreSQL market writer.
+                # Only Terminan owns paper strategy/execution. Math owns POC.
+                # A gap must never establish an executable closed-minute signal.
+                if current.complete:
+                    self.paper.on_closed_minute(
+                        symbol, ClosedMinute(current.start, current.poc, True,
+                                             "CALLER_SUPPLIED_UNATTESTED"))
+                else:
+                    self.paper.on_gap(symbol)
                 outputs.append(("closed_minute", symbol, current))
                 current = None
             if current is None:
@@ -65,10 +80,11 @@ class Runtime:
             else:
                 current.add(t)
             self.flow.setdefault(symbol, RollingFlow()).add(t)
-            fill = self.paper.on_trade(t)
+            fill = self.paper.on_trade(ExecutionTrade(t.symbol, t.time, t.price))
             if fill:
-                if self.store:
-                    self.store.paper_fill(fill)
+                # A legacy Meta DB writer is not a Terminan result ledger.
+                # Preserve the in-memory paper fill for parity/migration only;
+                # Terminan owns durable receipts after an accepted ledger cutover.
                 outputs.append(("paper_fill", symbol, fill))
         return outputs
 
@@ -116,7 +132,7 @@ class Runtime:
                             for symbol in old - set(new):
                                 for typ in ("trade_unsubscribe", "orderbook_unsubscribe"):
                                     await socket.send(json.dumps({"Type":typ,"Data":{"connectionId":self.connection_id,"ticker":symbol}}))
-                                self.paper.reference.pop(symbol, None)
+                                self.paper.on_gap(symbol)
                             for symbol in set(new) - old:
                                 for typ in ("trade_subscribe", "orderbook_subscribe"):
                                     await socket.send(json.dumps({"Type":typ,"Data":{"connectionId":self.connection_id,"ticker":symbol,

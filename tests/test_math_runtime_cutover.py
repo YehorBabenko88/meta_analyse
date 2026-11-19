@@ -82,3 +82,50 @@ def test_math_import_is_required_and_fail_closed_for_nonpositive_market_inputs()
         core.price_bucket(D("0"), D("1"))
     with pytest.raises(ValueError):
         math.volume_profile_poc({D("100"): D("-1")}, close=D("100"))
+
+
+def test_legacy_runtime_paper_consumer_is_terminan_owner():
+    from meta_analyse.runtime import Runtime, PaperEngine as RuntimePaper
+    from terminan.paper import PaperEngine as TerminanPaper, ExecutionTrade
+    from meta_analyse.core import PaperEngine as OriginalOracle
+
+    assert RuntimePaper is TerminanPaper
+    runtime = Runtime(None, None)
+    assert type(runtime.paper) is TerminanPaper
+    assert runtime.paper.enabled is False
+    assert not hasattr(runtime.paper, "submit_order")
+    assert not hasattr(runtime.paper, "place_order")
+
+    # Identical UTC event sequence: legacy original is a frozen parity oracle,
+    # only the migrated Terminan engine runs inside the actual Meta Runtime.
+    base = datetime(2026, 10, 19, 12, 0, tzinfo=timezone.utc)
+    oracle = OriginalOracle()
+    oracle.enabled = runtime.paper.enabled = True
+    first = core.Trade("BTCUSDT", base, D("100"), D("1"), "Buy")
+    oracle.on_closed_minute("BTCUSDT", core.new_minute(first, D("1")))
+    runtime.symbols = ["BTCUSDT"]
+
+    def packet(seconds, price):
+        stamp = base + timedelta(seconds=seconds)
+        return {"Type": "trade_update", "Data": {
+            "ticker": "BTCUSDT",
+            "trades": [{"price": str(price), "size": "1", "side": "Buy",
+                        "time": stamp.isoformat()}],
+        }}
+
+    assert runtime.receive(packet(0, "100")) == []
+    assert runtime.receive(packet(60, "102"))[0][0] == "closed_minute"
+    oracle.on_trade(core.Trade("BTCUSDT", base + timedelta(seconds=60),
+                               D("102"), D("1"), "Buy"))
+    assert runtime.paper.positions["BTCUSDT"].side == oracle.positions["BTCUSDT"].side
+    events = runtime.receive(packet(61, "100"))
+    expected = oracle.on_trade(core.Trade("BTCUSDT", base + timedelta(seconds=61),
+                                          D("100"), D("1"), "Buy"))
+    assert events == [("paper_fill", "BTCUSDT", runtime.paper.fills[0])]
+    actual = runtime.paper.fills[0]
+    for attr in ("symbol", "side", "entry", "exit", "reason", "gross",
+                 "fees", "net", "exit_time"):
+        assert getattr(actual, attr) == getattr(expected, attr)
+
+    assert runtime.receive(packet(130, "103"))[0][0] == "closed_minute"
+    assert "BTCUSDT" not in runtime.paper.reference

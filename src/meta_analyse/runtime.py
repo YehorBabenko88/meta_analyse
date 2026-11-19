@@ -11,6 +11,11 @@ from terminan.paper import PaperEngine, ClosedMinute, ExecutionTrade
 
 LOG = logging.getLogger(__name__)
 
+class DurableSinksRequired(RuntimeError):
+    def __init__(self):
+        super().__init__("GRID_TERMINAN_DURABLE_SINKS_REQUIRED")
+
+
 class Runtime:
     def __init__(self, metascalp, exchange, store=None, tick_size=D("0.00000001"), *, on_status=None):
         self.on_status = on_status
@@ -30,6 +35,12 @@ class Runtime:
         self.symbols = await self.exchange.top_volatile(20)
         return self.symbols
 
+    def _require_safe_feed_mode(self):
+        # Offline parity callers consume returned fills directly. The live
+        # monitor discards returned events and has no approved durable sink.
+        if self.store is not None or (self.running and self.paper.enabled):
+            raise DurableSinksRequired()
+
     def receive(self, msg):
         if msg.get("Type", "").lower() != "trade_update":
             return []
@@ -42,8 +53,7 @@ class Runtime:
         # selected-symbol trade when the old PostgreSQL store was configured:
         # silently accepting it could lose both market profiles and paper
         # fills after their competing Meta writer calls were removed.
-        if self.store is not None:
-            raise RuntimeError("GRID_TERMINAN_DURABLE_SINKS_REQUIRED")
+        self._require_safe_feed_mode()
         outputs = []
         for raw in data.get("trades", []):
             try:
@@ -97,6 +107,7 @@ class Runtime:
             raise RuntimeError("monitor already running")
         self.running = True
         try:
+            self._require_safe_feed_mode()
             await self._run()
         finally:
             self.running = False
@@ -144,6 +155,8 @@ class Runtime:
                             self.receive(json.loads(raw))
                         except asyncio.TimeoutError:
                             continue
+            except DurableSinksRequired:
+                raise
             except (ConnectionError, OSError, websockets.WebSocketException, ValueError) as exc:
                 self._status(f"Monitor disconnected ({type(exc).__name__}); retrying; data UNVERIFIED")
                 LOG.warning("Market stream reconnect (%s)", type(exc).__name__)

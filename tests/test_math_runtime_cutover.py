@@ -10,6 +10,7 @@ from importlib import metadata
 from types import SimpleNamespace
 
 import market_profile_math as math
+import pytest
 
 from meta_analyse import core, footprint, orderflow_aggregation, orderflow_metrics
 from meta_analyse import tape_velocity, wall_tracker
@@ -185,3 +186,42 @@ def test_legacy_runtime_cannot_write_market_or_paper_rows_after_owner_cutover():
     assert [event[0] for event in events] == ["closed_minute"]
     assert offline.paper.positions == {}
     assert offline.paper.fills == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("store,enabled", [(object(), False), (None, True)])
+async def test_live_monitor_refuses_before_opening_a_feed(store, enabled):
+    from meta_analyse.runtime import Runtime
+
+    class NoFeed:
+        async def discover(self):
+            pytest.fail("live feed opened before persistence admission")
+
+    runtime = Runtime(NoFeed(), None, store=store)
+    runtime.paper.enabled = enabled
+
+    with pytest.raises(RuntimeError, match="GRID_TERMINAN_DURABLE_SINKS_REQUIRED"):
+        await runtime.run()
+
+    assert not runtime.running
+    assert runtime.minutes == {}
+    assert runtime.paper.fills == []
+
+
+def test_paper_activation_during_live_monitor_refuses_before_mutation():
+    from meta_analyse.runtime import Runtime
+
+    runtime = Runtime(None, None)
+    runtime.symbols = ["BTCUSDT"]
+    runtime.running = True
+    runtime.paper.enabled = True
+
+    with pytest.raises(RuntimeError, match="GRID_TERMINAN_DURABLE_SINKS_REQUIRED"):
+        runtime.receive({"Type": "trade_update", "Data": {"ticker": "BTCUSDT",
+            "trades": [{"time": "2026-11-19T12:00:00Z", "side": "Buy",
+                        "size": "1", "price": "100"}]}})
+
+    assert runtime.minutes == runtime.flow == {}
+    assert runtime.paper.last_trade_time == {}
+    assert runtime.paper.positions == {}
+    assert runtime.paper.fills == []

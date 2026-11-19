@@ -1,5 +1,9 @@
 # Meta Analyse — Unified Release Issue #79: preliminary ownership and safety audit
 
+> **STAGE 2 OWNER MAP SUPERSEDES THE STAGE 1 PROPOSAL BELOW (2026-11-19).** The user and MASTER #111 now designate **Math** as sole owner of ALL domain numerical algorithms, **Terminan** as sole owner of strategies/simulation/experiment controls AND UI, **Grid** as sole market data collector/store, and **Unified System** as sole installer/Gateway/supervisor. Meta Analyse may be fully consolidated/archived after cutover, not retained as an independent analytics service by default. Do not treat the old row 'Meta Analyse owns orderflow/levels computation' as operative. Source-of-truth: https://github.com/YehorBabenko88/meta_analyse/issues/79#issuecomment-7007015981 .
+
+**Executable first cleanup:** Draft PR https://github.com/YehorBabenko88/meta_analyse/pull/81, stacked on PR #78 code, unifies duplicate SQL reads of `meta_analyse.historical_trades` without touching data or live services. No cross-repo move/deletion until owner ACK, numerical parity, consumer migration and rollback.
+
 Date: 2026-11-19. Status: **NO_GO**. Parent: https://github.com/YehorBabenko88/unified-system/issues/111
 
 ## Verified immutable baseline

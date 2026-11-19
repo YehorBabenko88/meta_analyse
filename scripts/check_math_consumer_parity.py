@@ -12,7 +12,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-MATH_SHA = "f41d5018e2b79d91f7934e7e838691725ce78277"
+MATH_SHA = "c637500f857b95b2db731eb05dcdf26f52c7a06f"
 MATH_BLOB = "430ee36dfe0f71872e4f2ed35d4eaac918989fa4"
 
 

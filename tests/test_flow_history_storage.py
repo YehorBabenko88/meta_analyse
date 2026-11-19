@@ -633,3 +633,20 @@ def test_legacy_orderflow_reader_preserves_bounds_and_no_completeness_claim():
                 store, venue="bybit", symbol="BTCUSDT",
                 start_ms=start_ms, end_ms=start_ms + 1000, limit=bad,
             )
+
+
+def test_legacy_orderflow_reader_keeps_unknown_aggressor_without_promoting_quality():
+    from meta_analyse.orderflow_archive_reader import read_orderflow_trades
+
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    start_ms = (start - epoch).days * 86400000
+    store = FakeStore([("legacy-unknown", start, Decimal("100"), Decimal("0"), "Unknown")])
+    records = read_orderflow_trades(
+        store, venue="bybit", symbol="BTCUSDT",
+        start_ms=start_ms, end_ms=start_ms + 1000,
+    )
+    assert records[0]["side"] == "Unknown"
+    assert records[0]["volume"] == Decimal("0")
+    assert store.connection.read_only
+    assert all("verified" not in row for row in records)

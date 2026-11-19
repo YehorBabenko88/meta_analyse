@@ -55,8 +55,8 @@ class Runtime:
                 continue
             if current and slot > current.start:
                 current.complete = (slot - current.start == timedelta(minutes=1))
-                if self.store:
-                    self.store.profile(symbol, current, self.quality if current.complete else "gap")
+                # Grid owns persisted market profiles; this retired Meta
+                # runtime must not create a competing PostgreSQL market writer.
                 # Only Terminan owns paper strategy/execution. Math owns POC.
                 # A gap must never establish an executable closed-minute signal.
                 if current.complete:
@@ -75,8 +75,9 @@ class Runtime:
             self.flow.setdefault(symbol, RollingFlow()).add(t)
             fill = self.paper.on_trade(ExecutionTrade(t.symbol, t.time, t.price))
             if fill:
-                if self.store:
-                    self.store.paper_fill(fill)
+                # A legacy Meta DB writer is not a Terminan result ledger.
+                # Preserve the in-memory paper fill for parity/migration only;
+                # Terminan owns durable receipts after an accepted ledger cutover.
                 outputs.append(("paper_fill", symbol, fill))
         return outputs
 

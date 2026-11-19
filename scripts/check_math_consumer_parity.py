@@ -142,8 +142,8 @@ def check_installed_api(root: Path) -> None:
         )
         working = source.read_bytes()
         if working != committed and (
-            working.replace(b"\\r\\n", b"\\n") != committed
-            or b"\\r" in working.replace(b"\\r\\n", b"")
+            working.replace(b"\r\n", b"\n") != committed
+            or b"\r" in working.replace(b"\r\n", b"")
         ):
             raise ValueError("unexpected Math API working bytes")
     if git(root, "rev-parse", "HEAD") != MATH_SHA:

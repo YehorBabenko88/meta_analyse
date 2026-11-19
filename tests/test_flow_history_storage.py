@@ -569,3 +569,57 @@ def test_cancelled_history_request_cannot_publish_orderflow(monkeypatch):
         assert snapshot.orderflow_rows == ()
         assert snapshot.flow_history_request_id == 1
     asyncio.run(scenario())
+
+
+def test_legacy_orderflow_archive_uses_single_readonly_query():
+    from meta_analyse.orderflow_archive_reader import read_orderflow_trades
+
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    trade_time = start + timedelta(microseconds=123456)
+    start_ms = (start - epoch).days * 86400000
+    price = Decimal("0.000000000000012345678901")
+    quantity = Decimal("123456.00000000000000001")
+    store = FakeStore([("trade-1", trade_time, price, quantity, "Buy")])
+    records = read_orderflow_trades(
+        store, venue="bybit", symbol="BTCUSDT",
+        start_ms=start_ms, end_ms=start_ms + 60000, limit=2,
+    )
+    assert records == [{
+        "trade_id": "trade-1",
+        "timestamp_ms": start_ms + 123,
+        "price": price,
+        "volume": quantity,
+        "side": "Buy",
+    }]
+    assert store.connection.read_only
+    assert store.connection.params == (
+        "bybit", "BTCUSDT", start, start + timedelta(minutes=1), 3,
+    )
+    assert records[0]["price"] is price
+    assert records[0]["volume"] is quantity
+
+
+def test_legacy_orderflow_reader_preserves_bounds_and_no_completeness_claim():
+    from meta_analyse.orderflow_archive_reader import read_orderflow_trades
+
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    start_ms = (start - epoch).days * 86400000
+    rows = [(str(i), start, Decimal("1"), Decimal("2"), "Sell") for i in range(3)]
+    store = FakeStore(rows)
+    records = read_orderflow_trades(
+        store, venue="bybit", symbol="BTCUSDT",
+        start_ms=start_ms, end_ms=start_ms + 1000, limit=2,
+    )
+    assert len(records) == 2
+    assert [row["trade_id"] for row in records] == ["0", "1"]
+    assert all("verified" not in row and "complete" not in row for row in records)
+    assert store.connection.params[-1] == 3
+
+    for bad in (True, -1, 0):
+        with pytest.raises(ValueError):
+            read_orderflow_trades(
+                store, venue="bybit", symbol="BTCUSDT",
+                start_ms=start_ms, end_ms=start_ms + 1000, limit=bad,
+            )

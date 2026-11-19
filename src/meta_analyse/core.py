@@ -187,16 +187,11 @@ class RollingFlow:
     def metrics(self, now: datetime) -> dict:
         out = {}
         for seconds in (60, 300, 3600):
-            items = [(amt, side) for ts, amt, side in self.trades if 0 <= (now-ts).total_seconds() <= seconds]
-            total = sum((a for a, _ in items), D(0))
-            buys = sum((a for a, s in items if s in ("buy", "1")), D(0))
-            sells = sum((a for a, s in items if s in ("sell", "2")), D(0))
-            out[seconds] = {"turnover_usd": total, "trades": len(items), "buy_usd": buys, "sell_usd": sells,
-                            "trades_per_second": D(len(items)) / D(seconds)}
+            rows=[(int(ts.timestamp()*1000),amt,side) for ts,amt,side in self.trades]
+            out[seconds] = flow_window_metrics(rows,int(now.timestamp()*1000),seconds)
         return out
 
     def wall_score(self, price: Decimal, size: Decimal, now: datetime) -> dict:
-        wall = price * size
         metrics = self.metrics(now)
-        return {"wall_usd": wall, "ratios": {s: wall / max(D(1), metrics[s]["turnover_usd"]) for s in metrics},
-                "observed_turnover": {s: metrics[s]["turnover_usd"] for s in metrics}}
+        return wall_turnover_ratios(price,size,
+                    {window:data["turnover_usd"] for window,data in metrics.items()})

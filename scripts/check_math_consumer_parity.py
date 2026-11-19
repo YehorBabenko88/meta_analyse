@@ -5,15 +5,21 @@ evidence of real market data. Never silently substitute a synthetic Math module.
 """
 from __future__ import annotations
 
+import importlib
+import importlib.metadata
 import importlib.util
+import hashlib
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 import subprocess
 import sys
 
-MATH_SHA = "c637500f857b95b2db731eb05dcdf26f52c7a06f"
+MATH_SHA = "09ced8443bf7fc58065fcd5e0c5a6ca7c4d8bbb0"
 MATH_BLOB = "430ee36dfe0f71872e4f2ed35d4eaac918989fa4"
+MATH_API_BLOB = "1fc85cf71961fb3686a69ad3a9feaeb7be6fdf61"
+MATH_PROJECT_BLOB = "060670a9a4888e5c42a59b170337c311ed180713"
 
 
 def git(root: Path, *args: str) -> str:
@@ -115,12 +121,93 @@ def check(math_module) -> None:
         raise AssertionError("Math must refuse zero-priced market input")
 
 
+
+def check_installed_api(root: Path) -> None:
+    """Prove installed v1 API resolves to exact owned Math checkout bytes."""
+    root = root.resolve(strict=True)
+    checks = (
+        ("python/market_compute_api.py", MATH_API_BLOB),
+        ("python/market_profile_math.py", MATH_BLOB),
+        ("pyproject.toml", MATH_PROJECT_BLOB),
+    )
+    for relative, expected_oid in checks:
+        source = (root / relative).resolve(strict=True)
+        if not source.is_relative_to(root):
+            raise ValueError("Math source escapes checkout")
+        if git(root, "rev-parse", "HEAD:" + relative) != expected_oid:
+            raise ValueError("unexpected Math API source object")
+        committed = subprocess.check_output(
+            ["git", "--no-replace-objects", "-C", str(root), "show", "HEAD:" + relative],
+            stderr=subprocess.DEVNULL,
+        )
+        working = source.read_bytes()
+        if working != committed and (
+            working.replace(b"\\r\\n", b"\\n") != committed
+            or b"\\r" in working.replace(b"\\r\\n", b"")
+        ):
+            raise ValueError("unexpected Math API working bytes")
+    if git(root, "rev-parse", "HEAD") != MATH_SHA:
+        raise ValueError("wrong installed Math release")
+    if git(root, "status", "--porcelain", "--untracked-files=no"):
+        raise ValueError("dirty Math source")
+    api = importlib.import_module("market_compute_api")
+    kernel = importlib.import_module("market_profile_math")
+    if Path(api.__file__).resolve(strict=True) != (root / "python/market_compute_api.py").resolve():
+        raise ValueError("Math API imported from unapproved distribution")
+    if Path(kernel.__file__).resolve(strict=True) != (root / "python/market_profile_math.py").resolve():
+        raise ValueError("Math kernel imported from unapproved distribution")
+    if importlib.metadata.version("unified-math-kernels") != "0.1.0":
+        raise ValueError("unexpected Math package version")
+
+    request = {
+        "schema": "math.market.compute.v1",
+        "execution_authority": False,
+        "source": {
+            "snapshot_sha256": "a" * 64,
+            "as_of_ms": 1792200000000,
+            "units": {"price": "quote/base", "volume": "base"},
+        },
+        "operations": [
+            {"operation": "price_bucket", "input": {"price": "1.235", "tick": "0.01"}},
+            {"operation": "volume_profile_poc", "input": {
+                "profile": [{"price": "99", "volume": "3"},
+                            {"price": "101", "volume": "3"}], "close": "101"}},
+            {"operation": "volume_profile_poc", "input": {
+                "profile": [{"price": "99", "volume": "3"},
+                            {"price": "101", "volume": "3"}], "close": None}},
+            {"operation": "executed_volume_delta", "input": {"buy": "3", "sell": "2"}},
+        ],
+    }
+    receipt = api.compute_batch(request)
+    assert receipt["schema"] == "math.market.result.v1"
+    assert receipt["algorithm_version"] == "math.market.v1"
+    assert receipt["execution_authority"] is False
+    assert receipt["trading_authorized"] is False
+    assert receipt["provenance"] == "CALLER_SUPPLIED_UNATTESTED"
+    assert [r["value"] for r in receipt["results"]] == ["1.24", "101", "99", "1"]
+    expected = hashlib.sha256(
+        json.dumps(request, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+                   allow_nan=False).encode()
+    ).hexdigest()
+    assert receipt["request_sha256"] == expected
+    assert api.compute_batch(request) == receipt
+    invalid = dict(request, execution_authority=True)
+    try:
+        api.compute_batch(invalid)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Math execution authorization must be refused")
+
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: check_math_consumer_parity.py MATH_CHECKOUT")
-    check(load_math(Path(sys.argv[1])))
+    root = Path(sys.argv[1])
+    check(load_math(root))
+    check_installed_api(root)
     print("META_MATH_SOURCE_PARITY=PASS checks=price_bucket,minute_poc,footprint_poc,delta,refusal")
-    print("MATH_RUNTIME_IMPORT=NOT_ESTABLISHED")
+    print("MATH_INSTALLED_COMPUTE_API_V1=PASS source-pinned,call-contract-only")
+    print("META_PRODUCTION_CONSUMER_CUTOVER=NOT_ESTABLISHED")
     print("REAL_MARKET_DATA=NOT_TESTED")
 
 

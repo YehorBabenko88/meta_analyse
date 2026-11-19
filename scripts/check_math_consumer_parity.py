@@ -111,14 +111,15 @@ def check(math_module) -> None:
     assert Footprint("BTCUSDT", 0, 60000, D("1")).poc is None
     assert math_module.volume_profile_poc({}) is None
 
-    # Explicit known divergence: legacy Meta accepted zero, Math refuses it.
-    assert price_bucket(zero, D("1")) == zero
-    try:
-        math_module.price_bucket(zero, D("1"))
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("Math must refuse zero-priced market input")
+    # Legacy source accepted zero, but live Meta now uses Math and fails closed.
+    # Refusal is mandatory in BOTH entrypoints; do not leave an old permissive fallback.
+    for bucket in (price_bucket, math_module.price_bucket):
+        try:
+            bucket(zero, D("1"))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Active Meta/Math must refuse zero-priced market input")
 
 
 

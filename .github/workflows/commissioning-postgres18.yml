@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: YehorBabenko88/Terminan
-          ref: 9723e1518b7dd6f32f3df75685c38588202207a0
+          ref: b49028e10a11398028c3cf1fb8560bdccce1ab79
           path: .source/terminan
           persist-credentials: false
       - name: Checkout exact owned Python bootstrap source
@@ -70,8 +70,8 @@ jobs:
         run: |
           import importlib.metadata,pathlib,subprocess
           root=pathlib.Path('.source/terminan').resolve(strict=True)
-          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='9723e1518b7dd6f32f3df75685c38588202207a0'
-          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD:terminan/paper.py'],text=True).strip()=='d87560f1050e2f1209d6b39c6c61bcae722695b8'
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='b49028e10a11398028c3cf1fb8560bdccce1ab79'
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD:terminan/paper.py'],text=True).strip()=='54329265c1826a0d694a622acfe315a0531a80e1'
           import terminan.paper
           assert importlib.metadata.version('unified-terminan')=='0.1.0'
           assert pathlib.Path(terminan.paper.__file__).resolve().is_relative_to(root)
@@ -160,7 +160,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: YehorBabenko88/Terminan
-          ref: 9723e1518b7dd6f32f3df75685c38588202207a0
+          ref: b49028e10a11398028c3cf1fb8560bdccce1ab79
           path: .source/terminan
           persist-credentials: false
       - name: Checkout exact owned Python bootstrap source
@@ -191,8 +191,8 @@ jobs:
         run: |
           import importlib.metadata,pathlib,subprocess
           root=pathlib.Path('.source/terminan').resolve(strict=True)
-          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='9723e1518b7dd6f32f3df75685c38588202207a0'
-          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD:terminan/paper.py'],text=True).strip()=='d87560f1050e2f1209d6b39c6c61bcae722695b8'
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='b49028e10a11398028c3cf1fb8560bdccce1ab79'
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD:terminan/paper.py'],text=True).strip()=='54329265c1826a0d694a622acfe315a0531a80e1'
           import terminan.paper
           assert importlib.metadata.version('unified-terminan')=='0.1.0'
           assert pathlib.Path(terminan.paper.__file__).resolve().is_relative_to(root)

@@ -32,7 +32,18 @@ def load_math(root: Path):
         raise ValueError("unexpected Math commit")
     if git(root, "rev-parse", "HEAD:python/market_profile_math.py") != MATH_BLOB:
         raise ValueError("unexpected Math source object")
-    if git(root, "hash-object", "--no-filters", str(source)) != MATH_BLOB:
+    committed = subprocess.check_output(
+        ["git", "--no-replace-objects", "-C", str(root),
+         "show", "HEAD:python/market_profile_math.py"],
+        stderr=subprocess.DEVNULL,
+    )
+    working = source.read_bytes()
+    # Windows checkout can expand only LF -> CRLF. Verify actual raw Git
+    # object bytes before allowing that single transport transformation.
+    normalized = working.replace(b"\r\n", b"\n")
+    if working != committed and (
+        normalized != committed or b"\r" in working.replace(b"\r\n", b"")
+    ):
         raise ValueError("unexpected Math working file bytes")
     if git(root, "status", "--porcelain", "--untracked-files=no"):
         raise ValueError("modified Math source checkout")

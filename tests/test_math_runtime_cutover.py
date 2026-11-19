@@ -127,5 +127,5 @@ def test_legacy_runtime_paper_consumer_is_terminan_owner():
                  "fees", "net", "exit_time"):
         assert getattr(actual, attr) == getattr(expected, attr)
 
-    assert runtime.receive(packet(130, "103"))[0][0] == "closed_minute"
+    assert runtime.receive(packet(190, "103"))[0][0] == "closed_minute"
     assert "BTCUSDT" not in runtime.paper.reference

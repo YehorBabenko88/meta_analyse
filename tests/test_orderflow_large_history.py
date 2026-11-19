@@ -93,3 +93,27 @@ def test_100k_generator_unknown_side_and_price_bucket_count():
     assert sum((row.sell_volume for _, row in rows), Decimal(0)) == Decimal("2.5")
     assert sum((row.unknown_volume for _, row in rows), Decimal(0)) == Decimal("2.5")
     assert rows[-1][1].cumulative_delta == Decimal("2.75")
+
+
+def test_math_batch_limit_remains_strict_and_stream_bucket_budget_is_bounded():
+    """Streaming is a separate bounded Math contract, not a batch-limit bypass."""
+    import pytest
+    from market_compute_api import STREAM_ABI
+    from market_profile_math import aggregate_orderflow, MAX_ORDERFLOW_BATCH
+    from meta_analyse.orderflow_aggregation import aggregate_by_time
+
+    assert STREAM_ABI == "math.market.orderflow.stream.v1"
+    assert MAX_ORDERFLOW_BATCH == 20_000
+    rows = [(0, Decimal("100"), Decimal("1"), "buy")] * 20_001
+    with pytest.raises(ValueError, match="INVALID_AGGREGATE_BATCH"):
+        aggregate_orderflow(rows, mode="time", interval_ms=1000)
+    streamed = aggregate_by_time((Trade(*row) for row in rows), 1000)
+    assert len(streamed) == 1
+    assert streamed[0][1].trade_count == 20_001
+
+    # More than 20k independent result buckets cannot fit the bounded Math state.
+    # This is explicitly rejected; no silent truncation or disk/DB fallback.
+    source = (Trade(i * 1000, Decimal("100"), Decimal("1"), "buy")
+              for i in range(20_001))
+    with pytest.raises(ValueError, match="STREAM_BUCKET_LIMIT"):
+        aggregate_by_time(source, 1000)

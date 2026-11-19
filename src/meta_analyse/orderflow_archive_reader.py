@@ -30,17 +30,19 @@ def read_orderflow_trades(store, *, venue: str, symbol: str,
     snapshot = read_flow_history(
         store, venue=venue, symbol=symbol, start=start, end=end, limit=limit
     )
-    return [
-        {
+    # Preserve the old archive-record shape, including historically unknown sides.
+    # No publication/readiness flag is added; Grid remains the future owner.
+    records = []
+    for trade in snapshot.trades:
+        delta = trade.timestamp - epoch
+        records.append({
             "trade_id": trade.trade_id,
             "timestamp_ms": (
-                (trade.timestamp - epoch).days * 86400000
-                + (trade.timestamp - epoch).seconds * 1000
-                + (trade.timestamp - epoch).microseconds // 1000
+                (delta.days * 86400 + delta.seconds) * 1000
+                + delta.microseconds // 1000
             ),
             "price": trade.price,
             "volume": trade.quantity,
             "side": trade.side,
-        }
-        for trade in snapshot.trades
-    ]
+        })
+    return records

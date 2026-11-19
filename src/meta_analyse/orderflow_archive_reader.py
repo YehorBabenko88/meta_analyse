@@ -1,16 +1,22 @@
-"""Read-only PostgreSQL adapter for historical trades consumed by Order Flow."""
+"""Legacy Order Flow archive API over the one read-only historical-trade reader.
+
+This preserves the existing output shape while removing a second, divergent
+SQL query path. Neither this view nor the underlying snapshot proves that
+archive history is complete or exchange-authentic.
+"""
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
-from decimal import Decimal
+
+from .flow_history_storage import read_flow_history
 
 
 def read_orderflow_trades(store, *, venue: str, symbol: str,
                           start_ms: int, end_ms: int, limit: int = 10000):
-    """Return timestamp_ms/volume aliases without mutating archive tables.
+    """Return legacy trade records over the canonical bounded read-only query.
 
-    Interval is [start_ms, end_ms); rows are ordered deterministically.
-    Coverage/completeness is not implied by the returned records.
+    Interval is [start_ms, end_ms); results preserve Decimal precision.
+    The result may be limited and does not establish source completeness.
     """
     if not venue or not symbol:
         raise ValueError("venue and symbol are required")
@@ -21,21 +27,20 @@ def read_orderflow_trades(store, *, venue: str, symbol: str,
     epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
     start = epoch + timedelta(milliseconds=start_ms)
     end = epoch + timedelta(milliseconds=end_ms)
-    with store.connect() as conn:
-        with conn.transaction():
-            conn.execute("SET TRANSACTION READ ONLY")
-            rows = conn.execute("""SELECT trade_id,trade_ts,price,quantity,side
-                FROM meta_analyse.historical_trades
-                WHERE venue=%s AND symbol=%s AND trade_ts >= %s AND trade_ts < %s
-                ORDER BY trade_ts,trade_id LIMIT %s""",
-                (venue, symbol, start, end, limit)).fetchall()
+    snapshot = read_flow_history(
+        store, venue=venue, symbol=symbol, start=start, end=end, limit=limit
+    )
     return [
         {
-            "trade_id": trade_id,
-            "timestamp_ms": ((trade_ts - epoch).days * 86400000 + (trade_ts - epoch).seconds * 1000 + (trade_ts - epoch).microseconds // 1000),
-            "price": Decimal(price),
-            "volume": Decimal(quantity),
-            "side": side,
+            "trade_id": trade.trade_id,
+            "timestamp_ms": (
+                (trade.timestamp - epoch).days * 86400000
+                + (trade.timestamp - epoch).seconds * 1000
+                + (trade.timestamp - epoch).microseconds // 1000
+            ),
+            "price": trade.price,
+            "volume": trade.quantity,
+            "side": trade.side,
         }
-        for trade_id, trade_ts, price, quantity, side in rows
+        for trade in snapshot.trades
     ]

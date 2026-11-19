@@ -159,6 +159,75 @@ def check_installed_api(root: Path) -> None:
     if importlib.metadata.version("unified-math-kernels") != "0.1.0":
         raise ValueError("unexpected Math package version")
 
+    # Runtime consumer cutover evidence: not just a separate numerical oracle.
+    from meta_analyse.core import (Candle, Level, Minute, Trade as MinuteTrade,
+                                   RollingFlow, price_bucket as running_bucket,
+                                   untouched_levels)
+    from meta_analyse.footprint import Footprint, FootprintCell
+    from meta_analyse.orderflow_metrics import Trade as FlowTrade, calculate
+    from meta_analyse.orderflow_aggregation import aggregate_by_time, aggregate_by_price
+    from meta_analyse.tape_velocity import TapeVelocity
+    from meta_analyse.wall_tracker import WallTracker
+    from meta_analyse.liquidity import large_levels
+    from datetime import timedelta
+    from types import SimpleNamespace
+    import inspect
+
+    # Each imported public Meta wrapper must reference the exact installed Math module.
+    assert running_bucket is kernel.price_bucket
+    assert untouched_levels.__globals__["untouched_decimal_levels"] is kernel.untouched_decimal_levels
+    assert Minute.poc.fget.__globals__["volume_profile_poc"] is kernel.volume_profile_poc
+    assert Footprint.poc.fget.__globals__["volume_profile_poc"] is kernel.volume_profile_poc
+    assert FootprintCell.delta.fget.__globals__["executed_volume_delta"] is kernel.executed_volume_delta
+    assert calculate.__globals__["orderflow_volume_metrics"] is kernel.orderflow_volume_metrics
+    assert aggregate_by_time.__globals__["aggregate_orderflow"] is kernel.aggregate_orderflow
+    assert TapeVelocity.add.__globals__["tape_velocity_metrics"] is kernel.tape_velocity_metrics
+    assert WallTracker.observe.__globals__["wall_notional"] is kernel.wall_notional
+    assert large_levels.__globals__["large_liquidity_levels"] is kernel.large_liquidity_levels
+
+    now=datetime(2026,11,19,12,0,tzinfo=timezone.utc)
+    item=MinuteTrade("BTCUSDT",now,Decimal("100"),Decimal("1"),"Buy")
+    minute=Minute(now,Decimal("1"),item.price,item.price,item.price,item.price)
+    minute.add(item)
+    minute.add(MinuteTrade("BTCUSDT",now+timedelta(seconds=1),Decimal("101"),Decimal("1"),"Sell"))
+    assert minute.poc==Decimal("101")
+    clock=int(now.timestamp()*1000)
+    book=Footprint("BTCUSDT",clock,60000,Decimal("1"))
+    for i,(price,side) in enumerate((("100","Buy"),("101","Sell"))):
+        book.add(SimpleNamespace(symbol="BTCUSDT",timestamp_ms=clock+i,
+                                 price=Decimal(price),quantity=Decimal("1"),
+                                 taker_side=side),contiguous=True)
+    assert book.poc==Decimal("100") and book.delta==Decimal("0") and book.trusted
+    old_levels=[Candle(now,Decimal("101"),Decimal("99"),Decimal("100"),Decimal("100")),
+                Candle(now+timedelta(days=1),Decimal("102"),Decimal("99"),Decimal("100"),Decimal("101"))]
+    assert {(x.kind,x.price) for x in untouched_levels(old_levels,"D1")} == {
+        ("high",Decimal("102")),("low",Decimal("99"))}
+    flow=RollingFlow()
+    flow.add(item)
+    assert flow.metrics(now+timedelta(seconds=1))[60]["buy_usd"]==Decimal("100")
+    assert flow.wall_score(Decimal("10"),Decimal("100"),now+timedelta(seconds=1))["ratios"][60]==Decimal("10")
+    rows=[FlowTrade(2000,Decimal("100.19"),Decimal("3"),"buy"),
+          FlowTrade(999,Decimal("100.09"),Decimal("2"),"sell"),
+          FlowTrade(1000,Decimal("100.11"),Decimal("1"),"buy")]
+    assert calculate(rows).delta==Decimal("2")
+    assert [key for key,_ in aggregate_by_time(rows,1000)] == [0,1000,2000]
+    assert [key for key,_ in aggregate_by_price(rows,Decimal("0.1"))] == [
+        Decimal("100.0"),Decimal("100.1")]
+    tape=TapeVelocity(Decimal("1"),5000,20)
+    first=SimpleNamespace(timestamp_ms=1000,price=Decimal("100"),quantity=Decimal("1"),taker_side="Buy")
+    second=SimpleNamespace(timestamp_ms=2000,price=Decimal("101"),quantity=Decimal("2"),taker_side="Sell")
+    tape.add(first,Decimal("100"),contiguous=True)
+    snapshot=tape.add(second,Decimal("100"),contiguous=True)
+    assert snapshot.trades_per_second==Decimal("0.4") and snapshot.buy_notional==Decimal("100")
+    wall=WallTracker()
+    wall.observe(SimpleNamespace(valid=True,bids={Decimal("100"):Decimal("1000")},asks={}),1000)
+    warnings=wall.observe(SimpleNamespace(valid=True,bids={},asks={}),2000)
+    assert len(warnings)==1 and warnings[0].notional==Decimal("100000")
+    assert large_levels(SimpleNamespace(valid=True,symbol="BTCUSDT",
+        bids={Decimal("100"):Decimal("1000"),Decimal("99"):Decimal("10000")},
+        asks={Decimal("101"):Decimal("2000"),Decimal("102"):Decimal("500")}),
+        Decimal("100"),Decimal("1"))
+
     # Expanded Math-owned market algorithms are checked at pinned source,
     # without introducing another Meta implementation or synthetic live data.
     for name in (
@@ -242,7 +311,8 @@ def main() -> None:
     check_installed_api(root)
     print("META_MATH_SOURCE_PARITY=PASS checks=price_bucket,minute_poc,footprint_poc,delta,refusal")
     print("MATH_INSTALLED_COMPUTE_API_V1=PASS source-pinned,call-contract-only")
-    print("META_PRODUCTION_CONSUMER_CUTOVER=NOT_ESTABLISHED")
+    print("META_MATH_RUNNING_PYTHON_CONSUMERS=SWITCHED_SOURCE_ONLY")
+    print("META_PRODUCTION_DEPLOYMENT=NOT_ESTABLISHED")
     print("REAL_MARKET_DATA=NOT_TESTED")
 
 

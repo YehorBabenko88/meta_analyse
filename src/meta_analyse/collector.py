@@ -21,9 +21,6 @@ class CollectorService:
         self.refresh_errors=0
 
     async def run(self):
-        # Unified Release: Grid exclusively owns Bybit ingestion and writes.
-        # Preserve source for parity/rollback, but refuse legacy collector startup.
-        raise RuntimeError('META_LEGACY_BYBIT_COLLECTOR_DISABLED')
         self.running=True
         try:
             while self.running:

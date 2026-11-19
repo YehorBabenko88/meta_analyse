@@ -73,9 +73,13 @@ class DesktopService:
         self.orderflow_status = 'No validated historical trade source attached'
 
     def initialize(self):
-        self.api = MetaScalp()
-        self.exchange = BybitPublic()
-        self.runtime = Runtime(self.api, self.exchange, self.store, on_status=self._monitor_status)
+        # Unified owns the final terminal and Grid is the only Bybit client.
+        # The legacy desktop is retained solely for offline migration tests;
+        # do not construct network clients or collectors through its launcher.
+        self.status = 'Legacy Meta desktop disabled; use Unified Terminan/Grid'
+        self.flow_state = 'disconnected'
+        self.flow_status = 'Legacy market collection disabled — UNVERIFIED'
+        raise RuntimeError('META_LEGACY_DESKTOP_DISABLED')
 
     def _monitor_status(self, text):
         self.status = text

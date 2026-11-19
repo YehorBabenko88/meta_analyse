@@ -26,7 +26,9 @@ def test_runtime_calls_same_installed_math_symbols():
     assert footprint.volume_profile_poc is math.volume_profile_poc
     assert footprint.executed_volume_delta is math.executed_volume_delta
     assert orderflow_metrics.orderflow_volume_metrics is math.orderflow_volume_metrics
-    assert orderflow_aggregation.aggregate_orderflow is math.aggregate_orderflow
+    from market_compute_api import STREAM_ABI
+    assert STREAM_ABI == "math.market.orderflow.stream.v1"
+    assert orderflow_aggregation.aggregate_orderflow_stream is math.aggregate_orderflow_stream
     assert tape_velocity.tape_velocity_metrics is math.tape_velocity_metrics
     assert wall_tracker.wall_notional is math.wall_notional
 

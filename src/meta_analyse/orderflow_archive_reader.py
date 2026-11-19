@@ -6,7 +6,7 @@ archive history is complete or exchange-authentic.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 from .flow_history_storage import read_flow_history
 

@@ -38,3 +38,10 @@ NOT READY TO ARCHIVE OR DELETE. Missing target-owner ACK, full static/dynamic im
 
 ## Rollback
 Keep PR #78 source and all refs. PR #81 can be reverted without touching database schemas or user data. No force push, mass branch closure, backup removal or live orders.
+## Stage 4 pinned Math consumer contract (not yet production cutover)
+- Math Draft PR #121 pinned HEAD `f41d5018e2b79d91f7934e7e838691725ce78277`, verified source blob `python/market_profile_math.py` = `430ee36dfe0f71872e4f2ed35d4eaac918989fa4`.
+- Exact same-input source parity check: `scripts/check_math_consumer_parity.py` loads only that verified Math blob; `.github/workflows/ci.yml` executes the check on Windows and Linux, independently of existing mandatory suites. This test is offline source parity, not real data, not a runtime Math import or end-to-end release proof.
+- Concrete Meta call graph: `core.py:Minute.add -> price_bucket`; `core.py:Minute.poc -> volume_profile_poc(profile, close=minute.close)`; `footprint.py:Footprint.add -> price_bucket`; `footprint.py:Footprint.poc -> volume_profile_poc({price: cell.buy+cell.sell})`; `footprint.py:FootprintCell.delta -> executed_volume_delta(buy,sell)`; `footprint.py:Footprint.delta` sums those deltas. `core.py:PaperEngine.on_closed_minute` consumes Minute.poc, and belongs in Terminan later.
+- **Do not switch these runtime imports yet**: Math #121 is a raw `python/market_profile_math.py` file without a verified, installable distribution/API and versioned Gateway contract. Math refuses zero/nonfinite prices that legacy Meta may accept; no full real-input-domain parity or rollback evidence yet. #114 must establish installer/import path first.
+- Terminan #87 `c19085cee84539855c51d492772bf7e0124e46dc` and #88 `603ae1d9a05087a2640564885b0b47388980e9ff` are **incompatible** regarding strategy registry imports (`terminan.contracts` vs `terminan.strategies`). Meta does not change strategy imports until Terminan owner resolves one canonical contract; do not merge independently.
+- Current PR #81 is documentation/tests plus internal SQL dedup; it neither deploys a second market service nor changes user history.

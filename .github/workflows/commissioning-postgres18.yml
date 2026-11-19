@@ -18,6 +18,7 @@ jobs:
         options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       UNIFIED_SOURCE_ROOT: ${{ github.workspace }}/.source/unified-system
+      MATH_SOURCE_ROOT: ${{ github.workspace }}/.source/math
       QT_QPA_PLATFORM: offscreen
       PYTHONASYNCIODEBUG: '1'
       META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
@@ -142,6 +143,7 @@ jobs:
     timeout-minutes: 10
     env:
       UNIFIED_SOURCE_ROOT: ${{ github.workspace }}/.source/unified-system
+      MATH_SOURCE_ROOT: ${{ github.workspace }}/.source/math
       META_ANALYSE_CI_IDENTITY_SCOPE: full
       META_ANALYSE_PLATFORM_SUITE: commissioning
     steps:

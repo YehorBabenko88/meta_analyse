@@ -81,3 +81,7 @@ See docs/meta-stage6-feature-migration.csv for 17 feature families with USED/UNK
 - MOVE the headless integration launch onto Unified's explicit `--dependency-root` for the Math SDK. This lets the isolated process import `core.py -> market_profile_math` using the already pinned SDK at `98d6783522aac7155cbb4635e5b29239746d88e0`. CI retains `-I -S -B` and the existing Math source parity verification.
 - MERGE through existing adapters and owner APIs. Production registration must supply the approved Math root or use the replacement Gateway route. Direct exchange/collector, paper writer and Qt/settings ownership transfers still require matching, qualified contracts and persisted row-digest/restore proof.
 - DELETE no source or data. Keep the legacy paper tests as a parity oracle until Terminan accepts equivalent inputs and results.
+
+## Stage 11: qualify the next Math cohort
+
+Meta CI, commissioning and storage integration pin Math #122 at `150910fff08c896f243fdf7e64ec18611420a4d2`. The kernel, public compute API and package metadata Git objects match the Stage 10 pin. The parity script still verifies the same three objects and installed SDK. Unified bootstrap receives the Math source root explicitly. Revert the Stage 11 pin commit to restore the prior candidate across all four files together. This requires no data migration.

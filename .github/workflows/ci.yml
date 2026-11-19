@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: YehorBabenko88/math
-          ref: ed4339a30e4a97bf29f70b45627bf988bc1338b1
+          ref: 98d6783522aac7155cbb4635e5b29239746d88e0
           path: .source/math
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -233,7 +233,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: YehorBabenko88/math
-          ref: ed4339a30e4a97bf29f70b45627bf988bc1338b1
+          ref: 98d6783522aac7155cbb4635e5b29239746d88e0
           path: .source/math
           persist-credentials: false
       - uses: actions/setup-python@v5

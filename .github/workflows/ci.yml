@@ -34,6 +34,15 @@ jobs:
           assert (root/'unified_system/owned_python.py').is_file()
       - name: Verify exact Actions source SHA
         run: python scripts/record_ci_source.py
+      - name: Checkout pinned Math market-profile source (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: YehorBabenko88/math
+          ref: f41d5018e2b79d91f7934e7e838691725ce78277
+          path: .source/math
+          persist-credentials: false
+      - name: Verify Meta-to-Math numerical source parity (offline only)
+        run: python scripts/check_math_consumer_parity.py .source/math
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -217,6 +226,15 @@ jobs:
           assert (root/'unified_system/owned_python.py').is_file()
       - name: Verify exact Actions source SHA
         run: python scripts/record_ci_source.py
+      - name: Checkout pinned Math market-profile source (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: YehorBabenko88/math
+          ref: f41d5018e2b79d91f7934e7e838691725ce78277
+          path: .source/math
+          persist-credentials: false
+      - name: Verify Meta-to-Math numerical source parity (offline only)
+        run: python scripts/check_math_consumer_parity.py .source/math
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

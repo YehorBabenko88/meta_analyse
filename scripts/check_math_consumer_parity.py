@@ -308,8 +308,10 @@ def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: check_math_consumer_parity.py MATH_CHECKOUT")
     root = Path(sys.argv[1])
-    check(load_math(root))
+    # Authenticate the installed canonical package before importing Meta's
+    # production callers, which now import that package at module load.
     check_installed_api(root)
+    check(load_math(root))
     print("META_MATH_SOURCE_PARITY=PASS checks=price_bucket,minute_poc,footprint_poc,delta,refusal")
     print("MATH_INSTALLED_COMPUTE_API_V1=PASS source-pinned,call-contract-only")
     print("META_MATH_RUNNING_PYTHON_CONSUMERS=SWITCHED_SOURCE_ONLY")

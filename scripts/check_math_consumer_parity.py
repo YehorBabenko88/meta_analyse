@@ -16,9 +16,9 @@ from pathlib import Path
 import subprocess
 import sys
 
-MATH_SHA = "ed4339a30e4a97bf29f70b45627bf988bc1338b1"
-MATH_BLOB = "1c7d46e92df966a6eebfd1311370b01ab5bbee1d"
-MATH_API_BLOB = "ebe6b1ae286ba07dd9728d656780ddf8a5871853"
+MATH_SHA = "98d6783522aac7155cbb4635e5b29239746d88e0"
+MATH_BLOB = "2e952926c6218aa58eb992fa7f8a252a22444c64"
+MATH_API_BLOB = "47042fa83270209aeaf3d3b1c8224e7aae2362d6"
 MATH_PROJECT_BLOB = "82876b8a6fe14cc6ddfddc6b2f3785206c82d895"
 
 
@@ -181,7 +181,10 @@ def check_installed_api(root: Path) -> None:
     assert Footprint.poc.fget.__globals__["volume_profile_poc"] is kernel.volume_profile_poc
     assert FootprintCell.delta.fget.__globals__["executed_volume_delta"] is kernel.executed_volume_delta
     assert calculate.__globals__["orderflow_volume_metrics"] is kernel.orderflow_volume_metrics
-    assert aggregate_by_time.__globals__["aggregate_orderflow"] is kernel.aggregate_orderflow
+    assert aggregate_by_time.__globals__["aggregate_orderflow_stream"] is kernel.aggregate_orderflow_stream
+    from market_compute_api import STREAM_ABI
+    assert STREAM_ABI == "math.market.orderflow.stream.v1"
+
     assert TapeVelocity.add.__globals__["tape_velocity_metrics"] is kernel.tape_velocity_metrics
     assert WallTracker.observe.__globals__["wall_notional"] is kernel.wall_notional
     assert large_levels.__globals__["large_liquidity_levels"] is kernel.large_liquidity_levels

@@ -7,3 +7,16 @@ def test_desktop_exposes_explicit_disconnect_handler():
 
 def test_flow_start_error_can_be_rendered_without_qt_worker_calls():
     assert callable(Window.repaint_state)
+
+
+def test_legacy_desktop_cli_refuses_before_qt_or_exchange_start(monkeypatch):
+    import pytest
+    import meta_analyse.desktop as desktop
+
+    def no_qt(*_args, **_kwargs):
+        raise AssertionError("obsolete desktop must not construct a Qt application")
+
+    monkeypatch.setattr(desktop, "QApplication", no_qt)
+    monkeypatch.setattr(desktop, "Window", no_qt)
+    with pytest.raises(SystemExit, match="META_LEGACY_TERMINAL_DISABLED_USE_UNIFIED_TERMINAN"):
+        desktop.main()

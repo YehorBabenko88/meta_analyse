@@ -7,6 +7,7 @@ They do not claim real market provenance or a released Unified deployment.
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal as D
 from importlib import metadata
+import json
 from types import SimpleNamespace
 
 import market_profile_math as math
@@ -224,4 +225,46 @@ def test_paper_activation_during_live_monitor_refuses_before_mutation():
     assert runtime.minutes == runtime.flow == {}
     assert runtime.paper.last_trade_time == {}
     assert runtime.paper.positions == {}
+    assert runtime.paper.fills == []
+
+
+@pytest.mark.asyncio
+async def test_packet_delivered_during_shutdown_cannot_reach_paper_engine(monkeypatch):
+    from meta_analyse import runtime as monitor
+
+    class Feed:
+        base = "http://127.0.0.1:1234"
+
+        async def discover(self):
+            pass
+
+        async def connections(self):
+            return [{"exchange": "bybit", "state": 2, "id": "fixture"}]
+
+        async def top_volatile(self, _n):
+            return ["BTCUSDT"]
+
+    class Socket:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            pass
+
+        async def send(self, _message):
+            pass
+
+        async def recv(self):
+            runtime.stop()
+            runtime.paper.enabled = True
+            return json.dumps({"Type": "trade_update", "Data": {"ticker": "BTCUSDT",
+                "trades": [{"time": "2026-11-19T12:00:00Z", "side": "Buy",
+                            "size": "1", "price": "100"}]}})
+
+    feed = Feed()
+    runtime = monitor.Runtime(feed, feed)
+    monkeypatch.setattr(monitor.websockets, "connect", lambda *_args, **_kwargs: Socket())
+    await runtime.run()
+    assert not runtime.running
+    assert runtime.minutes == runtime.paper.last_trade_time == {}
     assert runtime.paper.fills == []

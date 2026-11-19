@@ -152,6 +152,8 @@ class Runtime:
                             next_refresh = asyncio.get_running_loop().time() + 300
                         try:
                             raw = await asyncio.wait_for(socket.recv(), timeout=1)
+                            if not self.running:
+                                return
                             self.receive(json.loads(raw))
                         except asyncio.TimeoutError:
                             continue

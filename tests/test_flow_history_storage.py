@@ -581,6 +581,14 @@ def test_legacy_orderflow_archive_uses_single_readonly_query():
     price = Decimal("0.000000000000012345678901")
     quantity = Decimal("123456.00000000000000001")
     store = FakeStore([("trade-1", trade_time, price, quantity, "Buy")])
+    calls = []
+    original_execute = store.connection.execute
+
+    def record_execute(sql, params=None):
+        calls.append(sql)
+        return original_execute(sql, params)
+
+    store.connection.execute = record_execute
     records = read_orderflow_trades(
         store, venue="bybit", symbol="BTCUSDT",
         start_ms=start_ms, end_ms=start_ms + 60000, limit=2,
@@ -593,6 +601,8 @@ def test_legacy_orderflow_archive_uses_single_readonly_query():
         "side": "Buy",
     }]
     assert store.connection.read_only
+    assert sum("SELECT" in sql for sql in calls) == 1
+    assert calls.count("SET TRANSACTION READ ONLY") == 1
     assert store.connection.params == (
         "bybit", "BTCUSDT", start, start + timedelta(minutes=1), 3,
     )

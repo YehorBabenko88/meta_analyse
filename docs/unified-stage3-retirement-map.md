@@ -74,3 +74,66 @@ See docs/meta-stage6-feature-migration.csv for 17 feature families with USED/UNK
 - Deletion gate: validate every old source consumer, identical-input precision and causal behavior, user settings/history/results and DB row counts/digests, no concurrent writers or duplicate services, physical Windows release acceptance, and separate owner confirmation.
 
 - Full pinned Python **file** inventory: `docs/meta-stage6-file-inventory.csv` contains all 83 `src/meta_analyse/*.py` modules at this Draft PR head, their exact Git blob OIDs, candidate owners, and explicit NOT_EXHAUSTIVELY_CHECKED reachability. Nine mixed-ownership modules require per-symbol separation. The 17-row feature-family ledger is `docs/meta-stage6-feature-migration.csv`. These two ledgers are not a complete dynamic/per-function audit, so archive clearance remains NO_GO.
+
+## Stage 10: isolated headless Math dependency
+
+- KEEP `grid_history_adapter.analyze_grid_history`, MetaScalp level ownership, historical settings and persisted result evidence pending migration.
+- MOVE the headless integration launch onto Unified's explicit `--dependency-root` for the Math SDK. This lets the isolated process import `core.py -> market_profile_math` using the already pinned SDK at `98d6783522aac7155cbb4635e5b29239746d88e0`. CI retains `-I -S -B` and the existing Math source parity verification.
+- MERGE through existing adapters and owner APIs. Production registration must supply the approved Math root or use the replacement Gateway route. Direct exchange/collector, paper writer and Qt/settings ownership transfers still require matching, qualified contracts and persisted row-digest/restore proof.
+- DELETE no source or data. Keep the legacy paper tests as a parity oracle until Terminan accepts equivalent inputs and results.
+
+## Stage 11: qualify the next Math cohort
+
+Meta CI, commissioning and storage integration pin Math #122 at `150910fff08c896f243fdf7e64ec18611420a4d2`. The kernel, public compute API and package metadata Git objects match the Stage 10 pin. The parity script still verifies the same three objects and installed SDK. Unified bootstrap receives the Math source root explicitly. Revert the Stage 11 pin commit to restore the prior candidate across all four files together. This requires no data migration.
+
+## Stage 15: offline Terminan journal delivery
+
+`python -m meta_analyse.offline_paper_delivery SOURCE_JSON EXPECTED_SHA256 LEDGER_SQLITE`
+requires the pinned Terminan SDK from #91. Retain the source file and its independently
+recorded SHA-256 before attempting delivery. The `meta.paper.source.v1` object contains
+`schema`, `source_id`, `symbol`, and an ordered nonempty `events` array of
+`terminan.paper.event.v1` objects with contiguous sequences starting at one. Source limit
+is 8 MiB. Terminan validates each event and commits its ACK and checkpoint. An interrupted
+delivery can leave a committed prefix. To resume, reopen the same ledger and replay the
+original file with its original hash. Do not edit a rejected or incomplete file and treat
+it as a retry: content changes create a different run identity.
+
+The delivery receipt reports the source digest, run identity, highest ACKed sequence,
+fill count and ordered SHA-256 of fill ACKs. The adapter reads back the journal and rejects
+a fill digest mismatch. Keep the original source and local SQLite backup for restoration.
+The live monitor remains fenced. Source qualification, live cursor admission and migration
+of historical PostgreSQL rows need separate evidence.
+
+## Stage 16: reconcile the Terminan checkpoint before resuming
+
+The adapter checks the last durable ACK against the source sequence and event hash
+before submitting anything on reopen. The delivered receipt uses the checkpoint
+read back from Terminan and requires the final persisted ACK to match the delivery
+ACK. A divergent checkpoint fails closed. Qualification pins Terminan #91
+`7b15cacb03cd51477d0d7b4254694e0db923f092` and its Math SDK dependency
+`ba7a07e8a7730c7d6be328b2dfd39132274e1e8e`.
+
+## Stage 19: refresh offline qualification pins
+
+Meta's CI qualification ties the existing offline PaperJournal delivery and installer
+to Terminan #91 4035647edb332260859850ad2a3ffc1044a4c818 and its active Math SDK pin
+8de3858cd5ca9a63dc3cd10f5f5cdec870ef4440. The original source, durable ACK and fill
+digest checks remain unchanged. This does not change the legacy live-monitor interlock.
+Rollback reverts the CI and parity pins together while retaining any offline ledgers.
+
+## Stage 20: archive historical paper fills from one PostgreSQL snapshot
+
+An authorized migration caller can pass an attested Store, a dedicated Terminan
+PaperReplayLedger and a stable source ID to archive_paper_fills. The function uses
+one REPEATABLE READ READ ONLY transaction and two named cursors. The first scans
+the digest and count, and the second transfers the canonical rows from that same
+snapshot into Terminan's existing atomic importer. The two scans use the existing
+Meta digest-v1 encoding and bounded batches of 256 rows. Preserve the original
+database backup, source ID and returned digest. A retry with a changed snapshot
+must refuse under the existing source ID. Verify with Terminan restore_meta_fills.
+No historical rows are modified in Meta. Settings and level_map are outside this
+paper-fill contract, and the live interlock remains in place.
+
+Qualification pins Terminan #91 0f3b1408ada9a2cdea20e66ec56840d5bb196bac and Math
+#122 876b31f2310827d417e70ed22d0e9b5cfc9b5320. To roll back, revert the source
+commit while retaining the PostgreSQL backup and any committed Terminan archive.

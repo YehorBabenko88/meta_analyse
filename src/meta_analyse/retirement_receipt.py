@@ -1,10 +1,11 @@
-"""Migration-only read-only receipts for retired Meta persistent state.
+"""Receipts and historical paper-fill transfer for retired Meta state.
 
-Never writes, exports row contents, authenticates a market source or provisions PG.
-The returned hashes are local comparison evidence, NOT a signed attestation.
+The Meta source is read only. Terminan owns archive writes and verified readback.
+The returned hashes are local comparison evidence, not a signed attestation.
 """
 from __future__ import annotations
 
+from contextlib import closing
 from datetime import datetime, timezone
 from decimal import Decimal
 from hashlib import sha256
@@ -48,59 +49,51 @@ def _canonical(value):
     raise ValueError("UNSUPPORTED_PERSISTED_TYPE")
 
 
-def persisted_state_receipt(store, table: str, *, max_rows: int = 1_000_000):
-    """Bounded-memory digest of one explicitly scoped, locked-down SQL result.
-
-    Store.connect must be authorized by the private cluster ownership contract.
-    This never claims a source-complete or authoritative market snapshot.
-    """
-    if type(table) is not str or table not in _SQL:
-        raise ValueError("UNAPPROVED_STATE_TABLE")
-    if type(max_rows) is not int or not 1 <= max_rows <= 10_000_000:
+def _check_source(store, max_rows, limit):
+    if type(max_rows) is not int or not 1 <= max_rows <= limit:
         raise ValueError("INVALID_ROW_BUDGET")
     if getattr(store, "expected_cluster", None) is None:
         raise ValueError("EXPECTED_CLUSTER_REQUIRED")
 
-    sql, width = _SQL[table]
-    digest = sha256(b"meta.persisted-state.digest.v1\0" + table.encode() + b"\0")
+
+def _encoded_rows(cursor, table, max_rows):
+    _, width = _SQL[table]
     count = 0
     previous_key = None
-    with store.connect() as connection:
-        with connection.transaction():
-            connection.execute("SET TRANSACTION READ ONLY")
-            cursor = connection.execute(sql)
-            while True:
-                rows = cursor.fetchmany(256)
-                if not rows:
-                    break
-                if len(rows) > 256:
-                    raise ValueError("INVALID_FETCH_BATCH")
-                for row in rows:
-                    if not isinstance(row, (list, tuple)) or len(row) != width:
-                        raise ValueError("INVALID_STATE_ROW")
-                    count += 1
-                    if count > max_rows:
-                        raise ValueError("STATE_ROW_BUDGET_EXCEEDED")
-                    # Protect against a compromised cursor dropping ORDER BY,
-                    # duplicating an identity or returning inconsistent rows.
-                    key = (row[0] if table != "level_map" else tuple(row[:3]))
-                    if previous_key is not None:
-                        try:
-                            in_order = key > previous_key
-                        except TypeError as exc:
-                            raise ValueError("INVALID_STATE_ORDER") from exc
-                        if not in_order:
-                            raise ValueError("INVALID_STATE_ORDER")
-                    previous_key = key
-                    encoded = json.dumps(
-                        [_canonical(value) for value in row],
-                        ensure_ascii=True, allow_nan=False,
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    if len(encoded) > 262_144:
-                        raise ValueError("STATE_ROW_TOO_LARGE")
-                    digest.update(len(encoded).to_bytes(4, "big"))
-                    digest.update(encoded)
+    while rows := cursor.fetchmany(256):
+        if len(rows) > 256:
+            raise ValueError("INVALID_FETCH_BATCH")
+        for row in rows:
+            if not isinstance(row, (list, tuple)) or len(row) != width:
+                raise ValueError("INVALID_STATE_ROW")
+            count += 1
+            if count > max_rows:
+                raise ValueError("STATE_ROW_BUDGET_EXCEEDED")
+            key = row[0] if table != "level_map" else tuple(row[:3])
+            if previous_key is not None:
+                try:
+                    in_order = key > previous_key
+                except TypeError as exc:
+                    raise ValueError("INVALID_STATE_ORDER") from exc
+                if not in_order:
+                    raise ValueError("INVALID_STATE_ORDER")
+            previous_key = key
+            encoded = json.dumps(
+                [_canonical(value) for value in row],
+                ensure_ascii=True, allow_nan=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            if len(encoded) > 262_144:
+                raise ValueError("STATE_ROW_TOO_LARGE")
+            yield encoded
+
+
+def _receipt(table, rows):
+    digest = sha256(b"meta.persisted-state.digest.v1\0" + table.encode() + b"\0")
+    count = 0
+    for count, encoded in enumerate(rows, 1):
+        digest.update(len(encoded).to_bytes(4, "big"))
+        digest.update(encoded)
     return {
         "schema": "meta.persisted-state.digest.v1",
         "table": table,
@@ -110,3 +103,35 @@ def persisted_state_receipt(store, table: str, *, max_rows: int = 1_000_000):
         "execution_authority": False,
         "trading_authorized": False,
     }
+
+
+def persisted_state_receipt(store, table: str, *, max_rows: int = 1_000_000):
+    """Digest one explicitly scoped SQL result from an authorized cluster."""
+    if type(table) is not str or table not in _SQL:
+        raise ValueError("UNAPPROVED_STATE_TABLE")
+    _check_source(store, max_rows, 10_000_000)
+    sql, _ = _SQL[table]
+    with store.connect() as connection, connection.transaction():
+        connection.execute("SET TRANSACTION READ ONLY")
+        return _receipt(table, _encoded_rows(connection.execute(sql), table, max_rows))
+
+
+def archive_paper_fills(store, terminan_ledger, source_id: str, *, max_rows: int = 1_000_000):
+    """Send one authorized historical snapshot to the existing Terminan archive.
+
+    Use a stable source ID to retry the same snapshot. Terminan rejects a
+    previously committed ID with a different digest. No source rows are logged
+    or staged on disk by Meta.
+    """
+    _check_source(store, max_rows, 1_000_000)
+    table = "paper_fills"
+    sql, _ = _SQL[table]
+    with store.connect() as connection, connection.transaction():
+        connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+        with connection.cursor(name="meta_archive_receipt") as cursor:
+            cursor.execute(sql)
+            receipt = _receipt(table, _encoded_rows(cursor, table, max_rows))
+        with connection.cursor(name="meta_archive_delivery") as cursor:
+            cursor.execute(sql)
+            with closing(json.loads(row) for row in _encoded_rows(cursor, table, max_rows)) as rows:
+                return terminan_ledger.import_meta_fills(source_id, rows, receipt)

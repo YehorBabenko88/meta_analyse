@@ -21,12 +21,16 @@ ROOT=Path(__file__).parents[1]
 TOKEN='a'*64
 # Real owner bootstrap supplied by the coordinated Unified source checkout.
 UNIFIED=Path(os.environ.get('UNIFIED_SOURCE_ROOT',ROOT.parent/'unified-system'))
+MATH=Path(os.environ.get('MATH_SOURCE_ROOT',ROOT.parent/'math'))
 
 
 def owned_argv(root):
     bootstrap=UNIFIED/'unified_system/owned_python.py'
     assert bootstrap.is_file(), 'Exact Unified bootstrap checkout required (UNIFIED_SOURCE_ROOT)'
+    math_python=(MATH/'python').resolve(strict=True)
+    assert (math_python/'market_profile_math.py').is_file(), 'Pinned Math SDK checkout required (MATH_SOURCE_ROOT)'
     return [sys.executable,'-I','-S','-B',str(bootstrap),'--source-root',str(root),
+            '--dependency-root',str(math_python),
             '--module','meta_analyse.headless_service','--','--execute','--port','0']
 
 
@@ -56,7 +60,7 @@ def launch(capsule):
     lines=queue.Queue();reader=threading.Thread(target=lambda:lines.put(process.stdout.readline()),daemon=True);reader.start()
     try:
         line=lines.get(timeout=12)
-        if not line:raise AssertionError('Service failed startup: '+process.stderr.read(1000))
+        if not line:raise AssertionError('Service failed startup: '+process.stderr.read(8192))
         port=json.loads(line)['port']
         return process,port
     except BaseException:

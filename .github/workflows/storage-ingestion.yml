@@ -63,14 +63,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: YehorBabenko88/math
-          ref: 98d6783522aac7155cbb4635e5b29239746d88e0
+          ref: 876b31f2310827d417e70ed22d0e9b5cfc9b5320
           path: .source/math
           persist-credentials: false
       - name: Checkout pinned Terminan paper-only package
         uses: actions/checkout@v4
         with:
           repository: YehorBabenko88/Terminan
-          ref: b49028e10a11398028c3cf1fb8560bdccce1ab79
+          ref: 0f3b1408ada9a2cdea20e66ec56840d5bb196bac
           path: .source/terminan
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -87,8 +87,8 @@ jobs:
         run: |
           import importlib.metadata,pathlib,subprocess
           root=pathlib.Path('.source/terminan').resolve(strict=True)
-          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='b49028e10a11398028c3cf1fb8560bdccce1ab79'
-          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD:terminan/paper.py'],text=True).strip()=='54329265c1826a0d694a622acfe315a0531a80e1'
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()=='0f3b1408ada9a2cdea20e66ec56840d5bb196bac'
+          assert subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD:terminan/paper.py'],text=True).strip()=='a76ec2ea46b34a4d63d02b570b5a67e779daa5af'
           import terminan.paper
           assert importlib.metadata.version('unified-terminan')=='0.1.0'
           assert pathlib.Path(terminan.paper.__file__).resolve().is_relative_to(root)
@@ -100,7 +100,7 @@ jobs:
           import importlib.metadata, pathlib, subprocess
           root=pathlib.Path('.source/math').resolve(strict=True)
           actual=subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()
-          assert actual=='98d6783522aac7155cbb4635e5b29239746d88e0'
+          assert actual=='876b31f2310827d417e70ed22d0e9b5cfc9b5320'
           assert importlib.metadata.version('unified-math-kernels')=='0.1.0'
           import market_profile_math,market_compute_api
           assert pathlib.Path(market_profile_math.__file__).resolve().is_relative_to(root)

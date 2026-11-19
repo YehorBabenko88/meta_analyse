@@ -2,7 +2,9 @@
 [CmdletBinding()]
 param(
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'MetaAnalyse'),
-    [string]$Python = ''
+    [string]$Python = '',
+    [string]$MathWheel = '',
+    [string]$TerminanWheel = ''
 )
 $ErrorActionPreference = 'Stop'
 
@@ -10,6 +12,16 @@ function Invoke-Checked {
     param([string]$Command, [string[]]$Arguments, [string]$Operation)
     & $Command @Arguments
     if ($LASTEXITCODE -ne 0) { throw "$Operation failed (exit $LASTEXITCODE). Installation incomplete." }
+}
+
+if (-not $MathWheel -or -not $TerminanWheel) {
+    throw 'Specify -MathWheel and -TerminanWheel with local wheels from the approved source cohort.'
+}
+$mathPackage = Get-Item -LiteralPath $MathWheel
+$terminanPackage = Get-Item -LiteralPath $TerminanWheel
+if ($mathPackage -isnot [System.IO.FileInfo] -or $mathPackage.Name -notlike 'unified_math_kernels-*.whl' -or
+    $terminanPackage -isnot [System.IO.FileInfo] -or $terminanPackage.Name -notlike 'unified_terminan-*.whl') {
+    throw 'Expected local Math and Terminan wheel files.'
 }
 
 $pythonCommand = $Python
@@ -43,7 +55,8 @@ if (-not (Test-Path -LiteralPath $exe)) {
 }
 Invoke-Checked -Command $exe -Arguments @('-c', 'import sys; sys.exit(sys.version_info[:2] != (3, 12))') -Operation 'Existing virtual environment verification'
 Invoke-Checked -Command $exe -Arguments @('-m', 'pip', 'install', '--constraint', $lock, '-e', $PSScriptRoot) -Operation 'Dependency installation'
-Invoke-Checked -Command $exe -Arguments @('-c', 'import meta_analyse.desktop') -Operation 'Application import verification'
+Invoke-Checked -Command $exe -Arguments @('-m', 'pip', 'install', '--no-index', '--no-deps', '--force-reinstall', $mathPackage.FullName, $terminanPackage.FullName) -Operation 'Owner wheel installation'
+Invoke-Checked -Command $exe -Arguments @('-I', '-c', 'import market_profile_math, terminan.paper, meta_analyse.desktop') -Operation 'Application import verification'
 $launcher = Join-Path $InstallRoot 'run.cmd'
 # Preserve Unicode paths, quote spaces, escape cmd percent expansion.
 $cmdExe = $exe.Replace('%', '%%')

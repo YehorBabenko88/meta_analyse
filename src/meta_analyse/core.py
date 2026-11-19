@@ -1,7 +1,8 @@
 """Deterministic price/volume logic shared by live runtime and tests."""
 from __future__ import annotations
 from dataclasses import dataclass, field
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
+from market_profile_math import price_bucket, volume_profile_poc, untouched_decimal_levels, flow_window_metrics, wall_turnover_ratios
 from datetime import datetime, timezone, timedelta
 from collections import deque
 
@@ -11,11 +12,6 @@ def floor_minute(ts: datetime) -> datetime:
     if ts.tzinfo is None:
         raise ValueError("UTC offset required")
     return ts.astimezone(timezone.utc).replace(second=0, microsecond=0)
-
-def price_bucket(price: Decimal, tick: Decimal) -> Decimal:
-    if tick <= 0:
-        raise ValueError("tick must be positive")
-    return (price / tick).quantize(D("1"), rounding=ROUND_HALF_UP) * tick
 
 @dataclass(frozen=True)
 class Candle:
@@ -35,14 +31,10 @@ class Level:
 
 def untouched_levels(candles: list[Candle], timeframe: str) -> list[Level]:
     """Only CLOSED candles; equal wick touch invalidates a previous level."""
-    remaining: dict[tuple[str, Decimal], Level] = {}
-    for candle in sorted(candles, key=lambda c: c.start):
-        for key, level in list(remaining.items()):
-            if (level.kind == "high" and candle.high >= level.price) or (level.kind == "low" and candle.low <= level.price):
-                remaining.pop(key)
-        remaining[("high", candle.high)] = Level(candle.high, "high", candle.start, timeframe)
-        remaining[("low", candle.low)] = Level(candle.low, "low", candle.start, timeframe)
-    return list(remaining.values())
+    rows = [(int(c.start.timestamp()*1000),c.high,c.low) for c in candles]
+    results = untouched_decimal_levels(rows)
+    dates = {int(c.start.timestamp()*1000): c.start for c in candles}
+    return [Level(price,kind,dates[start],timeframe) for kind,price,start in results]
 
 @dataclass(frozen=True)
 class Trade:
@@ -71,9 +63,7 @@ class Minute:
 
     @property
     def poc(self) -> Decimal:
-        if not self.profile:
-            raise ValueError("empty volume profile")
-        return min(self.profile, key=lambda p: (-self.profile[p], abs(p - self.close), p))
+        return volume_profile_poc(self.profile, close=self.close)
 
     def add(self, t: Trade) -> None:
         if floor_minute(t.time) != self.start:

@@ -164,20 +164,24 @@ def test_legacy_runtime_cannot_write_market_or_paper_rows_after_owner_cutover():
 
     import pytest
 
-    # Never silently drop a durable strategy result when the sole Terminan
-    # receipt sink has not been registered. Refusal precedes ALL mutations.
-    with pytest.raises(RuntimeError, match="TERMINAN_DURABLE_PAPER_LEDGER_REQUIRED"):
-        runtime.receive(msg(0, "100"))
-    assert runtime.minutes == {}
-    assert runtime.paper.positions == {}
-    assert runtime.paper.fills == []
-    assert runtime.paper.last_trade_time == {}
+    # Old persistent stores cannot substitute for the sole Grid writer or
+    # Terminan's durable receipt ledger, regardless of paper enablement.
+    for enabled in (True, False):
+        runtime.paper.enabled = enabled
+        with pytest.raises(RuntimeError, match="GRID_TERMINAN_DURABLE_SINKS_REQUIRED"):
+            runtime.receive(msg(0, "100"))
+        assert runtime.minutes == {}
+        assert runtime.paper.positions == {}
+        assert runtime.paper.fills == []
+        assert runtime.paper.last_trade_time == {}
 
-    # Offline/disabled market observations remain possible for migration
-    # tests, and may never write old Meta market tables.
-    runtime.paper.enabled = False
-    assert runtime.receive(msg(0, "100")) == []
-    events = runtime.receive(msg(60, "102"))
+    # Without persistence, the legacy migration fixture can still process
+    # bounded offline observations; it may not claim durable results.
+    offline = Runtime(None, None, store=None, tick_size=D("1"))
+    offline.symbols = ["BTCUSDT"]
+    offline.paper.enabled = False
+    assert offline.receive(msg(0, "100")) == []
+    events = offline.receive(msg(60, "102"))
     assert [event[0] for event in events] == ["closed_minute"]
-    assert runtime.paper.positions == {}
-    assert runtime.paper.fills == []
+    assert offline.paper.positions == {}
+    assert offline.paper.fills == []

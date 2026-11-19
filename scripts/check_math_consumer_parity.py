@@ -16,10 +16,10 @@ from pathlib import Path
 import subprocess
 import sys
 
-MATH_SHA = "09ced8443bf7fc58065fcd5e0c5a6ca7c4d8bbb0"
+MATH_SHA = "013b0e84d8265aa9af8e072f380ca481c16869a3"
 MATH_BLOB = "430ee36dfe0f71872e4f2ed35d4eaac918989fa4"
 MATH_API_BLOB = "1fc85cf71961fb3686a69ad3a9feaeb7be6fdf61"
-MATH_PROJECT_BLOB = "060670a9a4888e5c42a59b170337c311ed180713"
+MATH_PROJECT_BLOB = "82876b8a6fe14cc6ddfddc6b2f3785206c82d895"
 
 
 def git(root: Path, *args: str) -> str:

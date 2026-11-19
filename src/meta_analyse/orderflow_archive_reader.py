@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
 
-from .flow_history_storage import read_flow_history, to_orderflow_records
+from .flow_history_storage import read_flow_history
 
 
 def read_orderflow_trades(store, *, venue: str, symbol: str,
@@ -31,6 +31,16 @@ def read_orderflow_trades(store, *, venue: str, symbol: str,
         store, venue=venue, symbol=symbol, start=start, end=end, limit=limit
     )
     return [
-        {**record, "trade_id": trade.trade_id, "side": trade.side}
-        for trade, record in zip(snapshot.trades, to_orderflow_records(snapshot))
+        {
+            "trade_id": trade.trade_id,
+            "timestamp_ms": (
+                (trade.timestamp - epoch).days * 86400000
+                + (trade.timestamp - epoch).seconds * 1000
+                + (trade.timestamp - epoch).microseconds // 1000
+            ),
+            "price": trade.price,
+            "volume": trade.quantity,
+            "side": trade.side,
+        }
+        for trade in snapshot.trades
     ]

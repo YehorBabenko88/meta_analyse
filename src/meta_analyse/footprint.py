@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass,field
 from decimal import Decimal
-from .core import price_bucket
+from market_profile_math import price_bucket, volume_profile_poc, executed_volume_delta
 
 @dataclass
 class FootprintCell:
@@ -12,7 +12,7 @@ class FootprintCell:
 
     @property
     def delta(self):
-        return self.buy-self.sell
+        return executed_volume_delta(self.buy,self.sell)
 
 @dataclass
 class Footprint:
@@ -46,7 +46,7 @@ class Footprint:
     def poc(self):
         if not self.cells:
             return None
-        return min(self.cells,key=lambda p:(-(self.cells[p].buy+self.cells[p].sell),p))
+        return volume_profile_poc({price: cell.buy+cell.sell for price,cell in self.cells.items()})
 
     @property
     def delta(self):

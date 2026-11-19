@@ -162,9 +162,22 @@ def test_legacy_runtime_cannot_write_market_or_paper_rows_after_owner_cutover():
                 "trades": [{"time": (start + timedelta(seconds=seconds)).isoformat(),
                             "side": "Buy", "size": "1", "price": price}]}}
 
-    runtime.receive(msg(0, "100"))
-    runtime.receive(msg(60, "102"))
-    events = runtime.receive(msg(61, "100"))
-    assert [event[0] for event in events] == ["paper_fill"]
-    assert len(runtime.paper.fills) == 1
-    assert runtime.paper.fills[0].reason == "target"
+    import pytest
+
+    # Never silently drop a durable strategy result when the sole Terminan
+    # receipt sink has not been registered. Refusal precedes ALL mutations.
+    with pytest.raises(RuntimeError, match="TERMINAN_DURABLE_PAPER_LEDGER_REQUIRED"):
+        runtime.receive(msg(0, "100"))
+    assert runtime.minutes == {}
+    assert runtime.paper.positions == {}
+    assert runtime.paper.fills == []
+    assert runtime.paper.last_trade_time == {}
+
+    # Offline/disabled market observations remain possible for migration
+    # tests, and may never write old Meta market tables.
+    runtime.paper.enabled = False
+    assert runtime.receive(msg(0, "100")) == []
+    events = runtime.receive(msg(60, "102"))
+    assert [event[0] for event in events] == ["closed_minute"]
+    assert runtime.paper.positions == {}
+    assert runtime.paper.fills == []

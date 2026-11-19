@@ -3,7 +3,7 @@
 No independent aggregation implementation; historical callers retain FlowMetrics DTO.
 """
 from decimal import Decimal
-from market_profile_math import aggregate_orderflow
+from market_compute_api import STREAM_ABI, aggregate_orderflow_stream
 from .orderflow_metrics import FlowMetrics
 
 
@@ -19,9 +19,13 @@ def _adapt(trades, *, mode, interval_ms=None, tick_size=None, initial_delta=Deci
             raise ValueError("tick_size must be finite and positive") from exc
         if not tick_size.is_finite() or tick_size <= 0:
             raise ValueError("tick_size must be finite and positive")
-    rows=[(trade.timestamp_ms,trade.price,trade.volume,trade.side) for trade in trades]
-    grouped=aggregate_orderflow(rows,mode=mode,interval_ms=interval_ms,
-                               tick_size=tick_size,initial_delta=initial_delta)
+    # Preserve one-pass generator semantics. Math owns all per-trade Decimal
+    # arithmetic; only public FlowMetrics DTO conversion remains here.
+    if STREAM_ABI != "math.market.orderflow.stream.v1":
+        raise ValueError("UNSUPPORTED_MATH_STREAM_ABI")
+    rows=((trade.timestamp_ms,trade.price,trade.volume,trade.side) for trade in trades)
+    grouped=aggregate_orderflow_stream(rows,mode=mode,interval_ms=interval_ms,
+                                      tick_size=tick_size,initial_delta=initial_delta)
     return tuple((bucket,FlowMetrics(
         result["buy_volume"],result["sell_volume"],result["unknown_volume"],
         result["delta"],result["cumulative_delta"],result["imbalance"],

@@ -522,11 +522,12 @@ class Window(QWidget):
 
 
 def main():
-    app = QApplication(sys.argv)
-    app.setStyleSheet(TRADER_QSS)
-    window = Window()
-    window.show()
-    sys.exit(app.exec())
+    """Refuse the obsolete second terminal before creating Qt or Bybit clients.
+
+    This legacy UI remains importable for isolated migration/regression tests.
+    Unified System is the launcher owner; Terminan is the only final UI.
+    """
+    raise SystemExit("META_LEGACY_TERMINAL_DISABLED_USE_UNIFIED_TERMINAN")
 
 
 if __name__ == "__main__":

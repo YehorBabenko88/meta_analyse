@@ -16,8 +16,8 @@ from pathlib import Path
 import subprocess
 import sys
 
-MATH_SHA = "013b0e84d8265aa9af8e072f380ca481c16869a3"
-MATH_BLOB = "430ee36dfe0f71872e4f2ed35d4eaac918989fa4"
+MATH_SHA = "7ea2eb7f4240cc50ab4e7a0084728ce15a6e22f7"
+MATH_BLOB = "13c3721ea9cab8079a8f6bfba4244c1b0a79a393"
 MATH_API_BLOB = "1fc85cf71961fb3686a69ad3a9feaeb7be6fdf61"
 MATH_PROJECT_BLOB = "82876b8a6fe14cc6ddfddc6b2f3785206c82d895"
 

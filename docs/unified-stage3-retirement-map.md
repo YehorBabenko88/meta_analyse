@@ -112,3 +112,11 @@ read back from Terminan and requires the final persisted ACK to match the delive
 ACK. A divergent checkpoint fails closed. Qualification pins Terminan #91
 `7b15cacb03cd51477d0d7b4254694e0db923f092` and its Math SDK dependency
 `ba7a07e8a7730c7d6be328b2dfd39132274e1e8e`.
+
+## Stage 19: refresh offline qualification pins
+
+Meta's CI qualification ties the existing offline PaperJournal delivery and installer
+to Terminan #91 4035647edb332260859850ad2a3ffc1044a4c818 and its active Math SDK pin
+8de3858cd5ca9a63dc3cd10f5f5cdec870ef4440. The original source, durable ACK and fill
+digest checks remain unchanged. This does not change the legacy live-monitor interlock.
+Rollback reverts the CI and parity pins together while retaining any offline ledgers.

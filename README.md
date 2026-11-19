@@ -13,14 +13,13 @@ Standalone Python/PySide6 desktop that uses the official [MetaScalp SDK](https:/
 
 ## Install / run
 
-Clone or download this repository on the **separate MetaScalp PC**. In PowerShell from the downloaded directory:
+The legacy installer can verify an isolated environment using local Math and Terminan wheels built from the approved source cohort. Obtain and verify those artifacts before running it. In PowerShell from the downloaded directory, with `$mathWheel` and `$terminanWheel` set to their local paths, run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1
-& "$env:LOCALAPPDATA\MetaAnalyse\run.cmd"
+.\install.ps1 -MathWheel $mathWheel -TerminanWheel $terminanWheel
 ```
 
-Python 3.12 and dependencies can be installed in user space; script tries winget if Python launcher is absent. PostgreSQL is NOT installed, modified or connected by default to protect other local databases; set `META_ANALYSE_DSN` to an account allowed to create objects in its dedicated schema, and manually start monitoring in the UI. MetaScalp must be running with an active Bybit connection. Without configured PostgreSQL the program remains in-memory only.
+The installer takes Python 3.12, the constrained Meta dependencies, and the two supplied owner wheels. Standalone desktop launch remains fenced pending Unified orchestration. Installation does not establish live-feed or PostgreSQL acceptance.
 
 ## Known blockers — production not yet ready
 

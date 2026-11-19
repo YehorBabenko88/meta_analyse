@@ -156,8 +156,20 @@ jobs:
       - name: Verify repeated installation
         shell: pwsh
         run: |
-          ./install.ps1 -Python (Get-Command python).Source -InstallRoot "$env:RUNNER_TEMP\installer target"
-          ./install.ps1 -Python (Get-Command python).Source -InstallRoot "$env:RUNNER_TEMP\installer target"
+          $wheelDir = Join-Path $env:RUNNER_TEMP 'installer-wheels'
+          python -m pip wheel --no-deps --wheel-dir $wheelDir ./.source/math ./.source/terminan
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned owner wheels failed to build' }
+          $math = @(Get-ChildItem -LiteralPath $wheelDir -Filter 'unified_math_kernels-*.whl' -File)
+          $terminan = @(Get-ChildItem -LiteralPath $wheelDir -Filter 'unified_terminan-*.whl' -File)
+          if ($math.Count -ne 1 -or $terminan.Count -ne 1) { throw 'Expected exactly one wheel per owner' }
+          $installArgs = @{
+            Python = (Get-Command python).Source
+            InstallRoot = Join-Path $env:RUNNER_TEMP 'installer target'
+            MathWheel = $math[0].FullName
+            TerminanWheel = $terminan[0].FullName
+          }
+          ./install.ps1 @installArgs
+          ./install.ps1 @installArgs
       - name: Verify tracked source before publication
         id: source_clean
         if: always()

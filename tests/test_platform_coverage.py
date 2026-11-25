@@ -110,7 +110,7 @@ def test_new_platform_jobs_cannot_qualify_without_both_real_lanes():
         assert '-p scripts.ci_identity_manifest -p scripts.ci_platform_coverage' in text
         assert 'python scripts/platform_coverage.py aggregate --linux platform-linux --windows platform-windows --suite '+suite in text
         assert "os.environ['LINUX_RESULT']=='success' and os.environ['WINDOWS_RESULT']=='success'" in text
-        assert 'actions/download-artifact@v4' in text
+        assert 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4' in text
         assert "if: always() && steps.platform_receipt.outcome == 'success'" in text
         assert '--ignore=tests/test_s1_supervisor.py' not in text
     windows=(root/'scripts/test-windows.ps1').read_text()

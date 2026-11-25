@@ -25,10 +25,10 @@ jobs:
     env:
       META_ANALYSE_SYNTHETIC_IDENTITIES: s1-identities.json
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
       - run: python scripts/record_ci_source.py
@@ -51,7 +51,7 @@ jobs:
         id: validate_public
         if: always() && steps.privacy.outcome == 'success'
         run: python scripts/project_public_ci_evidence.py --validate public-evidence
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always() && steps.privacy.outcome == 'success' && steps.validate_public.outcome == 'success'
         with:
           name: s1-precheck-${{ matrix.os }}

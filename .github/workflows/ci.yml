@@ -311,6 +311,20 @@ jobs:
         run: python scripts/check_integration_junit.py diagnostic-tests.xml --minimum 169 --require-exact test_exact_refusal_predicate_remains_unresolved --require-exact test_dpapi_input_retains_evidence_for_replay_without_public_leak --require-exact test_no_elevation_blocks_before_powershell --require-exact test_candidate_binding_rejects_wrong_sha_dirty_and_untracked_collector --require-exact test_nonelevated_diagnose_emits_single_safe_failure --require-exact test_observation_contains_collector_binding_only_privately --require-exact test_collector_change_during_collection_blocks_observation --require-exact test_artifact_gate_rejects_raw_private_payload_without_echo --require-exact test_child_missing_elevation_is_not_trusted --require-exact test_private_evidence_real_dpapi_roundtrip_or_platform_refusal --require-exact test_complete_named_service_implementation_proof_can_verify --require-exact test_unproved_or_spoofed_service_implementation_stays_unresolved --require-exact test_native_format_and_kernel_label_never_authorize_error31 --require-exact test_combined_lsa_membership_requires_every_implementation
       - name: Confirm PostgreSQL18 server
         run: python -c "import os,psycopg,json; c=psycopg.connect(os.environ['META_ANALYSE_TEST_ADMIN_DSN']); v=c.info.server_version; assert v==180001; open('postgres-version.json','w').write(json.dumps({'server_version':v})); c.close()"
+      - name: Build wheel and sdist from tracked source and reject private key material
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_root="${RUNNER_TEMP}/meta-key-material-build"
+          rm -rf "$build_root"
+          mkdir -p "$build_root/src" "$build_root/dist"
+          git archive --format=tar HEAD | tar -x -C "$build_root/src"
+          python -m venv "$build_root/venv"
+          "$build_root/venv/bin/python" -m pip install "setuptools==80.9.0" "wheel==0.45.1"
+          "$build_root/venv/bin/python" -m pip wheel --no-deps --no-build-isolation -w "$build_root/dist" "$build_root/src"
+          (cd "$build_root/src" && "$build_root/venv/bin/python" -c "import sys; from setuptools import build_meta; print(build_meta.build_sdist(sys.argv[1]))" "$build_root/dist")
+          python scripts/check_no_private_key_material.py --dist "$build_root/dist" --require-wheel --require-sdist
+          python scripts/check_no_private_key_material.py --git-tree .
       - run: python -m compileall -q src
       - name: Repeat lifecycle resource regressions in fresh processes
         run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir repeat-lifecycle

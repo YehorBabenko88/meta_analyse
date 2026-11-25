@@ -19,6 +19,12 @@ meta-analyse = "meta_analyse.desktop:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# F2 (unified-system#156): TLS/private-key fixture material must never ship in a
+# wheel or sdist. Enforced by MANIFEST.in, this exclusion, and
+# scripts/check_no_private_key_material.py in CI on the built distributions.
+[tool.setuptools.exclude-package-data]
+"*" = ["*.key", "*.pem", "*.p12", "*.pfx", "*.csr", "*.srl", "*.der", "*.crt", "*.cer", "*.jks", "*.keystore"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

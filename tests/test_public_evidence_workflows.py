@@ -12,7 +12,7 @@ def test_every_upload_is_gated_and_staging_only():
     uploads=0
     for path in workflows:
         text=path.read_text()
-        blocks=text.split('      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4')[1:]
+        blocks=text.split('      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2')[1:]
         for block in blocks:
             block=re.split(r'\n  [a-zA-Z0-9_-]+:\n',block)[0]
             uploads+=1
@@ -40,7 +40,7 @@ def test_s1_upload_requires_successful_independent_validation():
     assert 'id: validate_public' in validation
     assert "if: always() && steps.privacy.outcome == 'success'" in validation
     assert 'python scripts/project_public_ci_evidence.py --validate public-evidence' in validation
-    upload=text.split('      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4\n')[1]
+    upload=text.split('      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2\n')[1]
     assert "if: always() && steps.privacy.outcome == 'success' && steps.validate_public.outcome == 'success'" in upload
     assert 'name: s1-precheck-${{ matrix.os }}' in upload
     assert 'path: public-evidence/' in upload
@@ -50,7 +50,7 @@ def test_projection_commands_stop_on_first_failure():
     for path in (ROOT/'.github/workflows').glob('*.yml'):
         text=path.read_text()
         for block in text.split('      - name: Project isolated public evidence')[1:]:
-            block=block.split('      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4')[0]
+            block=block.split('      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2')[0]
             assert ('shell: bash' in block and 'set -euo pipefail' in block) or ('shell: pwsh' in block and block.count('$LASTEXITCODE -ne 0')==2)
 
 

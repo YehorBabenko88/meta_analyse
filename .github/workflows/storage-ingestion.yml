@@ -54,26 +54,26 @@ jobs:
       META_ANALYSE_TEST_ADMIN_DSN: postgresql://ingestion_test:ingestion_test_only@127.0.0.1:5432/ingestion_test
       META_ANALYSE_TEST_DSN: postgresql://ingestion_test:ingestion_test_only@127.0.0.1:5432/ingestion_test
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify exact Actions source SHA
         run: python scripts/record_ci_source.py
       - name: Checkout immutable Math runtime dependency
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: YehorBabenko88/math
           ref: 876b31f2310827d417e70ed22d0e9b5cfc9b5320
           path: .source/math
           persist-credentials: false
       - name: Checkout pinned Terminan paper-only package
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: YehorBabenko88/Terminan
           ref: 0f3b1408ada9a2cdea20e66ec56840d5bb196bac
           path: .source/terminan
           persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
       - name: Install test dependencies
@@ -122,7 +122,7 @@ jobs:
           set -euo pipefail
           python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit storage-tests.xml
           python scripts/project_public_ci_evidence.py --validate public-evidence
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always() && steps.privacy_gate.outcome == 'success'
         with:
           name: storage-ingestion-exact-source

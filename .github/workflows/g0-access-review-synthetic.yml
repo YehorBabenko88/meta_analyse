@@ -20,10 +20,10 @@ jobs:
     env:
       META_ANALYSE_SYNTHETIC_IDENTITIES: access-identities.json
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
       - run: python scripts/record_ci_source.py
@@ -45,7 +45,7 @@ jobs:
       - name: Validate public artifact
         if: always() && steps.privacy.outcome == 'success'
         run: python scripts/project_public_ci_evidence.py --validate public-evidence
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always() && steps.privacy.outcome == 'success'
         with:
           name: g0-access-${{ matrix.os }}

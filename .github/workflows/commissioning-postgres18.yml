@@ -24,25 +24,25 @@ jobs:
       META_ANALYSE_TEST_ADMIN_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
       META_ANALYSE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Checkout immutable Math runtime dependency
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: YehorBabenko88/math
           ref: 876b31f2310827d417e70ed22d0e9b5cfc9b5320
           path: .source/math
           persist-credentials: false
       - name: Checkout sole Terminan paper strategy source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: YehorBabenko88/Terminan
           ref: 0f3b1408ada9a2cdea20e66ec56840d5bb196bac
           path: .source/terminan
           persist-credentials: false
       - name: Checkout exact owned Python bootstrap source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: YehorBabenko88/unified-system
           ref: d065537d880295282eb2a157579813958417407e
@@ -58,7 +58,7 @@ jobs:
           assert (root/'unified_system/owned_python.py').is_file()
       - name: Verify exact Actions source SHA
         run: python scripts/record_ci_source.py
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with: {python-version: '3.12'}
       - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
       - run: python -m pip install -c requirements.lock -e '.[test,archive]'
@@ -111,7 +111,7 @@ jobs:
           set -euo pipefail
           python scripts/platform_coverage.py receipt --xml pg18-tests.xml --manifest "${{ runner.temp }}/pg18-full-identities.json" --ledger "${{ runner.temp }}/platform-ledger.json" --output public-platform
           python scripts/platform_coverage.py validate public-platform
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always() && steps.platform_receipt.outcome == 'success'
         with:
           name: commissioning-platform-linux
@@ -131,7 +131,7 @@ jobs:
           set -euo pipefail
           python scripts/project_public_ci_evidence.py --output public-evidence --source source-sha.json --junit pg18-tests.xml --junit-glob "pg18-lifecycle/*/tests.xml" --postgres-version postgres-version.json
           python scripts/project_public_ci_evidence.py --validate public-evidence
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always() && steps.privacy_gate.outcome == 'success'
         with:
           name: commissioning-postgres18
@@ -147,26 +147,26 @@ jobs:
       META_ANALYSE_CI_IDENTITY_SCOPE: full
       META_ANALYSE_PLATFORM_SUITE: commissioning
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Checkout immutable Math runtime dependency
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: YehorBabenko88/math
           ref: 876b31f2310827d417e70ed22d0e9b5cfc9b5320
           path: .source/math
           persist-credentials: false
       - name: Checkout sole Terminan paper strategy source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: YehorBabenko88/Terminan
           ref: 0f3b1408ada9a2cdea20e66ec56840d5bb196bac
           path: .source/terminan
           persist-credentials: false
       - name: Checkout exact owned Python bootstrap source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: YehorBabenko88/unified-system
           ref: d065537d880295282eb2a157579813958417407e
@@ -180,7 +180,7 @@ jobs:
           actual=subprocess.check_output(['git','--no-replace-objects','-C',str(root),'rev-parse','HEAD'],text=True).strip()
           assert actual=='d065537d880295282eb2a157579813958417407e'
           assert (root/'unified_system/owned_python.py').is_file()
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
       - run: python -m pip install -c requirements.lock -e '.[test,archive]'
@@ -264,7 +264,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native receipt rejected' }
           python scripts/platform_coverage.py validate public-platform
           if ($LASTEXITCODE -ne 0) { throw 'Native staging rejected' }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always() && steps.platform_receipt.outcome == 'success'
         with:
           name: commissioning-platform-windows
@@ -277,11 +277,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
       - name: Require both actual lanes
@@ -289,11 +289,11 @@ jobs:
           LINUX_RESULT: ${{ needs.postgres18-linux.result }}
           WINDOWS_RESULT: ${{ needs.native-windows.result }}
         run: python -c "import os; assert os.environ['LINUX_RESULT']=='success' and os.environ['WINDOWS_RESULT']=='success'"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: commissioning-platform-linux
           path: platform-linux
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: commissioning-platform-windows
           path: platform-windows

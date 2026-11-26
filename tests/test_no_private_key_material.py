@@ -140,3 +140,25 @@ def test_checker_rejects_oversized_sdist_member(tmp_path):
         'meta_analyse-0.1.0/large.bin': b'x' * (checker.MAX_MEMBER_BYTES + 1),
     })
     assert checker.main(['--dist', str(dirty)]) == 2
+
+
+def test_checker_rejects_cumulative_zip_expansion(tmp_path, monkeypatch):
+    dirty = tmp_path / 'total-large'
+    dirty.mkdir()
+    monkeypatch.setattr(checker, 'MAX_TOTAL_BYTES', 15)
+    _wheel(dirty / 'meta_analyse-0.1.0-py3-none-any.whl', {
+        'meta_analyse/first.bin': b'a' * 10,
+        'meta_analyse/second.bin': b'b' * 10,
+    })
+    assert checker.main(['--dist', str(dirty)]) == 2
+
+
+def test_checker_rejects_cumulative_sdist_expansion(tmp_path, monkeypatch):
+    dirty = tmp_path / 'total-sdist'
+    dirty.mkdir()
+    monkeypatch.setattr(checker, 'MAX_TOTAL_BYTES', 15)
+    _sdist(dirty / 'meta_analyse-0.1.0.tar.gz', {
+        'meta_analyse-0.1.0/first.bin': b'a' * 10,
+        'meta_analyse-0.1.0/second.bin': b'b' * 10,
+    })
+    assert checker.main(['--dist', str(dirty)]) == 2

@@ -1,0 +1,5 @@
+# F2 (unified-system#156): source distributions never carry evidence trees or
+# TLS/private-key fixture material. Checked in CI by
+# scripts/check_no_private_key_material.py --dist on the built wheel and sdist.
+prune docs
+global-exclude *.key *.pem *.p12 *.pfx *.csr *.srl *.der *.crt *.cer *.jks *.keystore

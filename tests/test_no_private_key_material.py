@@ -100,3 +100,43 @@ def test_checker_accepts_clean_distributions_and_refuses_missing_ones(tmp_path):
     only_wheel.mkdir()
     _wheel(only_wheel / 'meta_analyse-0.1.0-py3-none-any.whl', {'meta_analyse/__init__.py': b''})
     assert checker.main(['--dist', str(only_wheel), '--require-wheel', '--require-sdist']) == 2
+
+
+def test_checker_rejects_oversized_wheel_member_without_extracting(tmp_path):
+    dirty = tmp_path / 'large-wheel'
+    dirty.mkdir()
+    _wheel(dirty / 'meta_analyse-0.1.0-py3-none-any.whl', {
+        'meta_analyse/oversized.bin': b'x' * (checker.MAX_MEMBER_BYTES + 1),
+    })
+    assert checker.main(['--dist', str(dirty)]) == 2
+
+
+def test_checker_rejects_archive_symlinks(tmp_path):
+    dirty = tmp_path / 'links'
+    dirty.mkdir()
+    with tarfile.open(dirty / 'meta_analyse-0.1.0.tar.gz', 'w:gz') as archive:
+        link = tarfile.TarInfo('meta_analyse-0.1.0/docs/external')
+        link.type = tarfile.SYMTYPE
+        link.linkname = '../../external'
+        archive.addfile(link)
+    assert checker.main(['--dist', str(dirty)]) == 2
+
+
+def test_checker_rejects_symlink_in_wheel(tmp_path):
+    dirty = tmp_path / 'wheel-link'
+    dirty.mkdir()
+    with zipfile.ZipFile(dirty / 'meta_analyse-0.1.0-py3-none-any.whl', 'w') as archive:
+        link = zipfile.ZipInfo('meta_analyse/external')
+        link.create_system = 3
+        link.external_attr = (0o120777 << 16)
+        archive.writestr(link, '../../external')
+    assert checker.main(['--dist', str(dirty)]) == 2
+
+
+def test_checker_rejects_oversized_sdist_member(tmp_path):
+    dirty = tmp_path / 'large-sdist'
+    dirty.mkdir()
+    _sdist(dirty / 'meta_analyse-0.1.0.tar.gz', {
+        'meta_analyse-0.1.0/large.bin': b'x' * (checker.MAX_MEMBER_BYTES + 1),
+    })
+    assert checker.main(['--dist', str(dirty)]) == 2

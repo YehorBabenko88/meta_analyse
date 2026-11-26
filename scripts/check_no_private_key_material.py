@@ -20,6 +20,7 @@ from pathlib import Path
 MAX_MEMBER_BYTES = 16 * 1024 * 1024
 MAX_ARCHIVE_BYTES = 128 * 1024 * 1024
 MAX_MEMBERS = 20000
+MAX_TOTAL_BYTES = 128 * 1024 * 1024
 FORBIDDEN_SUFFIXES = ('.key', '.pem', '.p12', '.pfx', '.csr', '.srl', '.der', '.crt', '.cer', '.jks', '.keystore')
 _DASH = b'-' * 5
 MARKERS = tuple(_DASH + b'BEGIN ' + label + _DASH for label in (
@@ -43,12 +44,16 @@ def scan_wheel(path):
         infos = archive.infolist()
         if len(infos) > MAX_MEMBERS:
             raise ValueError('archive exceeds member count bound')
+        total_unpacked = 0
         for info in infos:
             mode = info.external_attr >> 16
             if stat.S_ISLNK(mode):
                 raise ValueError('archive contains symlink')
             if info.is_dir():
                 continue
+            total_unpacked += info.file_size
+            if total_unpacked > MAX_TOTAL_BYTES:
+                raise ValueError("archive exceeds total unpacked bound")
             if info.file_size > MAX_MEMBER_BYTES:
                 raise ValueError('archive member exceeds size bound')
             with archive.open(info) as stream:
@@ -63,6 +68,7 @@ def scan_sdist(path):
         raise ValueError('archive exceeds size bound')
     with tarfile.open(path, 'r:gz') as archive:
         count = 0
+        total_unpacked = 0
         for member in archive:
             count += 1
             if count > MAX_MEMBERS:
@@ -71,6 +77,9 @@ def scan_sdist(path):
                 raise ValueError('archive contains link')
             if not member.isfile():
                 continue
+            total_unpacked += member.size
+            if total_unpacked > MAX_TOTAL_BYTES:
+                raise ValueError("archive exceeds total unpacked bound")
             if member.size > MAX_MEMBER_BYTES:
                 raise ValueError('archive member exceeds size bound')
             stream = archive.extractfile(member)
@@ -91,8 +100,8 @@ def scan_git_tree(repo):
             continue
         name = raw.decode('utf-8', 'surrogateescape')
         path = root / name
-        if path.is_symlink():
-            raise ValueError('tracked symlink found')
+        if path.is_symlink() or path.resolve(strict=True) != path.absolute():
+            raise ValueError('tracked symlink path found')
         if not path.is_file():
             raise ValueError('tracked file missing')
         if path.stat().st_size > MAX_MEMBER_BYTES:

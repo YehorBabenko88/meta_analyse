@@ -10,3 +10,10 @@ dist/
 
 # Coordinated exact-source test dependency; never part of the Meta test catalog.
 .source/unified-system/
+
+# F2 (unified-system#156): never commit TLS/private-key fixture material.
+# Tests generate any certificates they need at runtime in a temp directory.
+*.key
+*.p12
+*.pfx
+*.srl

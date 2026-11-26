@@ -312,6 +312,20 @@ jobs:
       - name: Confirm PostgreSQL18 server
         run: python -c "import os,psycopg,json; c=psycopg.connect(os.environ['META_ANALYSE_TEST_ADMIN_DSN']); v=c.info.server_version; assert v==180001; open('postgres-version.json','w').write(json.dumps({'server_version':v})); c.close()"
       - run: python -m compileall -q src
+      - name: Build wheel and sdist from tracked source and reject private key material
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_root="${RUNNER_TEMP}/meta-key-material-build"
+          rm -rf "$build_root"
+          mkdir -p "$build_root/src" "$build_root/dist"
+          git archive --format=tar HEAD | tar -x -C "$build_root/src"
+          python -m venv "$build_root/venv"
+          "$build_root/venv/bin/python" -m pip install "setuptools==80.9.0" "wheel==0.45.1"
+          "$build_root/venv/bin/python" -m pip wheel --no-deps --no-build-isolation -w "$build_root/dist" "$build_root/src"
+          (cd "$build_root/src" && "$build_root/venv/bin/python" -c "import sys; from setuptools import build_meta; print(build_meta.build_sdist(sys.argv[1]))" "$build_root/dist")
+          python scripts/check_no_private_key_material.py --dist "$build_root/dist" --require-wheel --require-sdist
+          python scripts/check_no_private_key_material.py --git-tree .
       - name: Repeat lifecycle resource regressions in fresh processes
         run: python scripts/repeat_lifecycle_tests.py --runs 10 --output-dir repeat-lifecycle
       - name: Mandatory local HTTP archive fault regression (Linux)

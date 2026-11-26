@@ -10,12 +10,16 @@ private-key, certificate or CSR header. Exit code 0 = clean, 1 = material found,
 2 = usage/input error. Only member names are printed, never contents.
 """
 import argparse
+import stat
 import subprocess
 import sys
 import tarfile
 import zipfile
 from pathlib import Path
 
+MAX_MEMBER_BYTES = 16 * 1024 * 1024
+MAX_ARCHIVE_BYTES = 128 * 1024 * 1024
+MAX_MEMBERS = 20000
 FORBIDDEN_SUFFIXES = ('.key', '.pem', '.p12', '.pfx', '.csr', '.srl', '.der', '.crt', '.cer', '.jks', '.keystore')
 _DASH = b'-' * 5
 MARKERS = tuple(_DASH + b'BEGIN ' + label + _DASH for label in (
@@ -33,28 +37,71 @@ def offending(name, data):
 
 
 def scan_wheel(path):
+    if path.stat().st_size > MAX_ARCHIVE_BYTES:
+        raise ValueError('archive exceeds size bound')
     with zipfile.ZipFile(path) as archive:
-        for info in archive.infolist():
-            if not info.is_dir():
-                yield info.filename, archive.read(info)
+        infos = archive.infolist()
+        if len(infos) > MAX_MEMBERS:
+            raise ValueError('archive exceeds member count bound')
+        for info in infos:
+            mode = info.external_attr >> 16
+            if stat.S_ISLNK(mode):
+                raise ValueError('archive contains symlink')
+            if info.is_dir():
+                continue
+            if info.file_size > MAX_MEMBER_BYTES:
+                raise ValueError('archive member exceeds size bound')
+            with archive.open(info) as stream:
+                data = stream.read(MAX_MEMBER_BYTES + 1)
+            if len(data) > MAX_MEMBER_BYTES:
+                raise ValueError('archive member exceeds size bound')
+            yield info.filename, data
 
 
 def scan_sdist(path):
+    if path.stat().st_size > MAX_ARCHIVE_BYTES:
+        raise ValueError('archive exceeds size bound')
     with tarfile.open(path, 'r:gz') as archive:
-        for member in archive.getmembers():
-            if member.isfile():
-                yield member.name, archive.extractfile(member).read()
+        count = 0
+        for member in archive:
+            count += 1
+            if count > MAX_MEMBERS:
+                raise ValueError('archive exceeds member count bound')
+            if member.issym() or member.islnk():
+                raise ValueError('archive contains link')
+            if not member.isfile():
+                continue
+            if member.size > MAX_MEMBER_BYTES:
+                raise ValueError('archive member exceeds size bound')
+            stream = archive.extractfile(member)
+            if stream is None:
+                raise ValueError('archive member unavailable')
+            with stream:
+                data = stream.read(MAX_MEMBER_BYTES + 1)
+            if len(data) > MAX_MEMBER_BYTES:
+                raise ValueError('archive member exceeds size bound')
+            yield member.name, data
 
 
 def scan_git_tree(repo):
-    names = subprocess.check_output(['git', '-C', str(repo), 'ls-files', '-z'])
+    root = Path(repo).resolve(strict=True)
+    names = subprocess.check_output(['git', '-C', str(root), 'ls-files', '-z'])
     for raw in names.split(b'\0'):
         if not raw:
             continue
         name = raw.decode('utf-8', 'surrogateescape')
-        path = Path(repo) / name
-        if path.is_file() and not path.is_symlink():
-            yield name, path.read_bytes()
+        path = root / name
+        if path.is_symlink():
+            raise ValueError('tracked symlink found')
+        if not path.is_file():
+            raise ValueError('tracked file missing')
+        if path.stat().st_size > MAX_MEMBER_BYTES:
+            raise ValueError('tracked file exceeds size bound')
+        with path.open('rb') as stream:
+            data = stream.read(MAX_MEMBER_BYTES + 1)
+        if len(data) > MAX_MEMBER_BYTES:
+            raise ValueError('tracked file exceeds size bound')
+        yield name, data
 
 
 def check_dist(directory, require_wheel, require_sdist):
